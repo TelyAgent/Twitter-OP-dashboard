@@ -1,0 +1,1550 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pallax 产品组周报 Dashboard</title>
+<style>
+:root {
+  /* Design tokens · v2 (Claude Design) */
+  --bg: #fafaf7;
+  --bg-card: #ffffff;
+  --bg-soft: #f5f4f0;
+  --bg-softer: #efede7;
+  --ink: #1a1a1a;
+  --ink-1: #404040;
+  --ink-2: #6b6b6b;
+  --ink-3: #9a9a9a;
+  --line: #e6e4dc;
+  --line-2: #d3d0c5;
+  --ok: #8B6B2D;
+  --ok-bg: #F1E8D0;
+  --warn: #BA7517;
+  --warn-bg: #FAEEDA;
+  --bad: #422010;
+  --bad-bg: #E8DBCF;
+  --info: #1a1a1a;
+  --info-bg: #efede7;
+  --nsm-amber: #BA7517;
+  --nsm-amber-deep: #412402;
+  --nsm-amber-soft: #F5EBD8;
+  --nsm-amber-mid: #D88E1F;
+  --nsm-amber-text: #5C3406;
+  --nsm-amber-label: #7A4509;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.06);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.08);
+  /* legacy aliases (current inline styles still reference these) */
+  --color-text-primary: var(--ink);
+  --color-text-secondary: var(--ink-2);
+  --color-text-tertiary: var(--ink-3);
+  --color-text-success: var(--ok);
+  --color-text-danger: var(--bad);
+  --color-background-primary: var(--bg-card);
+  --color-background-secondary: var(--bg-soft);
+  --color-border-tertiary: var(--line);
+  --color-border-secondary: var(--line-2);
+  --color-border-success: var(--ok);
+  --color-border-danger: var(--bad);
+  --color-border-info: var(--ink);
+  --border-radius-md: var(--r-md);
+  --border-radius-lg: var(--r-lg);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--ink);
+  font-feature-settings: "ss01", "cv11", "tnum";
+  -webkit-font-smoothing: antialiased;
+  padding: 28px 28px 80px;
+  max-width: 1240px;
+  margin: 0 auto;
+  font-size: 14px;
+}
+input, select, textarea, button { font-family: inherit; color: inherit; }
+input[type="text"], input[type="number"], input[type="week"], input[type="email"], select, textarea {
+  border: 0.5px solid var(--line);
+  background: var(--bg-card);
+  border-radius: var(--r-sm);
+  padding: 6px 8px;
+  color: var(--ink);
+  outline: none;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--line-2); box-shadow: 0 0 0 3px rgba(0,0,0,0.04); }
+button { cursor: pointer; border: 0.5px solid var(--line); background: var(--bg-card); border-radius: var(--r-sm); padding: 6px 12px; font-size: 13px; color: var(--ink); }
+button:hover { background: var(--bg-soft); }
+
+.wr { padding: 0; }
+.wr-head { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px; margin-bottom: 18px; }
+.wr-title { font-size: 20px; font-weight: 600; margin: 0; letter-spacing: -0.005em; display: flex; align-items: baseline; gap: 10px; }
+.wr-title::before { content: ""; width: 9px; height: 9px; border-radius: 2px; background: var(--nsm-amber); display: inline-block; transform: translateY(-1px); }
+.wr-sub { font-size: 13px; color: var(--ink-2); margin: 4px 0 0; }
+
+.wr-tabs-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 22px; }
+.wr-tabs { display: inline-flex; background: var(--bg-soft); border-radius: var(--r-md); padding: 3px; gap: 2px; flex-wrap: wrap; }
+.wr-tab { font-size: 13px; padding: 7px 14px; border-radius: 7px; cursor: pointer; color: var(--ink-2); border: none; background: transparent; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; transition: background 0.15s, color 0.15s; }
+.wr-tab.active { background: var(--bg-card); color: var(--ink); box-shadow: var(--shadow-sm); }
+.wr-tab .wr-x { opacity: 0; font-size: 14px; line-height: 1; color: var(--ink-3); padding: 0 2px; }
+.wr-tab:hover .wr-x { opacity: 1; }
+.wr-tab .wr-x:hover { color: var(--bad); }
+.wr-tab.overview { background: var(--bg-softer); color: var(--ink-1); }
+.wr-tab.overview.active { background: var(--ink); color: #fff; box-shadow: var(--shadow-sm); }
+.wr-tab input.wr-rename-input { font-size: 13px; height: 22px; padding: 2px 6px; width: 110px; border-radius: 4px; }
+.wr-addteam-icon { width: 30px; height: 30px; border-radius: var(--r-md); border: 0.5px dashed var(--line-2); background: transparent; cursor: pointer; color: var(--ink-2); font-size: 16px; padding: 0; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+.wr-addteam-icon:hover { background: var(--bg-soft); color: var(--ink); }
+.wr-ghostbtn { font-size: 13px; padding: 6px 12px; border-radius: var(--r-md); border: 0.5px dashed var(--line-2); background: transparent; cursor: pointer; color: var(--ink-2); font-weight: 500; }
+.wr-ghostbtn:hover { background: var(--bg-soft); color: var(--ink); }
+
+.wr-meta { display: flex; gap: 10px; align-items: center; font-size: 12px; color: var(--ink-3); margin-bottom: 22px; flex-wrap: wrap; }
+.wr-meta input { width: 150px; }
+.wr-meta input[type="text"] { width: 110px; }
+
+.wr-section { margin-bottom: 28px; }
+.wr-shead { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.wr-shead-actions { margin-left: auto; display: flex; gap: 6px; }
+.wr-snum { width: 22px; height: 22px; border-radius: 50%; background: var(--bg-soft); color: var(--ink-2); font-size: 12px; font-weight: 500; display: inline-flex; align-items: center; justify-content: center; }
+.wr-snum.ns { background: var(--nsm-amber-soft); color: var(--nsm-amber-label); }
+.wr-stitle { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: 0; }
+.wr-shint { font-size: 12px; color: var(--ink-3); }
+.wr-card { background: var(--bg-card); border: 0.5px solid var(--line); border-radius: var(--r-lg); padding: 18px 20px; }
+
+/* ========== NSM Hero ========== */
+.wr-ns-card { background: var(--nsm-amber-soft); border-radius: var(--r-xl); padding: 26px 30px; position: relative; overflow: hidden; }
+.wr-ns-row { display: grid; grid-template-columns: 1.05fr 1fr; gap: 36px; align-items: start; }
+.wr-ns-row > div { min-width: 0; }
+.wr-ns-card input[data-f="name"] { font-size: 14px; font-weight: 600; background: transparent; border: none; outline: none; padding: 0; color: var(--nsm-amber-label) !important; width: 100%; letter-spacing: 0.02em; }
+.wr-ns-card input[data-f="name"]:focus { background: rgba(255,255,255,0.55); border-radius: 4px; padding: 0 6px; }
+.wr-ns-val-row { display: flex; align-items: baseline; gap: 14px; margin-top: 10px; flex-wrap: wrap; }
+.wr-ns-val { display: inline-flex; align-items: baseline; min-width: 0; }
+.wr-ns-val input { font-size: clamp(40px, 5.2vw, 56px) !important; font-weight: 600 !important; letter-spacing: -0.03em; line-height: 1; background: transparent; border: none; outline: none; padding: 0; color: var(--nsm-amber-deep) !important; width: 200px; font-variant-numeric: tabular-nums; }
+.wr-ns-val input:focus { background: rgba(255,255,255,0.6); border-radius: 6px; padding: 0 6px; }
+.wr-ns-unit-input { font-size: 18px !important; font-weight: 500; background: transparent; border: none; outline: none; color: var(--nsm-amber-text) !important; width: 70px; padding: 0; }
+.wr-ns-unit-input:focus { background: rgba(255,255,255,0.6); border-radius: 4px; padding: 0 6px; }
+.wr-ns-delta { font-size: 13px; color: var(--nsm-amber-text); margin-top: 6px; }
+.wr-ns-delta .wr-up, .wr-ns-delta .wr-down, .wr-ns-delta .wr-flat { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 99px; font-size: 12px; font-weight: 600; background: rgba(255,255,255,0.55); }
+.wr-ns-delta .wr-up { background: var(--ok-bg); color: var(--ok); }
+.wr-ns-delta .wr-down { background: var(--bad-bg); color: var(--bad); }
+
+.wr-ns-meta { display: flex; gap: 20px; flex-wrap: wrap; font-size: 12px; color: var(--nsm-amber-text); padding-top: 8px; }
+.wr-ns-meta-item { display: flex; flex-direction: column; gap: 4px; }
+.wr-ns-meta-item label { font-size: 10px; color: var(--nsm-amber-label); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+.wr-ns-meta-item input { width: 110px; font-size: 14px; height: 28px; padding: 2px 8px; background: rgba(255,255,255,0.55); border-color: transparent; color: var(--nsm-amber-deep); }
+.wr-ns-meta-item input:focus { background: #fff; border-color: var(--line-2); box-shadow: none; }
+
+.wr-ns-progress { background: rgba(133, 79, 11, 0.15); border-radius: 4px; height: 8px; overflow: hidden; margin-top: 6px; }
+.wr-ns-progress-bar { height: 100%; background: var(--nsm-amber); transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1); }
+.wr-ns-target-meta { font-size: 12px; color: var(--nsm-amber-text); margin-top: 8px; font-weight: 500; }
+.wr-ns-trend { margin-top: 16px; padding: 12px 14px; background: rgba(255,255,255,0.4); border-radius: var(--r-md); }
+.wr-ns-trend-label { font-size: 11px; color: var(--nsm-amber-label); margin-bottom: 6px; display: flex; justify-content: space-between; align-items: baseline; font-weight: 500; }
+.wr-ns-trend-canvas-wrap { position: relative; height: 100px; }
+
+/* ========== Tasks ========== */
+.wr-task-row { display: grid; grid-template-columns: 1.5fr 100px 100px 130px 32px; gap: 8px; margin-bottom: 8px; align-items: center; }
+.wr-task-row input, .wr-task-row select { font-size: 12px; }
+.wr-iconbtn { width: 28px; height: 28px; border-radius: var(--r-sm); border: 0.5px solid var(--line); background: transparent; color: var(--ink-2); cursor: pointer; font-size: 14px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+.wr-iconbtn:hover { background: var(--bg-soft); color: var(--ink); }
+.wr-addbtn { font-size: 13px; padding: 6px 12px; margin-top: 6px; }
+
+/* ========== Pills + Metric grid ========== */
+.wr-pillrow { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.wr-pill { font-size: 12px; padding: 6px 12px; border-radius: 99px; border: 0.5px solid var(--line); background: transparent; cursor: pointer; color: var(--ink-2); font-weight: 500; transition: background 0.15s; }
+.wr-pill:hover { background: var(--bg-soft); }
+.wr-pill.active { background: var(--info-bg); color: var(--info); border-color: transparent; }
+
+.wr-metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.wr-metric { background: var(--bg-card); border: 0.5px solid var(--line); border-radius: var(--r-md); padding: 14px 16px; }
+.wr-metric-lbl { font-size: 12px; color: var(--ink-2); margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+.wr-metric-lbl > span:first-child { display: inline-flex; align-items: center; gap: 7px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wr-metric-lbl > span:first-child::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--ink-3); flex-shrink: 0; }
+.wr-metric-val { font-size: 20px; font-weight: 600; line-height: 1.15; letter-spacing: -0.005em; font-variant-numeric: tabular-nums; }
+.wr-metric-delta { font-size: 11px; margin-top: 6px; color: var(--ink-3); display: flex; align-items: center; gap: 4px; }
+
+.wr-up, .wr-down, .wr-flat { font-variant-numeric: tabular-nums; font-weight: 600; }
+.wr-up { color: var(--ok); }
+.wr-down { color: var(--bad); }
+.wr-flat { color: var(--ink-3); }
+
+.wr-input-row { display: grid; grid-template-columns: 1.3fr 60px 80px 80px 80px 80px 90px 32px; gap: 6px; align-items: center; margin-bottom: 6px; }
+.wr-input-row input, .wr-input-row select { font-size: 12px; }
+.wr-input-row .wr-h { font-size: 10px; color: var(--ink-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.wr-chart-wrap { position: relative; width: 100%; height: 240px; margin-top: 16px; }
+
+/* ========== Retro ========== */
+.wr-retro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+.wr-retro-card { background: var(--bg-card); border: 0.5px solid var(--line); border-radius: var(--r-md); padding: 14px 16px; border-left: none; }
+.wr-retro-card.next { grid-column: 1 / -1; }
+.wr-retro-lbl { font-size: 11px; color: var(--ink-2); margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; display: inline-flex; align-items: center; gap: 6px; }
+.wr-retro-lbl::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--ink-3); }
+.wr-retro-card.good .wr-retro-lbl::before { background: var(--ok); }
+.wr-retro-card.bad .wr-retro-lbl::before { background: var(--bad); }
+.wr-retro-card.next .wr-retro-lbl::before { background: var(--nsm-amber); }
+textarea.wr-area { width: 100%; min-height: 70px; font-size: 13px; resize: vertical; font-family: var(--font-sans); box-sizing: border-box; line-height: 1.5; }
+
+/* ========== Footer ========== */
+.wr-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 28px; flex-wrap: wrap; padding-top: 16px; border-top: 0.5px solid var(--line); }
+.wr-foot-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.wr-status { font-size: 12px; color: var(--ink-3); align-self: center; }
+.wr-foot-actions button#wr-save { background: var(--ink); color: #fff; border-color: var(--ink); font-weight: 500; padding: 8px 16px; }
+.wr-foot-actions button#wr-save:hover { background: var(--ink-1); }
+
+/* ========== Modal ========== */
+.wr-modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.wr-modal { background: var(--bg-card); border-radius: var(--r-lg); padding: 20px 24px; width: min(560px, 92%); max-height: 90%; overflow-y: auto; box-shadow: var(--shadow-lg); }
+.wr-modal h4 { margin: 0 0 14px; font-size: 16px; font-weight: 600; }
+.wr-modal-section { margin-bottom: 14px; font-size: 13px; }
+.wr-modal-section label { display: block; font-size: 11px; color: var(--ink-2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+.wr-modal-section input, .wr-modal-section textarea, .wr-modal-section select { width: 100%; box-sizing: border-box; font-size: 13px; }
+.wr-modal-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
+.wr-anchor { position: relative; }
+.wr-api-bar { display: flex; gap: 6px; align-items: center; margin-bottom: 14px; padding: 8px 12px; background: var(--bg-soft); border-radius: var(--r-md); font-size: 12px; }
+.wr-api-bar .wr-api-label { color: var(--ink-3); font-weight: 500; white-space: nowrap; }
+#wr-api-url-show { font-family: var(--font-mono); font-size: 11px; color: var(--ink-1); }
+
+/* ========== Overview ========== */
+.wr-ovw-hero { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 22px; }
+.wr-ovw-stat { background: var(--bg-card); border: 0.5px solid var(--line); border-radius: var(--r-md); padding: 14px 16px; }
+.wr-ovw-stat-lbl { font-size: 12px; color: var(--ink-2); margin-bottom: 4px; }
+.wr-ovw-stat-val { font-size: 24px; font-weight: 600; line-height: 1.15; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.wr-ovw-team-card { background: var(--bg-card); border: 0.5px solid var(--line); border-radius: var(--r-lg); padding: 18px 22px; margin-bottom: 12px; cursor: pointer; transition: border-color 0.15s; }
+.wr-ovw-team-card:hover { border-color: var(--line-2); }
+.wr-ovw-team-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.wr-ovw-team-name { font-size: 15px; font-weight: 600; letter-spacing: 0; }
+.wr-ovw-team-nsm-name { font-size: 12px; color: var(--ink-3); }
+.wr-ovw-team-row { display: grid; grid-template-columns: 1.2fr 1fr 1fr 90px; gap: 14px; align-items: center; margin-top: 6px; }
+.wr-ovw-team-val { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.wr-ovw-team-sub { font-size: 11px; color: var(--ink-3); }
+.wr-ovw-bar-wrap { background: var(--bg-soft); border-radius: 4px; height: 8px; overflow: hidden; margin-top: 6px; }
+.wr-ovw-bar { height: 100%; background: var(--info); transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1); }
+.wr-ovw-bar.warn { background: var(--nsm-amber-mid); }
+.wr-ovw-bar.bad { background: var(--bad); }
+.wr-ovw-bar.good { background: var(--ok); }
+.wr-ovw-spark-wrap { position: relative; height: 30px; width: 100%; }
+.wr-ovw-chart-wrap { position: relative; width: 100%; height: 280px; margin-top: 16px; }
+
+/* ========== Auth overlay ========== */
+.wr-auth-bg { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 200; }
+.wr-auth-card { background: var(--bg-card); border: 0.5px solid var(--line); border-radius: var(--r-lg); padding: 32px 36px; width: min(400px, 92%); box-shadow: var(--shadow-md); }
+.wr-auth-card h3 { margin: 0 0 6px; font-size: 18px; font-weight: 600; letter-spacing: -0.005em; }
+.wr-auth-card p { margin: 0 0 18px; font-size: 13px; color: var(--ink-2); line-height: 1.5; }
+.wr-auth-card input { width: 100%; padding: 10px 12px; font-size: 14px; margin-bottom: 12px; }
+.wr-auth-card button { width: 100%; padding: 10px 14px; font-size: 14px; background: var(--ink); color: #fff; border: none; border-radius: var(--r-md); font-weight: 500; }
+.wr-auth-card button:hover { background: var(--ink-1); }
+.wr-auth-card button:disabled { background: var(--line-2); cursor: not-allowed; }
+.wr-auth-msg { font-size: 12px; color: var(--ink-2); margin-top: 10px; min-height: 16px; }
+
+/* ========== Cloud bar ========== */
+.wr-cloud-bar { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-3); margin-left: auto; }
+.wr-cloud-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
+.wr-cloud-dot.syncing { background: var(--nsm-amber-mid); }
+.wr-cloud-dot.error { background: var(--bad); }
+.wr-cloud-bar button { font-size: 11px; padding: 3px 10px; border-radius: var(--r-sm); }
+
+/* ========== Funnel stages ========== */
+.wr-funnel-stages {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(var(--stage-count, 4), 1fr);
+  margin-bottom: 18px;
+}
+.wr-funnel-stage {
+  background: var(--bg-soft);
+  border-radius: var(--r-md);
+  padding: 14px 14px 16px;
+  position: relative;
+  border: 0.5px solid var(--line);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+.wr-funnel-stage:hover { border-color: var(--line-2); }
+.wr-funnel-stage.active {
+  background: var(--bg-card);
+  border-color: var(--ink);
+  box-shadow: var(--shadow-md);
+}
+.wr-funnel-stage-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.wr-funnel-stage-idx { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); font-weight: 600; }
+.wr-funnel-stage-arrow {
+  position: absolute; right: -10px; top: 50%; transform: translateY(-50%);
+  width: 18px; height: 18px; background: var(--bg-card);
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: var(--ink-3); z-index: 2; border: 0.5px solid var(--line);
+}
+.wr-funnel-stage:last-child .wr-funnel-stage-arrow { display: none; }
+.wr-funnel-stage-name { font-size: 13px; font-weight: 600; letter-spacing: 0; }
+.wr-funnel-stage-conv { font-size: 11px; color: var(--ink-3); margin-top: 2px; display: flex; align-items: center; gap: 6px; }
+.wr-funnel-stage-conv .pct { font-family: var(--font-mono); color: var(--ink-1); font-weight: 600; }
+.wr-funnel-metrics { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+
+.wr-metric-chip {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 10px;
+  padding: 9px 11px;
+  background: var(--bg-card);
+  border: 0.5px solid var(--line);
+  border-radius: var(--r-sm);
+  transition: background 0.15s;
+}
+.wr-funnel-stage.active .wr-metric-chip { background: var(--bg-soft); }
+.wr-metric-chip-name {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--ink-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.wr-metric-chip-name::before {
+  content: ""; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--ink-3); flex-shrink: 0;
+}
+.wr-metric-chip.health-ok .wr-metric-chip-name::before { background: var(--ok); }
+.wr-metric-chip.health-warn .wr-metric-chip-name::before { background: var(--nsm-amber-mid); }
+.wr-metric-chip.health-bad .wr-metric-chip-name::before { background: var(--bad); }
+.wr-metric-chip-delta {
+  font-size: 10px; font-weight: 600;
+  padding: 1px 6px; border-radius: 99px;
+  background: var(--bg-soft); color: var(--ink-3);
+  white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.wr-metric-chip-delta.up { background: var(--ok-bg); color: var(--ok); }
+.wr-metric-chip-delta.down { background: var(--bad-bg); color: var(--bad); }
+.wr-metric-chip-val {
+  font-size: 16px; font-weight: 600; letter-spacing: -0.005em;
+  font-variant-numeric: tabular-nums;
+  grid-column: 1 / -1;
+}
+
+/* ========== Retro pair ========== */
+.wr-retro-pair {
+  display: grid;
+  grid-template-columns: 1.4fr auto 1fr auto;
+  gap: 14px; align-items: center;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--bg-card);
+  border: 0.5px solid var(--line);
+  margin-bottom: 8px;
+}
+.wr-retro-pair-task { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.wr-retro-pair-task-desc input { font-size: 13px; font-weight: 500; width: 100%; border: none; background: transparent; padding: 0; outline: none; }
+.wr-retro-pair-task-desc input:focus { background: var(--bg-soft); border-radius: 3px; padding: 0 4px; }
+.wr-retro-pair-task-meta {
+  font-size: 11px; color: var(--ink-3);
+  display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+}
+.wr-retro-pair-task-meta input, .wr-retro-pair-task-meta select {
+  font-size: 11px; padding: 0; border: none; background: transparent; outline: none; color: var(--ink-2);
+}
+.wr-retro-pair-task-meta input:focus, .wr-retro-pair-task-meta select:focus {
+  background: var(--bg-soft); border-radius: 3px;
+}
+.wr-retro-pair-arrow { color: var(--ink-3); font-size: 18px; }
+.wr-retro-pair-impact { display: flex; flex-direction: column; gap: 4px; font-size: 12px; min-width: 0; }
+.wr-retro-pair-metric-name { color: var(--ink-2); font-weight: 500; font-size: 11px; }
+.wr-retro-pair-metric-row {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  font-variant-numeric: tabular-nums;
+}
+.wr-retro-pair-metric-row .from { color: var(--ink-3); font-size: 13px; }
+.wr-retro-pair-metric-row .to { color: var(--ink); font-weight: 700; font-size: 15px; }
+.wr-retro-pair-metric-row .delta-pill {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 7px; border-radius: 99px;
+  font-size: 11px; font-weight: 600;
+  background: var(--bg-softer); color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.wr-retro-pair-metric-row .delta-pill.up { background: var(--ok-bg); color: var(--ok); }
+.wr-retro-pair-metric-row .delta-pill.down { background: var(--bad-bg); color: var(--bad); }
+.wr-retro-pair-verdict {
+  font-size: 11px; font-weight: 600;
+  padding: 3px 10px; border-radius: 99px;
+  white-space: nowrap;
+}
+.wr-retro-pair-verdict.ok { background: var(--ok-bg); color: var(--ok); }
+.wr-retro-pair-verdict.bad { background: var(--bad-bg); color: var(--bad); }
+.wr-retro-pair-verdict.na { background: var(--bg-softer); color: var(--ink-3); }
+.wr-retro-pair-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+
+/* ========== Collapsible details ========== */
+details.wr-collapsible summary {
+  font-size: 12px; color: var(--ink-3); cursor: pointer;
+  padding: 8px 0; user-select: none;
+  list-style: none;
+}
+details.wr-collapsible summary::-webkit-details-marker { display: none; }
+details.wr-collapsible summary::before {
+  content: "▸"; display: inline-block;
+  margin-right: 6px; transition: transform 0.15s;
+  font-size: 10px;
+}
+details.wr-collapsible[open] summary::before { transform: rotate(90deg); }
+details.wr-collapsible[open] summary { color: var(--ink-2); margin-bottom: 8px; }
+
+/* ========== NSM v2 structure additions ========== */
+.wr-ns-left { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.wr-ns-right { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.wr-ns-label-row { display: flex; align-items: center; gap: 8px; }
+.wr-ns-pin { font-size: 10px; letter-spacing: 0.12em; font-weight: 600; padding: 3px 8px; border-radius: 99px; background: rgba(133, 79, 11, 0.18); color: var(--nsm-amber-label); text-transform: uppercase; flex-shrink: 0; }
+.wr-ns-bignum-row { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.wr-ns-delta-pill { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 99px; font-size: 12px; font-weight: 600; background: rgba(255,255,255,0.6); color: var(--nsm-amber-deep); font-variant-numeric: tabular-nums; }
+.wr-ns-delta-pill.up { background: var(--ok-bg); color: var(--ok); }
+.wr-ns-delta-pill.down { background: var(--bad-bg); color: var(--bad); }
+.wr-ns-delta-label { font-size: 12px; color: var(--nsm-amber-label); font-weight: 500; }
+
+.wr-ns-ring-row { display: flex; align-items: center; gap: 18px; }
+.wr-ns-ring { width: 96px; height: 96px; position: relative; flex-shrink: 0; }
+.wr-ns-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.wr-ns-ring-track { fill: none; stroke: rgba(133, 79, 11, 0.15); stroke-width: 10; }
+.wr-ns-ring-fill { fill: none; stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset 0.6s cubic-bezier(0.22, 1, 0.36, 1); }
+.wr-ns-ring-fill.ok { stroke: var(--ok); }
+.wr-ns-ring-fill.warn { stroke: var(--nsm-amber-mid); }
+.wr-ns-ring-fill.bad { stroke: var(--bad); }
+.wr-ns-ring-label { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 600; }
+.wr-ns-ring-label .v { font-size: 22px; color: var(--nsm-amber-deep); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.wr-ns-ring-label .l { font-size: 10px; color: var(--nsm-amber-label); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; }
+.wr-ns-ring-side { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--nsm-amber-text); }
+.wr-ns-ring-side .k { color: var(--nsm-amber-label); font-weight: 500; }
+.wr-ns-ring-side .v { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ========== Responsive ========== */
+@media (max-width: 880px) {
+  .wr-ns-row { grid-template-columns: 1fr; }
+  .wr-ns-val input { font-size: 48px !important; }
+  .wr-ovw-team-row { grid-template-columns: 1fr; row-gap: 12px; }
+}
+</style>
+</head>
+<body>
+<div class="wr-auth-bg" id="wr-auth" style="display: none;">
+  <div class="wr-auth-card">
+    <h3>Pallax 周报登录</h3>
+    <p>用公司邮箱接收一次性登录链接（Magic Link）。</p>
+    <input type="email" id="wr-auth-email" placeholder="you@company.com" autocomplete="email" />
+    <button id="wr-auth-send">发送登录链接</button>
+    <div class="wr-auth-msg" id="wr-auth-msg"></div>
+  </div>
+</div>
+<div class="wr wr-anchor" id="wr-root" style="display: none;">
+<div class="wr-head">
+  <div>
+    <h3 class="wr-title">产品组周报 Dashboard</h3>
+    <p class="wr-sub">流量 → 互动 → 转化 → 付费 (默认漏斗, 可自定义)</p>
+  </div>
+</div>
+<div class="wr-tabs-row">
+  <div class="wr-tabs" id="wr-team-tabs"></div>
+  <button class="wr-addteam-icon" id="wr-add-team" title="新增产品组">+</button>
+  <span class="wr-cloud-bar">
+    <span class="wr-cloud-dot" id="wr-cloud-dot"></span>
+    <span id="wr-cloud-text">未登录</span>
+    <span id="wr-cloud-user" style="margin-left: 8px;"></span>
+    <button class="wr-ghostbtn" id="wr-cloud-logout" style="display: none;">退出</button>
+  </span>
+</div>
+<div class="wr-meta" id="wr-meta-row">
+  <span>周次</span>
+  <input type="week" id="wr-week" />
+  <span>填写人</span>
+  <input type="text" id="wr-owner" placeholder="姓名" style="width: 120px;" />
+</div>
+<div id="wr-overview-view" style="display: none;"></div>
+<div id="wr-team-view">
+  <div class="wr-section">
+    <div class="wr-shead">
+      <span class="wr-snum ns">★</span>
+      <h4 class="wr-stitle">北极星指标 (NSM)</h4>
+      <span class="wr-shint">本组核心价值度量, 仅 1 个</span>
+    </div>
+    <div class="wr-ns-card" id="wr-ns-card"></div>
+  </div>
+  <div class="wr-section">
+    <div class="wr-shead">
+      <span class="wr-snum">1</span>
+      <h4 class="wr-stitle">指标面板</h4>
+      <span class="wr-shint">流量漏斗各阶段的关键指标</span>
+      <span class="wr-shead-actions">
+        <button class="wr-ghostbtn" id="wr-config-api">⚙ API 配置</button>
+        <button class="wr-ghostbtn" id="wr-fetch-api">↓ 从 API 拉取</button>
+        <button class="wr-ghostbtn" id="wr-add-cat">+ 分类</button>
+      </span>
+    </div>
+    <div class="wr-card">
+      <div class="wr-api-bar">
+        <span class="wr-api-label">当前接口:</span>
+        <span id="wr-api-url-show" style="color: var(--color-text-tertiary);">未配置</span>
+      </div>
+      <div id="wr-input-cats"></div>
+      <div class="wr-metric-grid" id="wr-input-metrics" style="display:none;"></div>
+      <details class="wr-collapsible" id="wr-edit-details">
+        <summary>编辑指标 / 填入数据</summary>
+        <div id="wr-input-rows"></div>
+        <button class="wr-addbtn" id="wr-add-input">+ 添加指标</button>
+      </details>
+      <div class="wr-chart-wrap">
+        <canvas id="wr-chart"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="wr-section">
+    <div class="wr-shead">
+      <span class="wr-snum">2</span>
+      <h4 class="wr-stitle">本周工作项</h4>
+      <span class="wr-shint">每条任务关联一个驱动的指标</span>
+    </div>
+    <div class="wr-card">
+      <div class="wr-task-row" style="font-size: 12px; color: var(--color-text-secondary); font-weight: 500;">
+        <div>任务描述</div><div>负责人</div><div>状态</div><div>驱动指标</div><div></div>
+      </div>
+      <div id="wr-tasks"></div>
+      <button class="wr-addbtn" id="wr-add-task">+ 添加任务</button>
+    </div>
+  </div>
+  <div class="wr-section">
+    <div class="wr-shead">
+      <span class="wr-snum">3</span>
+      <h4 class="wr-stitle">上周工作项复盘</h4>
+      <span class="wr-shint">对照上周计划, 验证假设是否成立</span>
+      <span class="wr-shead-actions">
+        <button class="wr-ghostbtn" id="wr-pull-last">↑ 同步上周任务</button>
+      </span>
+    </div>
+    <div class="wr-card">
+      <div class="wr-task-row" style="font-size: 12px; color: var(--color-text-secondary); font-weight: 500;">
+        <div>上周任务</div><div>负责人</div><div>结果</div><div>驱动指标</div><div></div>
+      </div>
+      <div id="wr-last-tasks"></div>
+      <button class="wr-addbtn" id="wr-add-last-task">+ 添加上周任务</button>
+      <div class="wr-retro-grid" style="margin-top: 1.25rem;">
+        <div class="wr-retro-card good">
+          <div class="wr-retro-lbl">✓ 有效 / 假设被验证</div>
+          <textarea class="wr-area" id="wr-good" placeholder="哪些动作真的拨动了指标? NSM 是否同步上行?..."></textarea>
+        </div>
+        <div class="wr-retro-card bad">
+          <div class="wr-retro-lbl">✗ 无效 / 假设被证伪</div>
+          <textarea class="wr-area" id="wr-bad" placeholder="哪些任务做了但指标没动? 假设错在哪?..."></textarea>
+        </div>
+        <div class="wr-retro-card next">
+          <div class="wr-retro-lbl">→ 下周调整</div>
+          <textarea class="wr-area" id="wr-next" placeholder="下周聚焦哪个指标? 用什么动作? 衡量基准是?..."></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="wr-foot">
+    <span class="wr-status" id="wr-status">自动保存已启用</span>
+    <div class="wr-foot-actions">
+      <button id="wr-save">立即保存</button>
+    </div>
+  </div>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function() {
+  const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  let currentUser = null;
+
+  function setCloudStatus(state, text) {
+    const dot = document.getElementById('wr-cloud-dot');
+    const txt = document.getElementById('wr-cloud-text');
+    if (!dot || !txt) return;
+    dot.className = 'wr-cloud-dot' + (state === 'syncing' ? ' syncing' : state === 'error' ? ' error' : '');
+    txt.textContent = text;
+  }
+
+  function cloudUpsertTeams(list) {
+    if (!currentUser) return;
+    setCloudStatus('syncing', '同步中…');
+    const rows = list.map((t, i) => ({ id: t.id, label: t.label, sort_order: i, updated_at: new Date().toISOString() }));
+    sb.from('teams').upsert(rows).then(({ error }) => {
+      if (error) setCloudStatus('error', '同步失败');
+      else setCloudStatus('ok', '已同步');
+    });
+  }
+  function cloudDeleteTeam(teamId) {
+    if (!currentUser) return;
+    sb.from('teams').delete().eq('id', teamId).then(({ error }) => {
+      if (error) setCloudStatus('error', '删除失败');
+    });
+  }
+  function cloudUpsertSchema(teamId, sch) {
+    if (!currentUser) return;
+    setCloudStatus('syncing', '同步中…');
+    sb.from('team_schemas').upsert({ team_id: teamId, schema: sch, updated_at: new Date().toISOString() }).then(({ error }) => {
+      if (error) setCloudStatus('error', '同步失败');
+      else setCloudStatus('ok', '已同步');
+    });
+  }
+  function cloudUpsertApi(teamId, cfg) {
+    if (!currentUser) return;
+    sb.from('team_api_configs').upsert({ team_id: teamId, config: cfg, updated_at: new Date().toISOString() }).then();
+  }
+  function cloudUpsertWeekly(teamId, week, payload) {
+    if (!currentUser) return;
+    setCloudStatus('syncing', '同步中…');
+    sb.from('weekly_data').upsert({ team_id: teamId, week, data: payload, updated_at: new Date().toISOString(), updated_by: currentUser.id }).then(({ error }) => {
+      if (error) setCloudStatus('error', '同步失败');
+      else setCloudStatus('ok', '已同步');
+    });
+  }
+  function cloudDeleteWeekly(teamId, week) {
+    if (!currentUser) return;
+    sb.from('weekly_data').delete().match({ team_id: teamId, week }).then();
+  }
+
+  const TEAMS_KEY = 'pallax_weekly_teams_v3';
+  const SCHEMA_KEY = (id) => `pallax_weekly_schema_v7:${id}`;
+  const API_KEY = (id) => `pallax_weekly_api:${id}`;
+  const DATA_KEY = (id, w) => `pallax_weekly_v7:${id}:${w || 'current'}`;
+  const DATA_PREFIX = (id) => `pallax_weekly_v7:${id}:`;
+
+  const DEFAULT_TEAMS = [
+    { id: 'pythra', label: 'Pythra' },
+    { id: 'predx', label: 'PredX' },
+    { id: 'telyai', label: 'Telyai' }
+  ];
+
+  function defaultSchema() {
+    return {
+      nsm: { key: 'nsm', name: '北极星指标', unit: '', apiPath: 'nsm' },
+      inputCats: [
+        { id: 'traffic', label: '流量' },
+        { id: 'engagement', label: '互动' },
+        { id: 'conversion', label: '转化' },
+        { id: 'revenue', label: '付费' }
+      ],
+      inputs: [
+        { key: 'uv', name: 'UV (独立访客)', unit: '', cat: 'traffic', apiPath: 'uv' },
+        { key: 'pv', name: 'PV (页面浏览)', unit: '', cat: 'traffic', apiPath: 'pv' },
+        { key: 'visits', name: 'Visit (访问次数)', unit: '', cat: 'traffic', apiPath: 'visits' },
+        { key: 'ctr', name: '点击率 (CTR)', unit: '%', cat: 'engagement', apiPath: 'ctr' },
+        { key: 'duration', name: '平均停留时长', unit: 's', cat: 'engagement', apiPath: 'duration' },
+        { key: 'signupRate', name: '注册转化率', unit: '%', cat: 'conversion', apiPath: 'signup_rate' },
+        { key: 'paidRate', name: '付费率', unit: '%', cat: 'revenue', apiPath: 'paid_rate' },
+        { key: 'paidUsers', name: '付费用户数', unit: '', cat: 'revenue', apiPath: 'paid_users' }
+      ]
+    };
+  }
+  function defaultApiConfig() { return { url: '', method: 'GET', headers: '', payloadTemplate: '', responsePath: '' }; }
+
+  let teams = [];
+  let schema = defaultSchema();
+  let apiCfg = defaultApiConfig();
+  let state = { team: '', inputCat: 'traffic', week: '', owner: '', tasks: [], lastTasks: [], metrics: {}, retro: { good: '', bad: '', next: '' } };
+  let chart = null, nsTrendChart = null, ovwChart = null;
+  let editingTeamId = null;
+
+  function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function uid(prefix) { return prefix + '_' + Math.random().toString(36).slice(2, 8); }
+
+  function loadTeams() {
+    const raw = localStorage.getItem(TEAMS_KEY);
+    if (raw) { try { teams = JSON.parse(raw); } catch(e) { teams = DEFAULT_TEAMS.slice(); } }
+    else teams = DEFAULT_TEAMS.slice();
+    if (!Array.isArray(teams) || teams.length === 0) teams = DEFAULT_TEAMS.slice();
+  }
+  function persistTeams() { localStorage.setItem(TEAMS_KEY, JSON.stringify(teams)); cloudUpsertTeams(teams); }
+
+  function loadSchema() {
+    const raw = localStorage.getItem(SCHEMA_KEY(state.team));
+    if (raw) { try { schema = JSON.parse(raw); } catch(e) { schema = defaultSchema(); } }
+    else schema = defaultSchema();
+    if (!schema.nsm) schema.nsm = defaultSchema().nsm;
+    if (!Array.isArray(schema.inputCats) || schema.inputCats.length === 0) schema.inputCats = defaultSchema().inputCats;
+    if (!Array.isArray(schema.inputs)) schema.inputs = [];
+    if (!schema.inputCats.find(c => c.id === state.inputCat)) state.inputCat = schema.inputCats[0].id;
+  }
+  function persistSchema() { localStorage.setItem(SCHEMA_KEY(state.team), JSON.stringify(schema)); cloudUpsertSchema(state.team, schema); }
+  function loadSchemaForTeam(teamId) {
+    const raw = localStorage.getItem(SCHEMA_KEY(teamId));
+    if (raw) { try { return JSON.parse(raw); } catch(e) {} }
+    return defaultSchema();
+  }
+  function loadApi() {
+    const raw = localStorage.getItem(API_KEY(state.team));
+    if (raw) { try { apiCfg = JSON.parse(raw); } catch(e) { apiCfg = defaultApiConfig(); } }
+    else apiCfg = defaultApiConfig();
+  }
+  function persistApi() { localStorage.setItem(API_KEY(state.team), JSON.stringify(apiCfg)); cloudUpsertApi(state.team, apiCfg); }
+
+  function blankTask() { return { desc: '', owner: '', status: '进行中', driverKey: '' }; }
+  function blankLastTask() { return { desc: '', owner: '', result: '已完成', driverKey: '' }; }
+
+  function loadState() {
+    const raw = localStorage.getItem(DATA_KEY(state.team, state.week));
+    if (raw) {
+      try {
+        const p = JSON.parse(raw);
+        state.tasks = p.tasks || [];
+        state.lastTasks = p.lastTasks || [];
+        state.metrics = p.metrics || {};
+        state.retro = p.retro || { good: '', bad: '', next: '' };
+        state.owner = p.owner || '';
+        const st = document.getElementById('wr-status');
+        if (st) st.textContent = '已加载本地存档 · ' + (p.savedAt || '');
+      } catch(e) { resetState(); }
+    } else {
+      resetState();
+      const st = document.getElementById('wr-status');
+      if (st) st.textContent = '新周次 · 编辑后自动保存';
+    }
+  }
+  function resetState() {
+    state.tasks = [blankTask(), blankTask(), blankTask()];
+    state.lastTasks = [];
+    state.metrics = {};
+    state.retro = { good: '', bad: '', next: '' };
+  }
+  function saveState() {
+    const payload = { team: state.team, week: state.week, owner: state.owner, tasks: state.tasks, lastTasks: state.lastTasks, metrics: state.metrics, retro: state.retro, savedAt: new Date().toLocaleString('zh-CN') };
+    localStorage.setItem(DATA_KEY(state.team, state.week), JSON.stringify(payload));
+    cloudUpsertWeekly(state.team, state.week, payload);
+    document.getElementById('wr-status').textContent = '已保存 · ' + payload.savedAt;
+  }
+  let _saveTimer = null;
+  function scheduleSave() {
+    if (_saveTimer) clearTimeout(_saveTimer);
+    document.getElementById('wr-status').textContent = '编辑中…';
+    _saveTimer = setTimeout(saveState, 800);
+  }
+  function getCurrentWeek() {
+    const d = new Date();
+    const onejan = new Date(d.getFullYear(), 0, 1);
+    const week = Math.ceil((((d - onejan) / 86400000) + onejan.getDay() + 1) / 7);
+    return d.getFullYear() + '-W' + String(week).padStart(2, '0');
+  }
+  function prevWeekStr(weekStr) {
+    if (!weekStr) return '';
+    const m = weekStr.match(/^(\d{4})-W(\d{1,2})$/);
+    if (!m) return '';
+    let y = +m[1], w = +m[2] - 1;
+    if (w < 1) { y -= 1; w = 52; }
+    return y + '-W' + String(w).padStart(2, '0');
+  }
+  function findTeam(id) { return teams.find(t => t.id === id); }
+  function listTeamWeeks(teamId) {
+    const out = [];
+    const prefix = DATA_PREFIX(teamId);
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(prefix)) {
+        const week = k.slice(prefix.length);
+        if (/^\d{4}-W\d{1,2}$/.test(week)) out.push(week);
+      }
+    }
+    return out.sort();
+  }
+  function getNsmHistory(teamId, nsmKey, maxPoints) {
+    const weeks = listTeamWeeks(teamId);
+    const points = [];
+    weeks.forEach(w => {
+      const raw = localStorage.getItem(DATA_KEY(teamId, w));
+      if (!raw) return;
+      try {
+        const d = JSON.parse(raw);
+        const v = d.metrics && d.metrics[nsmKey] && typeof d.metrics[nsmKey].current === 'number' ? d.metrics[nsmKey].current : null;
+        if (v !== null) points.push({ week: w, value: v });
+      } catch(e) {}
+    });
+    if (maxPoints && points.length > maxPoints) return points.slice(-maxPoints);
+    return points;
+  }
+  function pullLastWeekTasks() {
+    const prev = prevWeekStr(state.week);
+    if (!prev) { alert('请先填写周次'); return; }
+    const raw = localStorage.getItem(DATA_KEY(state.team, prev));
+    if (!raw) { alert('未找到上周存档 (' + prev + ')'); return; }
+    try {
+      const p = JSON.parse(raw);
+      const src = p.tasks || [];
+      if (src.length === 0) { alert('上周任务列表为空'); return; }
+      state.lastTasks = src.filter(t => t.desc).map(t => ({ desc: t.desc, owner: t.owner || '', driverKey: t.driverKey || '', result: t.status === '已完成' ? '已完成' : (t.status === '阻塞' ? '阻塞/未完成' : '进行中') }));
+      renderLastTasks();
+      document.getElementById('wr-status').textContent = '已从 ' + prev + ' 同步 ' + state.lastTasks.length + ' 条任务';
+    } catch(e) { alert('解析上周存档失败'); }
+  }
+
+  function renderTeamTabs() {
+    const wrap = document.getElementById('wr-team-tabs');
+    wrap.innerHTML = '';
+    const ovwBtn = document.createElement('button');
+    ovwBtn.className = 'wr-tab overview' + (state.team === '__overview' ? ' active' : '');
+    ovwBtn.innerHTML = '<span>◧ 全组总览</span>';
+    ovwBtn.addEventListener('click', () => switchToTeam('__overview'));
+    wrap.appendChild(ovwBtn);
+    teams.forEach(t => {
+      const btn = document.createElement('button');
+      btn.className = 'wr-tab' + (state.team === t.id ? ' active' : '');
+      if (editingTeamId === t.id) {
+        btn.innerHTML = '<input class="wr-rename-input" type="text" value="' + escapeHtml(t.label) + '" />';
+        const input = btn.querySelector('input');
+        setTimeout(() => { input.focus(); input.select(); }, 0);
+        const commit = () => { const v = input.value.trim(); if (v) t.label = v; editingTeamId = null; persistTeams(); renderTeamTabs(); };
+        const cancel = () => { editingTeamId = null; renderTeamTabs(); };
+        input.addEventListener('blur', commit);
+        input.addEventListener('keydown', e => {
+          if (e.key === 'Enter') { e.preventDefault(); commit(); }
+          else if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+        });
+        input.addEventListener('click', e => e.stopPropagation());
+      } else {
+        btn.innerHTML = '<span>' + escapeHtml(t.label) + '</span><span class="wr-x" data-act="del" title="删除">×</span>';
+        btn.addEventListener('click', e => {
+          if (e.target.dataset.act === 'del') {
+            e.stopPropagation();
+            if (teams.length <= 1) { alert('至少保留一个产品组'); return; }
+            if (!confirm('删除产品组「' + t.label + '」?')) return;
+            Object.keys(localStorage).forEach(k => {
+              if (k.startsWith('pallax_weekly_v7:' + t.id + ':') || k.startsWith('pallax_weekly_v5:' + t.id + ':') || k.startsWith('pallax_weekly:' + t.id + ':')) localStorage.removeItem(k);
+            });
+            localStorage.removeItem(SCHEMA_KEY(t.id));
+            localStorage.removeItem(API_KEY(t.id));
+            cloudDeleteTeam(t.id);
+            teams = teams.filter(x => x.id !== t.id);
+            persistTeams();
+            if (state.team === t.id) switchToTeam(teams[0].id);
+            else renderTeamTabs();
+            return;
+          }
+          switchToTeam(t.id);
+        });
+        btn.addEventListener('dblclick', e => { e.preventDefault(); editingTeamId = t.id; renderTeamTabs(); });
+      }
+      wrap.appendChild(btn);
+    });
+  }
+
+  function switchToTeam(id) {
+    state.team = id;
+    if (id === '__overview') {
+      document.getElementById('wr-overview-view').style.display = '';
+      document.getElementById('wr-team-view').style.display = 'none';
+      document.getElementById('wr-meta-row').style.display = 'none';
+      renderTeamTabs();
+      renderOverview();
+    } else {
+      document.getElementById('wr-overview-view').style.display = 'none';
+      document.getElementById('wr-team-view').style.display = '';
+      document.getElementById('wr-meta-row').style.display = '';
+      loadSchema(); loadApi(); loadState();
+      renderTeamTabs(); renderAll();
+    }
+  }
+
+  function renderOverview() {
+    const view = document.getElementById('wr-overview-view');
+    if (ovwChart) { ovwChart.destroy(); ovwChart = null; }
+    const teamSummaries = teams.map(t => {
+      const sch = loadSchemaForTeam(t.id);
+      const weeks = listTeamWeeks(t.id);
+      const lastWeek = weeks[weeks.length - 1];
+      let cur = null, prev = null, goal = null;
+      if (lastWeek) {
+        try {
+          const d = JSON.parse(localStorage.getItem(DATA_KEY(t.id, lastWeek)));
+          const m = d.metrics && d.metrics[sch.nsm.key];
+          if (m) { cur = typeof m.current === 'number' ? m.current : null; prev = typeof m.previous === 'number' ? m.previous : null; goal = typeof m.goal === 'number' ? m.goal : null; }
+        } catch(e) {}
+      }
+      const history = getNsmHistory(t.id, sch.nsm.key, 12);
+      return { team: t, schema: sch, lastWeek, cur, prev, goal, history };
+    });
+
+    const totalTeams = teams.length;
+    const teamsWithGoal = teamSummaries.filter(s => typeof s.goal === 'number' && s.goal !== 0).length;
+    const teamsHittingGoal = teamSummaries.filter(s => typeof s.cur === 'number' && typeof s.goal === 'number' && s.goal !== 0 && s.cur >= s.goal).length;
+    const avgCompletion = (() => {
+      const arr = teamSummaries.filter(s => typeof s.cur === 'number' && typeof s.goal === 'number' && s.goal !== 0).map(s => Math.min(100, (s.cur / s.goal) * 100));
+      return arr.length === 0 ? null : arr.reduce((a,b)=>a+b,0) / arr.length;
+    })();
+    const teamsWithGrowth = teamSummaries.filter(s => typeof s.cur === 'number' && typeof s.prev === 'number' && s.prev !== 0).length;
+    const teamsGrowing = teamSummaries.filter(s => typeof s.cur === 'number' && typeof s.prev === 'number' && s.prev !== 0 && s.cur > s.prev).length;
+
+    let html = '<div class="wr-section"><div class="wr-shead"><span class="wr-snum">◧</span><h4 class="wr-stitle">全组总览</h4><span class="wr-shint">基于各组最新一周存档汇总</span></div>';
+    html += '<div class="wr-ovw-hero">';
+    html += '<div class="wr-ovw-stat"><div class="wr-ovw-stat-lbl">产品组数</div><div class="wr-ovw-stat-val">' + totalTeams + '</div></div>';
+    html += '<div class="wr-ovw-stat"><div class="wr-ovw-stat-lbl">达成目标</div><div class="wr-ovw-stat-val">' + teamsHittingGoal + '<span style="font-size: 14px; color: var(--color-text-tertiary); margin-left: 4px;">/ ' + teamsWithGoal + '</span></div></div>';
+    html += '<div class="wr-ovw-stat"><div class="wr-ovw-stat-lbl">平均完成度</div><div class="wr-ovw-stat-val">' + (avgCompletion === null ? '—' : avgCompletion.toFixed(0) + '%') + '</div></div>';
+    html += '<div class="wr-ovw-stat"><div class="wr-ovw-stat-lbl">环比上行</div><div class="wr-ovw-stat-val">' + teamsGrowing + '<span style="font-size: 14px; color: var(--color-text-tertiary); margin-left: 4px;">/ ' + teamsWithGrowth + '</span></div></div>';
+    html += '</div>';
+
+    teamSummaries.forEach((s, idx) => {
+      const t = s.team;
+      const nsmName = s.schema.nsm.name || '北极星指标';
+      const unit = s.schema.nsm.unit || '';
+      let deltaTxt = '—', deltaCls = 'wr-flat';
+      if (typeof s.cur === 'number' && typeof s.prev === 'number' && s.prev !== 0) {
+        const pct = ((s.cur - s.prev) / Math.abs(s.prev)) * 100;
+        deltaCls = pct > 0.5 ? 'wr-up' : pct < -0.5 ? 'wr-down' : 'wr-flat';
+        const arrow = pct > 0.5 ? '▲' : pct < -0.5 ? '▼' : '→';
+        deltaTxt = arrow + ' ' + Math.abs(pct).toFixed(1) + '%';
+      }
+      let progressPct = 0, barCls = '', progressTxt = '—';
+      if (typeof s.cur === 'number' && typeof s.goal === 'number' && s.goal !== 0) {
+        progressPct = Math.max(0, Math.min(100, (s.cur / s.goal) * 100));
+        progressTxt = progressPct.toFixed(0) + '%';
+        barCls = progressPct >= 100 ? 'good' : progressPct >= 70 ? '' : progressPct >= 40 ? 'warn' : 'bad';
+      }
+      html += '<div class="wr-ovw-team-card" data-team="' + t.id + '">';
+      html += '<div class="wr-ovw-team-head"><div><span class="wr-ovw-team-name">' + escapeHtml(t.label) + '</span><span class="wr-ovw-team-nsm-name" style="margin-left: 10px;">' + escapeHtml(nsmName) + '</span></div><span class="wr-ovw-team-sub">' + (s.lastWeek ? '最新: ' + s.lastWeek : '无存档') + '</span></div>';
+      html += '<div class="wr-ovw-team-row">';
+      html += '<div><div class="wr-ovw-team-val">' + formatVal(s.cur, unit) + '</div><div class="wr-ovw-team-sub">vs 上周 <span class="' + deltaCls + '">' + deltaTxt + '</span> · 目标 ' + formatVal(s.goal, unit) + '</div></div>';
+      html += '<div><div class="wr-ovw-team-sub" style="margin-bottom: 4px; display: flex; justify-content: space-between;"><span>完成度</span><span style="font-weight: 500; color: var(--color-text-primary);">' + progressTxt + '</span></div><div class="wr-ovw-bar-wrap"><div class="wr-ovw-bar ' + barCls + '" style="width: ' + progressPct + '%;"></div></div></div>';
+      html += '<div><div class="wr-ovw-team-sub" style="margin-bottom: 2px;">' + s.history.length + ' 周趋势</div><div class="wr-ovw-spark-wrap"><canvas id="wr-spark-' + idx + '"></canvas></div></div>';
+      html += '<button class="wr-ghostbtn" data-team="' + t.id + '" data-act="goto">进入 →</button>';
+      html += '</div></div>';
+    });
+
+    html += '<div class="wr-card" style="margin-top: 1rem;"><div style="font-size: 13px; font-weight: 500; margin-bottom: 4px;">各组完成度横向对比</div><div style="font-size: 11px; color: var(--color-text-tertiary); margin-bottom: 12px;">基于最新一周 NSM 当前值 / 目标值。无目标的组不展示。</div><div class="wr-ovw-chart-wrap"><canvas id="wr-ovw-completion-chart"></canvas></div></div></div>';
+    view.innerHTML = html;
+
+    teamSummaries.forEach((s, idx) => {
+      const canvas = document.getElementById('wr-spark-' + idx);
+      if (!canvas) return;
+      if (s.history.length < 2) {
+        canvas.parentElement.innerHTML = '<div style="font-size: 11px; color: var(--color-text-tertiary); padding-top: 6px;">数据不足</div>';
+        return;
+      }
+      new Chart(canvas, {
+        type: 'line',
+        data: { labels: s.history.map(p => p.week), datasets: [{ data: s.history.map(p => p.value), borderColor: '#BA7517', backgroundColor: 'rgba(186, 117, 23, 0.12)', borderWidth: 1.5, pointRadius: 0, fill: true, tension: 0.3 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: true, displayColors: false } }, scales: { x: { display: false }, y: { display: false } }, interaction: { mode: 'index', intersect: false } }
+      });
+    });
+
+    const compData = teamSummaries.filter(s => typeof s.cur === 'number' && typeof s.goal === 'number' && s.goal !== 0);
+    if (compData.length > 0) {
+      const ctx = document.getElementById('wr-ovw-completion-chart').getContext('2d');
+      ovwChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: compData.map(s => s.team.label),
+          datasets: [{
+            label: '完成度 %',
+            data: compData.map(s => Math.min(150, (s.cur / s.goal) * 100)),
+            backgroundColor: compData.map(s => {
+              const p = (s.cur / s.goal) * 100;
+              return p >= 100 ? '#1D9E75' : p >= 70 ? '#378ADD' : p >= 40 ? '#EF9F27' : '#E24B4A';
+            }),
+            borderRadius: 4
+          }]
+        },
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '完成度: ' + ctx.parsed.x.toFixed(1) + '%' } } }, scales: { x: { beginAtZero: true, suggestedMax: 110, grid: { color: 'rgba(128,128,128,0.1)' }, ticks: { callback: v => v + '%' } }, y: { grid: { display: false } } } }
+      });
+    }
+
+    view.querySelectorAll('button[data-act="goto"]').forEach(btn => {
+      btn.addEventListener('click', e => { e.stopPropagation(); switchToTeam(btn.dataset.team); });
+    });
+    view.querySelectorAll('.wr-ovw-team-card').forEach(card => {
+      card.addEventListener('click', () => switchToTeam(card.dataset.team));
+    });
+  }
+
+  function renderNorthStar() {
+    const ns = schema.nsm;
+    const data = state.metrics[ns.key] || {};
+    const cur = data.current, prev = data.previous, goal = data.goal;
+    let deltaPillHtml = '';
+    if (typeof cur === 'number' && typeof prev === 'number' && prev !== 0) {
+      const pct = ((cur - prev) / Math.abs(prev)) * 100;
+      const cls = pct > 0.5 ? 'up' : pct < -0.5 ? 'down' : 'flat';
+      const arrow = pct > 0.5 ? '▲' : pct < -0.5 ? '▼' : '→';
+      deltaPillHtml = '<span class="wr-ns-delta-pill ' + cls + '">' + arrow + ' ' + Math.abs(pct).toFixed(1) + '%</span><span class="wr-ns-delta-label">vs 上周</span>';
+    }
+    let attPct = null;
+    if (typeof cur === 'number' && typeof goal === 'number' && goal !== 0) {
+      attPct = (cur / goal) * 100;
+    }
+    const ringPct = attPct === null ? 0 : Math.max(0, Math.min(100, attPct));
+    const ringCls = attPct === null ? 'warn' : attPct >= 100 ? 'ok' : attPct >= 60 ? 'warn' : 'bad';
+    const r = 44, circ = 2 * Math.PI * r;
+    const ringDash = circ * (ringPct / 100);
+
+    const history = getNsmHistory(state.team, ns.key, 26);
+    const card = document.getElementById('wr-ns-card');
+    let cardHtml = '<div class="wr-ns-row">';
+    // ===== Left =====
+    cardHtml += '<div class="wr-ns-left">';
+    cardHtml += '<div class="wr-ns-label-row">';
+    cardHtml += '<span class="wr-ns-pin">★ NSM 北极星</span>';
+    cardHtml += '<input type="text" value="' + escapeHtml(ns.name) + '" data-f="name" placeholder="本组北极星指标名称" style="flex:1;" />';
+    cardHtml += '</div>';
+    cardHtml += '<div class="wr-ns-bignum-row">';
+    cardHtml += '<div class="wr-ns-val"><input type="number" value="' + (cur ?? '') + '" data-f="current" placeholder="0" /></div>';
+    cardHtml += '<input class="wr-ns-unit-input" type="text" value="' + escapeHtml(ns.unit) + '" data-f="unit" placeholder="单位" />';
+    if (deltaPillHtml) cardHtml += deltaPillHtml;
+    cardHtml += '</div>';
+    cardHtml += '<div class="wr-ns-meta">';
+    cardHtml += '<div class="wr-ns-meta-item"><label>上周</label><input type="number" value="' + (prev ?? '') + '" data-f="previous" placeholder="—" /></div>';
+    cardHtml += '<div class="wr-ns-meta-item"><label>目标</label><input type="number" value="' + (goal ?? '') + '" data-f="goal" placeholder="—" /></div>';
+    cardHtml += '<div class="wr-ns-meta-item"><label>API 字段</label><input type="text" value="' + escapeHtml(ns.apiPath) + '" data-f="apiPath" placeholder="nsm" /></div>';
+    cardHtml += '</div>';
+    cardHtml += '</div>';
+
+    // ===== Right =====
+    cardHtml += '<div class="wr-ns-right">';
+    cardHtml += '<div class="wr-ns-ring-row">';
+    cardHtml += '<div class="wr-ns-ring">';
+    cardHtml += '<svg viewBox="0 0 100 100">';
+    cardHtml += '<circle class="wr-ns-ring-track" cx="50" cy="50" r="' + r + '"></circle>';
+    cardHtml += '<circle class="wr-ns-ring-fill ' + ringCls + '" cx="50" cy="50" r="' + r + '" stroke-dasharray="' + circ + '" stroke-dashoffset="' + (circ - ringDash) + '"></circle>';
+    cardHtml += '</svg>';
+    cardHtml += '<div class="wr-ns-ring-label"><div class="v">' + (attPct === null ? '—' : Math.round(attPct) + '%') + '</div><div class="l">达标</div></div>';
+    cardHtml += '</div>';
+    cardHtml += '<div class="wr-ns-ring-side">';
+    cardHtml += '<div><span class="k">本周</span> <span class="v">' + formatVal(cur, ns.unit) + '</span></div>';
+    cardHtml += '<div><span class="k">目标</span> <span class="v">' + formatVal(goal, ns.unit) + '</span></div>';
+    if (typeof goal === 'number' && typeof cur === 'number' && cur < goal) {
+      cardHtml += '<div><span class="k">差距</span> <span class="v">' + formatVal(goal - cur, ns.unit) + '</span></div>';
+    }
+    cardHtml += '</div>';
+    cardHtml += '</div>';
+
+    cardHtml += '<div class="wr-ns-trend">';
+    cardHtml += '<div class="wr-ns-trend-label"><span>历史趋势 · 近 ' + history.length + ' 周</span>';
+    if (history.length >= 2) cardHtml += '<span>' + history[0].week + ' → ' + history[history.length-1].week + '</span>';
+    cardHtml += '</div>';
+    if (history.length < 2) cardHtml += '<div style="font-size:12px;color:var(--nsm-amber-label);">至少需要 2 周存档才能绘制趋势</div>';
+    else cardHtml += '<div class="wr-ns-trend-canvas-wrap"><canvas id="wr-ns-trend"></canvas></div>';
+    cardHtml += '</div>';
+    cardHtml += '</div>';
+
+    cardHtml += '</div>';
+    card.innerHTML = cardHtml;
+
+    card.querySelectorAll('input').forEach(el => {
+      el.addEventListener('input', e => {
+        const f = e.target.dataset.f, v = e.target.value;
+        if (f === 'name' || f === 'unit' || f === 'apiPath') {
+          schema.nsm[f] = v; persistSchema();
+          if (f === 'unit') renderNorthStar();
+        } else {
+          if (!state.metrics[ns.key]) state.metrics[ns.key] = {};
+          state.metrics[ns.key][f] = v === '' ? '' : Number(v);
+          renderNorthStar();
+          scheduleSave();
+        }
+      });
+    });
+
+    if (nsTrendChart) { nsTrendChart.destroy(); nsTrendChart = null; }
+    if (history.length >= 2) {
+      const canvas = document.getElementById('wr-ns-trend');
+      if (canvas) {
+        const goalNum = typeof goal === 'number' ? goal : null;
+        const datasets = [{ label: ns.name || 'NSM', data: history.map(p => p.value), borderColor: '#BA7517', backgroundColor: 'rgba(186, 117, 23, 0.15)', borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, fill: true, tension: 0.3 }];
+        if (goalNum !== null) datasets.push({ label: '目标', data: history.map(() => goalNum), borderColor: '#854F0B', borderDash: [5, 5], borderWidth: 1.5, pointRadius: 0, fill: false });
+        nsTrendChart = new Chart(canvas, {
+          type: 'line',
+          data: { labels: history.map(p => p.week), datasets },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: goalNum !== null, position: 'top', labels: { boxWidth: 10, font: { size: 11 }, color: '#633806' } }, tooltip: { displayColors: false } }, scales: { x: { ticks: { color: '#854F0B', font: { size: 10 } }, grid: { display: false } }, y: { ticks: { color: '#854F0B', font: { size: 10 } }, grid: { color: 'rgba(133, 79, 11, 0.1)' } } } }
+        });
+      }
+    }
+  }
+
+  function renderTasks() {
+    const wrap = document.getElementById('wr-tasks');
+    wrap.innerHTML = '';
+    state.tasks.forEach((t, i) => {
+      const row = document.createElement('div');
+      row.className = 'wr-task-row';
+      let opts = '<option value="">未关联</option>';
+      schema.inputs.forEach(m => { opts += '<option value="' + m.key + '"' + (t.driverKey===m.key?' selected':'') + '>' + escapeHtml(m.name) + '</option>'; });
+      row.innerHTML =
+        '<input type="text" placeholder="任务描述" value="' + escapeHtml(t.desc) + '" data-i="' + i + '" data-f="desc" />' +
+        '<input type="text" placeholder="负责人" value="' + escapeHtml(t.owner) + '" data-i="' + i + '" data-f="owner" />' +
+        '<select data-i="' + i + '" data-f="status">' +
+          '<option' + (t.status==='未开始'?' selected':'') + '>未开始</option>' +
+          '<option' + (t.status==='进行中'?' selected':'') + '>进行中</option>' +
+          '<option' + (t.status==='已完成'?' selected':'') + '>已完成</option>' +
+          '<option' + (t.status==='阻塞'?' selected':'') + '>阻塞</option>' +
+        '</select>' +
+        '<select data-i="' + i + '" data-f="driverKey">' + opts + '</select>' +
+        '<button class="wr-iconbtn" data-i="' + i + '" data-act="del" title="删除">×</button>';
+      wrap.appendChild(row);
+    });
+    wrap.querySelectorAll('input, select').forEach(el => {
+      const h = e => { state.tasks[+e.target.dataset.i][e.target.dataset.f] = e.target.value; scheduleSave(); };
+      el.addEventListener('input', h); el.addEventListener('change', h);
+    });
+    wrap.querySelectorAll('button[data-act="del"]').forEach(btn => {
+      btn.addEventListener('click', e => { state.tasks.splice(+e.currentTarget.dataset.i, 1); renderTasks(); scheduleSave(); });
+    });
+  }
+
+  function renderLastTasks() {
+    const wrap = document.getElementById('wr-last-tasks');
+    wrap.innerHTML = '';
+    if (state.lastTasks.length === 0) {
+      wrap.innerHTML = '<div style="font-size: 13px; color: var(--ink-3); padding: 8px 0;">点击「↑ 同步上周任务」从上周存档导入, 或手动添加。</div>';
+      return;
+    }
+    state.lastTasks.forEach((t, i) => {
+      const m = schema.inputs.find(x => x.key === t.driverKey);
+      let impactHtml = '<div class="wr-retro-pair-impact"><div class="wr-retro-pair-metric-name">未关联指标</div></div>';
+      let verdictHtml = '<span class="wr-retro-pair-verdict na">—</span>';
+
+      if (m) {
+        const md = state.metrics[m.key] || {};
+        const cur = md.current, prev = md.previous;
+        let pct = null;
+        if (typeof cur === 'number' && typeof prev === 'number' && prev !== 0) pct = ((cur - prev) / Math.abs(prev)) * 100;
+        let verdict = 'na', verdictLbl = '◯ 待验证';
+        if (pct !== null) {
+          if (t.result === '已完成' && pct > 0.5) { verdict = 'ok'; verdictLbl = '✓ 假设成立'; }
+          else if (t.result === '已完成' && pct < -0.5) { verdict = 'bad'; verdictLbl = '✗ 反向'; }
+          else if (t.result === '阻塞/未完成' && pct < -0.5) { verdict = 'bad'; verdictLbl = '✗ 阻塞'; }
+          else if (t.result === '部分完成' && pct > 0.5) { verdict = 'ok'; verdictLbl = '✓ 部分成立'; }
+          else { verdict = 'na'; verdictLbl = '◯ 不显著'; }
+        }
+        const deltaCls = pct === null ? 'flat' : pct > 0.5 ? 'up' : pct < -0.5 ? 'down' : 'flat';
+        const arr = deltaCls === 'up' ? '▲' : deltaCls === 'down' ? '▼' : '·';
+        const deltaTxt = pct === null ? '' : '<span class="delta-pill ' + deltaCls + '">' + arr + ' ' + Math.abs(pct).toFixed(1) + '%</span>';
+        impactHtml = '<div class="wr-retro-pair-impact">'
+          + '<div class="wr-retro-pair-metric-name">' + escapeHtml(m.name) + '</div>'
+          + '<div class="wr-retro-pair-metric-row">'
+          + '<span class="from">' + formatVal(prev, m.unit) + '</span>'
+          + '<span class="wr-retro-pair-arrow">→</span>'
+          + '<span class="to">' + formatVal(cur, m.unit) + '</span>'
+          + deltaTxt
+          + '</div></div>';
+        verdictHtml = '<span class="wr-retro-pair-verdict ' + verdict + '">' + verdictLbl + '</span>';
+      }
+
+      let opts = '<option value="">未关联</option>';
+      schema.inputs.forEach(mm => { opts += '<option value="' + mm.key + '"' + (t.driverKey===mm.key?' selected':'') + '>' + escapeHtml(mm.name) + '</option>'; });
+
+      const row = document.createElement('div');
+      row.className = 'wr-retro-pair';
+      row.innerHTML =
+        '<div class="wr-retro-pair-task">'
+          + '<div class="wr-retro-pair-task-desc"><input type="text" placeholder="上周任务" value="' + escapeHtml(t.desc) + '" data-i="' + i + '" data-f="desc" /></div>'
+          + '<div class="wr-retro-pair-task-meta">'
+            + '<span>负责人</span>'
+            + '<input type="text" value="' + escapeHtml(t.owner) + '" data-i="' + i + '" data-f="owner" style="width:60px;" />'
+            + '<span>·</span>'
+            + '<select data-i="' + i + '" data-f="result">'
+              + '<option' + (t.result==='已完成'?' selected':'') + '>已完成</option>'
+              + '<option' + (t.result==='部分完成'?' selected':'') + '>部分完成</option>'
+              + '<option' + (t.result==='进行中'?' selected':'') + '>进行中</option>'
+              + '<option' + (t.result==='阻塞/未完成'?' selected':'') + '>阻塞/未完成</option>'
+              + '<option' + (t.result==='已取消'?' selected':'') + '>已取消</option>'
+            + '</select>'
+            + '<span>·</span>'
+            + '<select data-i="' + i + '" data-f="driverKey" style="max-width:120px;">' + opts + '</select>'
+          + '</div>'
+        + '</div>'
+        + '<span class="wr-retro-pair-arrow">→</span>'
+        + impactHtml
+        + '<div class="wr-retro-pair-actions">'
+          + verdictHtml
+          + '<button class="wr-iconbtn" data-i="' + i + '" data-act="del" title="删除">×</button>'
+        + '</div>';
+      wrap.appendChild(row);
+    });
+    wrap.querySelectorAll('input, select').forEach(el => {
+      const h = e => {
+        state.lastTasks[+e.target.dataset.i][e.target.dataset.f] = e.target.value;
+        renderLastTasks();
+        scheduleSave();
+      };
+      el.addEventListener('input', h); el.addEventListener('change', h);
+    });
+    wrap.querySelectorAll('button[data-act="del"]').forEach(btn => {
+      btn.addEventListener('click', e => { state.lastTasks.splice(+e.currentTarget.dataset.i, 1); renderLastTasks(); scheduleSave(); });
+    });
+  }
+
+  function classifyHealth(cur, goal) {
+    if (typeof cur !== 'number' || typeof goal !== 'number' || goal === 0) return 'na';
+    const r = cur / goal;
+    if (r >= 1) return 'ok';
+    if (r >= 0.6) return 'warn';
+    return 'bad';
+  }
+
+  function buildMetricChip(m) {
+    const data = state.metrics[m.key] || {};
+    const cur = data.current, prev = data.previous, goal = data.goal;
+    let pct = null;
+    if (typeof cur === 'number' && typeof prev === 'number' && prev !== 0) pct = ((cur - prev) / Math.abs(prev)) * 100;
+    const cls = pct === null ? 'flat' : pct > 0.5 ? 'up' : pct < -0.5 ? 'down' : 'flat';
+    const arrow = cls === 'up' ? '▲' : cls === 'down' ? '▼' : '·';
+    const deltaTxt = pct === null ? '—' : arrow + ' ' + Math.abs(pct).toFixed(1) + '%';
+    const health = classifyHealth(cur, goal);
+    return '<div class="wr-metric-chip health-' + health + '">'
+      + '<div class="wr-metric-chip-name">' + escapeHtml(m.name) + '</div>'
+      + '<div class="wr-metric-chip-delta ' + cls + '">' + deltaTxt + '</div>'
+      + '<div class="wr-metric-chip-val">' + formatVal(cur, m.unit) + '</div>'
+      + '</div>';
+  }
+
+  function renderInputCats() {
+    // Promote first cat if state.inputCat is __all or invalid (stages view has no "all")
+    if (state.inputCat === '__all' || !schema.inputCats.find(c => c.id === state.inputCat)) {
+      state.inputCat = schema.inputCats[0] && schema.inputCats[0].id || '';
+    }
+    const wrap = document.getElementById('wr-input-cats');
+    const cats = schema.inputCats;
+    let html = '<div class="wr-funnel-stages" style="--stage-count:' + cats.length + ';">';
+    cats.forEach((cat, i) => {
+      const inputs = schema.inputs.filter(m => m.cat === cat.id);
+      // Conv label: in stage 1 just "本阶段汇总", else show first %-unit metric or label
+      let convHtml = '';
+      if (i === 0) {
+        convHtml = '<span>本阶段汇总</span>';
+      } else {
+        const headline = inputs.find(m => m.unit === '%');
+        if (headline) {
+          const v = (state.metrics[headline.key] || {}).current;
+          convHtml = '<span>' + escapeHtml(headline.name) + '</span><span class="pct">' + (typeof v === 'number' ? v.toFixed(1) + '%' : '—') + '</span>';
+        } else {
+          convHtml = '<span>转化阶段</span>';
+        }
+      }
+      const isActive = state.inputCat === cat.id;
+      const metricsHtml = inputs.length === 0
+        ? '<div style="font-size:11px;color:var(--ink-3);padding:4px 0;">无指标</div>'
+        : inputs.map(m => buildMetricChip(m)).join('');
+      html += '<div class="wr-funnel-stage' + (isActive ? ' active' : '') + '" data-cat="' + cat.id + '">'
+        + '<div class="wr-funnel-stage-head"><span class="wr-funnel-stage-idx">阶段 ' + (i + 1) + '</span></div>'
+        + '<div class="wr-funnel-stage-name">' + escapeHtml(cat.label) + '</div>'
+        + '<div class="wr-funnel-stage-conv">' + convHtml + '</div>'
+        + '<div class="wr-funnel-metrics">' + metricsHtml + '</div>'
+        + (i < cats.length - 1 ? '<div class="wr-funnel-stage-arrow">›</div>' : '')
+        + '</div>';
+    });
+    html += '</div>';
+    wrap.innerHTML = html;
+    wrap.querySelectorAll('.wr-funnel-stage').forEach(el => {
+      el.addEventListener('click', () => {
+        state.inputCat = el.dataset.cat;
+        renderInputCats(); renderInputRows(); renderChart();
+      });
+      el.addEventListener('dblclick', e => {
+        e.preventDefault();
+        const cat = schema.inputCats.find(c => c.id === el.dataset.cat);
+        if (!cat) return;
+        const newName = prompt('重命名分类:', cat.label);
+        if (newName && newName.trim()) { cat.label = newName.trim(); persistSchema(); renderInputCats(); }
+      });
+    });
+  }
+
+  function inputsOfCurrentCat() { return state.inputCat === '__all' ? schema.inputs : schema.inputs.filter(m => m.cat === state.inputCat); }
+
+  function renderInputMetricCards() {
+    // Stages view embeds chips inside each stage; metric grid stays hidden.
+  }
+
+  function buildInputRow(m) {
+    const data = state.metrics[m.key] || {};
+    const cur = data.current ?? '', prev = data.previous ?? '', goal = data.goal ?? '';
+    let catOpts = '';
+    schema.inputCats.forEach(c => { catOpts += '<option value="' + c.id + '"' + (m.cat===c.id?' selected':'') + '>' + escapeHtml(c.label) + '</option>'; });
+    return '<div class="wr-input-row">' +
+      '<input type="text" value="' + escapeHtml(m.name) + '" data-k="' + m.key + '" data-f="name" placeholder="指标名" />' +
+      '<input type="text" value="' + escapeHtml(m.unit) + '" data-k="' + m.key + '" data-f="unit" placeholder="单位" />' +
+      '<select data-k="' + m.key + '" data-f="cat">' + catOpts + '</select>' +
+      '<input type="number" value="' + cur + '" data-k="' + m.key + '" data-f="current" placeholder="本周" />' +
+      '<input type="number" value="' + prev + '" data-k="' + m.key + '" data-f="previous" placeholder="上周" />' +
+      '<input type="number" value="' + goal + '" data-k="' + m.key + '" data-f="goal" placeholder="目标" />' +
+      '<input type="text" value="' + escapeHtml(m.apiPath) + '" data-k="' + m.key + '" data-f="apiPath" placeholder="API 字段" />' +
+      '<button class="wr-iconbtn" data-k="' + m.key + '" data-act="del">×</button>' +
+      '</div>';
+  }
+
+  function renderInputRows() {
+    const list = inputsOfCurrentCat();
+    const container = document.getElementById('wr-input-rows');
+    let header = '<div class="wr-input-row"><span class="wr-h">指标名</span><span class="wr-h">单位</span><span class="wr-h">分类</span><span class="wr-h">本周</span><span class="wr-h">上周</span><span class="wr-h">目标</span><span class="wr-h">API 字段</span><span></span></div>';
+    container.innerHTML = header + list.map(m => buildInputRow(m)).join('');
+    bindInputRowEvents(container);
+  }
+
+  function bindInputRowEvents(container) {
+    container.querySelectorAll('input, select').forEach(el => {
+      const handler = e => {
+        const k = e.target.dataset.k, f = e.target.dataset.f, v = e.target.value;
+        if (!k || !f) return;
+        if (f === 'name' || f === 'unit' || f === 'apiPath' || f === 'cat') {
+          const m = schema.inputs.find(x => x.key === k);
+          if (m) { m[f] = v; persistSchema(); }
+          if (f === 'name' || f === 'unit') { renderInputCats(); renderTasks(); renderLastTasks(); renderChart(); }
+          if (f === 'cat') { renderInputCats(); renderInputRows(); renderChart(); }
+        } else {
+          if (!state.metrics[k]) state.metrics[k] = {};
+          state.metrics[k][f] = v === '' ? '' : Number(v);
+          renderInputCats(); renderLastTasks(); renderChart();
+          scheduleSave();
+        }
+      };
+      el.addEventListener('input', handler); el.addEventListener('change', handler);
+    });
+    container.querySelectorAll('button[data-act="del"]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        const k = e.currentTarget.dataset.k;
+        if (!confirm('删除该指标? 已填数据也会清除。')) return;
+        schema.inputs = schema.inputs.filter(m => m.key !== k);
+        delete state.metrics[k];
+        persistSchema();
+        renderInputCats(); renderInputRows();
+        renderTasks(); renderLastTasks(); renderChart();
+      });
+    });
+  }
+
+  function formatVal(v, unit) {
+    if (v === '' || v === undefined || v === null || Number.isNaN(v)) return '—';
+    let s = Number(v).toLocaleString('en-US', { maximumFractionDigits: 2 });
+    if (unit === '$') return '$' + s;
+    if (unit === '%') return s + '%';
+    return s + (unit ? ' ' + unit : '');
+  }
+
+  function renderChart() {
+    const list = schema.inputs;
+    const labels = list.map(m => m.name);
+    const cur = list.map(m => Number((state.metrics[m.key] || {}).current) || 0);
+    const prev = list.map(m => Number((state.metrics[m.key] || {}).previous) || 0);
+    const ctx = document.getElementById('wr-chart').getContext('2d');
+    if (chart) chart.destroy();
+    chart = new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets: [{ label: '上周', data: prev, backgroundColor: '#B4B2A9', borderRadius: 4 }, { label: '本周', data: cur, backgroundColor: '#378ADD', borderRadius: 4 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 12 } } } }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: 'rgba(128,128,128,0.1)' } } } }
+    });
+  }
+
+  function bindRetro() {
+    ['good','bad','next'].forEach(k => {
+      const el = document.getElementById('wr-' + k);
+      el.value = state.retro[k] || '';
+      el.oninput = e => { state.retro[k] = e.target.value; scheduleSave(); };
+    });
+  }
+
+  function getByPath(obj, path) {
+    if (!path) return obj;
+    return String(path).split(/[.\[\]]/).filter(Boolean).reduce((acc, k) => (acc == null ? acc : acc[k]), obj);
+  }
+
+  async function fetchFromApi() {
+    if (!apiCfg.url) { alert('请先在「⚙ API 配置」中填入接口地址'); return; }
+    const status = document.getElementById('wr-status');
+    status.textContent = '正在从 API 拉取...';
+    try {
+      const opts = { method: apiCfg.method || 'GET', headers: {} };
+      if (apiCfg.headers) { try { opts.headers = JSON.parse(apiCfg.headers); } catch(e) {} }
+      let url = apiCfg.url.replace(/\{week\}/g, encodeURIComponent(state.week)).replace(/\{team\}/g, encodeURIComponent(state.team));
+      if (opts.method !== 'GET' && apiCfg.payloadTemplate) {
+        opts.body = apiCfg.payloadTemplate.replace(/\{week\}/g, state.week).replace(/\{team\}/g, state.team);
+        if (!opts.headers['Content-Type']) opts.headers['Content-Type'] = 'application/json';
+      }
+      const resp = await fetch(url, opts);
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const json = await resp.json();
+      const root = apiCfg.responsePath ? getByPath(json, apiCfg.responsePath) : json;
+      let filled = 0;
+      const allMetrics = [schema.nsm].concat(schema.inputs);
+      allMetrics.forEach(m => {
+        if (!m.apiPath) return;
+        const v = getByPath(root, m.apiPath);
+        if (typeof v === 'number') { if (!state.metrics[m.key]) state.metrics[m.key] = {}; state.metrics[m.key].current = v; filled++; }
+        else if (v && typeof v === 'object') {
+          if (!state.metrics[m.key]) state.metrics[m.key] = {};
+          if (typeof v.current === 'number') state.metrics[m.key].current = v.current;
+          if (typeof v.previous === 'number') state.metrics[m.key].previous = v.previous;
+          if (typeof v.goal === 'number') state.metrics[m.key].goal = v.goal;
+          filled++;
+        }
+      });
+      renderNorthStar(); renderInputMetricCards(); renderInputRows(); renderChart();
+      status.textContent = '已从 API 填入 ' + filled + ' 个指标 · ' + new Date().toLocaleTimeString('zh-CN');
+    } catch (err) { status.textContent = '拉取失败: ' + err.message; alert('API 拉取失败: ' + err.message); }
+  }
+
+  function showApiModal() {
+    const root = document.getElementById('wr-root');
+    const bg = document.createElement('div');
+    bg.className = 'wr-modal-bg';
+    let m = '<div class="wr-modal"><h4>API 配置 · ' + escapeHtml(findTeam(state.team).label) + '</h4>';
+    m += '<div class="wr-modal-section"><label>接口 URL (支持 {team} 与 {week} 占位符)</label><input type="text" id="m-url" value="' + escapeHtml(apiCfg.url) + '" placeholder="https://api.example.com/metrics?team={team}&week={week}" /></div>';
+    m += '<div class="wr-modal-section" style="display: grid; grid-template-columns: 100px 1fr; gap: 10px; align-items: end;"><div><label>方法</label><select id="m-method"><option' + (apiCfg.method==='GET'?' selected':'') + '>GET</option><option' + (apiCfg.method==='POST'?' selected':'') + '>POST</option></select></div><div><label>响应中数据所在路径</label><input type="text" id="m-path" value="' + escapeHtml(apiCfg.responsePath) + '" placeholder="data.metrics" /></div></div>';
+    m += '<div class="wr-modal-section"><label>Headers (JSON, 选填)</label><textarea id="m-headers" rows="3">' + escapeHtml(apiCfg.headers) + '</textarea></div>';
+    m += '<div class="wr-modal-section"><label>POST Body 模板 (选填)</label><textarea id="m-payload" rows="3">' + escapeHtml(apiCfg.payloadTemplate) + '</textarea></div>';
+    m += '<div class="wr-modal-foot"><button class="wr-ghostbtn" id="m-cancel">取消</button><button id="m-save">保存配置</button></div></div>';
+    bg.innerHTML = m;
+    root.appendChild(bg);
+    bg.querySelector('#m-cancel').onclick = () => bg.remove();
+    bg.onclick = e => { if (e.target === bg) bg.remove(); };
+    bg.querySelector('#m-save').onclick = () => {
+      apiCfg.url = bg.querySelector('#m-url').value.trim();
+      apiCfg.method = bg.querySelector('#m-method').value;
+      apiCfg.responsePath = bg.querySelector('#m-path').value.trim();
+      apiCfg.headers = bg.querySelector('#m-headers').value.trim();
+      apiCfg.payloadTemplate = bg.querySelector('#m-payload').value.trim();
+      persistApi(); updateApiBar(); bg.remove();
+    };
+  }
+
+  function updateApiBar() {
+    const el = document.getElementById('wr-api-url-show');
+    if (!el) return;
+    el.textContent = apiCfg.url || '未配置';
+    el.style.color = apiCfg.url ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)';
+  }
+
+  function addInput() {
+    const cat = state.inputCat === '__all' ? schema.inputCats[0].id : state.inputCat;
+    const m = { key: uid('m'), name: '新指标', unit: '', cat, apiPath: '' };
+    schema.inputs.push(m); persistSchema();
+    renderInputMetricCards(); renderInputRows(); renderTasks(); renderLastTasks(); renderChart();
+    setTimeout(() => { const inp = document.querySelector('#wr-input-rows input[data-k="' + m.key + '"][data-f="name"]'); if (inp) { inp.focus(); inp.select(); } }, 0);
+  }
+  function addCat() {
+    const newName = prompt('分类名称:', '新分类');
+    if (!newName || !newName.trim()) return;
+    const id = uid('cat');
+    schema.inputCats.push({ id, label: newName.trim() });
+    state.inputCat = id;
+    persistSchema();
+    renderInputCats(); renderInputMetricCards(); renderInputRows(); renderChart();
+  }
+  function addTeam() {
+    const id = 'team_' + Date.now().toString(36);
+    teams.push({ id, label: '新产品组' });
+    persistTeams();
+    state.team = id; editingTeamId = id;
+    loadSchema(); loadApi(); loadState();
+    document.getElementById('wr-overview-view').style.display = 'none';
+    document.getElementById('wr-team-view').style.display = '';
+    document.getElementById('wr-meta-row').style.display = '';
+    renderTeamTabs(); renderAll();
+  }
+
+  function renderAll() {
+    document.getElementById('wr-owner').value = state.owner || '';
+    updateApiBar();
+    renderNorthStar();
+    renderInputCats(); renderInputMetricCards(); renderInputRows();
+    renderTasks(); renderLastTasks();
+    renderChart();
+    bindRetro();
+  }
+
+  async function cloudBootstrap() {
+    setCloudStatus('syncing', '拉取云端数据…');
+    try {
+      const [{ data: teamsRows }, { data: schemaRows }, { data: apiRows }, { data: weeklyRows }] = await Promise.all([
+        sb.from('teams').select('*').order('sort_order'),
+        sb.from('team_schemas').select('*'),
+        sb.from('team_api_configs').select('*'),
+        sb.from('weekly_data').select('*')
+      ]);
+      if (teamsRows && teamsRows.length) {
+        localStorage.setItem(TEAMS_KEY, JSON.stringify(teamsRows.map(r => ({ id: r.id, label: r.label }))));
+      } else {
+        const seed = (() => { try { return JSON.parse(localStorage.getItem(TEAMS_KEY)) || DEFAULT_TEAMS.slice(); } catch (e) { return DEFAULT_TEAMS.slice(); } })();
+        const seedRows = seed.map((t, i) => ({ id: t.id, label: t.label, sort_order: i, updated_at: new Date().toISOString() }));
+        await sb.from('teams').upsert(seedRows);
+        localStorage.setItem(TEAMS_KEY, JSON.stringify(seed));
+      }
+      (schemaRows || []).forEach(r => localStorage.setItem(SCHEMA_KEY(r.team_id), JSON.stringify(r.schema)));
+      (apiRows || []).forEach(r => localStorage.setItem(API_KEY(r.team_id), JSON.stringify(r.config)));
+      (weeklyRows || []).forEach(r => localStorage.setItem(DATA_KEY(r.team_id, r.week), JSON.stringify(r.data)));
+      setCloudStatus('ok', '已同步');
+    } catch (e) {
+      setCloudStatus('error', '拉取失败');
+      console.error('cloudBootstrap failed', e);
+    }
+  }
+
+  function showAuth() {
+    document.getElementById('wr-auth').style.display = '';
+    document.getElementById('wr-root').style.display = 'none';
+  }
+  function hideAuth() {
+    document.getElementById('wr-auth').style.display = 'none';
+    document.getElementById('wr-root').style.display = '';
+  }
+  function bindAuthUI() {
+    const btn = document.getElementById('wr-auth-send');
+    const email = document.getElementById('wr-auth-email');
+    const msg = document.getElementById('wr-auth-msg');
+    btn.addEventListener('click', async () => {
+      const v = email.value.trim();
+      if (!v) { msg.textContent = '请输入邮箱'; return; }
+      btn.disabled = true; msg.textContent = '正在发送…';
+      const { error } = await sb.auth.signInWithOtp({ email: v, options: { emailRedirectTo: window.location.href } });
+      btn.disabled = false;
+      if (error) msg.textContent = '发送失败: ' + error.message;
+      else msg.textContent = '已发送，请到邮箱点击链接登录。';
+    });
+    email.addEventListener('keydown', e => { if (e.key === 'Enter') btn.click(); });
+    document.getElementById('wr-cloud-logout').addEventListener('click', async () => {
+      await sb.auth.signOut();
+      location.reload();
+    });
+  }
+
+  async function bootApp() {
+    currentUser = (await sb.auth.getSession()).data.session?.user || null;
+    bindAuthUI();
+    if (!currentUser) {
+      showAuth();
+      sb.auth.onAuthStateChange((_event, session) => {
+        if (session?.user && !currentUser) {
+          currentUser = session.user;
+          location.reload();
+        }
+      });
+      return;
+    }
+    hideAuth();
+    document.getElementById('wr-cloud-user').textContent = currentUser.email || '';
+    document.getElementById('wr-cloud-logout').style.display = '';
+    await cloudBootstrap();
+    init();
+  }
+
+  function init() {
+    loadTeams();
+    state.team = teams[0].id;
+    state.week = getCurrentWeek();
+    loadSchema(); loadApi(); loadState();
+    document.getElementById('wr-week').value = state.week;
+    document.getElementById('wr-week').addEventListener('change', e => { state.week = e.target.value; loadState(); renderAll(); });
+    document.getElementById('wr-owner').addEventListener('input', e => { state.owner = e.target.value; scheduleSave(); });
+    document.getElementById('wr-add-task').addEventListener('click', () => { state.tasks.push(blankTask()); renderTasks(); scheduleSave(); });
+    document.getElementById('wr-add-last-task').addEventListener('click', () => { state.lastTasks.push(blankLastTask()); renderLastTasks(); scheduleSave(); });
+    document.getElementById('wr-pull-last').addEventListener('click', pullLastWeekTasks);
+    document.getElementById('wr-add-team').addEventListener('click', addTeam);
+    document.getElementById('wr-add-input').addEventListener('click', addInput);
+    document.getElementById('wr-add-cat').addEventListener('click', addCat);
+    document.getElementById('wr-config-api').addEventListener('click', showApiModal);
+    document.getElementById('wr-fetch-api').addEventListener('click', fetchFromApi);
+    document.getElementById('wr-save').addEventListener('click', saveState);
+    renderTeamTabs();
+    renderAll();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootApp);
+  else bootApp();
+})();
+</script>
+</body>
+</html>

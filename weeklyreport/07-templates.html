@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>金模板库 · Pallax 内容工厂</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+
+.config-nav-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--border-radius-md);font-size:12px;color:var(--color-text-secondary);cursor:pointer;margin-bottom:2px;}
+.config-nav-item:hover{background:var(--color-background-secondary);}
+.config-nav-item.active{background:#E6F1FB;color:#0C447C;font-weight:500;}
+.config-nav-item .count{margin-left:auto;font-size:10.5px;color:var(--color-text-tertiary);font-weight:400;}
+.config-nav-item.active .count{color:#185FA5;}
+
+.matrix-cell{position:relative;border-radius:var(--border-radius-md);padding:8px 6px;cursor:pointer;min-height:54px;display:flex;flex-direction:column;justify-content:center;text-align:center;border:0.5px solid transparent;}
+.matrix-cell.empty{background:var(--color-background-secondary);color:var(--color-text-tertiary);}
+.matrix-cell.empty .cell-num{font-size:10px;}
+.matrix-cell.weak{background:#FAEEDA;color:#854F0B;}
+.matrix-cell.solid{background:#EAF3DE;color:#27500A;}
+.matrix-cell.fire{background:#FAECE7;color:#993C1D;border-color:#D85A30;}
+.matrix-cell.selected{outline:1.5px solid #185FA5;outline-offset:-1px;}
+.cell-num{font-size:13px;font-weight:500;line-height:1.1;}
+.cell-sub{font-size:10px;margin-top:2px;opacity:0.85;}
+.fire-badge{position:absolute;top:3px;right:3px;font-size:10px;}
+
+.tpl-detail-card{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:12px;}
+.tpl-skeleton{background:var(--color-background-primary);border:0.5px dashed var(--color-border-secondary);border-radius:var(--border-radius-md);padding:11px 12px;font-size:12px;line-height:1.65;margin-top:8px;}
+.tpl-slot{background:#EEEDFE;color:#3C3489;padding:1px 5px;border-radius:3px;font-family:var(--font-mono);font-size:11px;}
+
+.example-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:0.5px solid var(--color-border-tertiary);font-size:11.5px;}
+.example-row:last-child{border-bottom:none;}
+.example-row .name{flex:1;min-width:0;}
+.example-row .views{font-size:11.5px;font-weight:500;color:#3B6D11;}
+.usage-bar{height:5px;background:var(--color-background-tertiary);border-radius:3px;overflow:hidden;margin-top:6px;}
+.usage-fill{height:100%;background:#1D9E75;}
+
+.legend{display:flex;align-items:center;gap:12px;font-size:10.5px;color:var(--color-text-secondary);}
+.legend-dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px;}
+
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.32);display:none;align-items:center;justify-content:center;z-index:200;}
+.modal-backdrop.open{display:flex;}
+.modal{background:var(--color-background-primary);border-radius:var(--border-radius-lg);width:760px;max-width:calc(100vw - 32px);max-height:calc(100vh - 48px);overflow-y:auto;padding:18px 20px;box-shadow:0 12px 48px rgba(0,0,0,0.18);}
+.modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.modal-title{font-size:15px;font-weight:600;}
+.modal-close{background:transparent;border:none;font-size:18px;color:var(--color-text-tertiary);cursor:pointer;padding:0 4px;}
+.modal-label{font-size:11px;color:var(--color-text-tertiary);margin-bottom:5px;display:block;letter-spacing:0.3px;}
+.modal-select,.modal-input,.modal-textarea{width:100%;border:0.5px solid var(--color-border-secondary);background:var(--color-background-primary);border-radius:var(--border-radius-md);padding:8px 10px;font-size:12.5px;font-family:inherit;color:var(--color-text-primary);}
+.modal-textarea{min-height:110px;font-family:var(--font-mono);font-size:12px;line-height:1.55;resize:vertical;}
+.modal-section{margin-bottom:14px;}
+.modal-hint{font-size:10.5px;color:var(--color-text-tertiary);margin-top:4px;line-height:1.5;}
+.modal-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;padding-top:14px;border-top:0.5px solid var(--color-border-tertiary);align-items:center;}
+
+.mode-tabs{display:inline-flex;background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:3px;gap:2px;margin-bottom:14px;}
+.mode-tab{padding:7px 14px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--color-text-secondary);background:transparent;border:none;}
+.mode-tab.active{background:var(--color-background-primary);color:var(--color-text-primary);font-weight:500;box-shadow:0 1px 2px rgba(0,0,0,0.05);}
+
+.viral-list{display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto;}
+.viral-card{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:flex-start;padding:9px 11px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);background:var(--color-background-primary);cursor:pointer;}
+.viral-card:hover{background:var(--color-background-secondary);}
+.viral-card.selected{border-color:#185FA5;background:#E6F1FB;}
+.viral-card input[type=checkbox]{margin-top:3px;}
+.viral-handle{font-size:12px;font-weight:500;margin-bottom:3px;display:flex;align-items:center;gap:6px;}
+.viral-text{font-size:11.5px;line-height:1.55;color:var(--color-text-primary);}
+.viral-meta{font-size:10.5px;color:var(--color-text-tertiary);margin-top:5px;display:flex;gap:10px;}
+.viral-views{font-size:11.5px;font-weight:500;color:#3B6D11;text-align:right;white-space:nowrap;}
+
+.preview-tpl{border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:10px 12px;margin-top:8px;background:var(--color-background-secondary);}
+.preview-tpl-head{display:flex;align-items:center;gap:6px;font-size:11.5px;margin-bottom:6px;}
+.preview-tpl-skel{font-size:12px;line-height:1.65;background:var(--color-background-primary);border:0.5px dashed var(--color-border-secondary);border-radius:var(--border-radius-md);padding:9px 11px;}
+.preview-tpl-skel .tpl-slot{background:#EEEDFE;color:#3C3489;padding:1px 5px;border-radius:3px;font-family:var(--font-mono);font-size:11px;}
+.preview-tpl-meta{display:flex;gap:8px;margin-top:8px;align-items:center;font-size:11px;}
+.preview-tpl-meta select{font-size:11px;padding:3px 6px;border:0.5px solid var(--color-border-tertiary);border-radius:4px;background:var(--color-background-primary);color:var(--color-text-primary);}
+
+</style>
+</head>
+<body>
+<div class="app">
+<nav class="topnav">
+  <div class="topnav-brand">
+    <div class="logo">P</div>
+    <div class="name">Pallax 内容工厂</div>
+  </div>
+  <div class="topnav-tabs">
+    <a href="02-radar.html" class="nav-item"><span class="ic">◉</span>热点雷达</a>
+    <a href="08-sources.html" class="nav-item"><span class="ic">⊙</span>监控源 list</a>
+    <a href="07-templates.html" class="nav-item active"><span class="ic">◫</span>金模板库</a>
+  </div>
+</nav>
+<main class="main">
+
+<div class="page-header">
+  <div class="left">
+    <span class="ic" style="font-size:18px;color:#185FA5">⚙</span>
+    <span class="title">06 配置中心</span>
+    <span class="subtitle">/ 金模板库</span>
+  </div>
+  <div class="right">
+    <span class="muted">最近更新 1 小时前</span>
+    <div class="avatar">LR</div>
+  </div>
+</div>
+
+<div>
+
+<div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+
+<div class="card">
+<div class="card-head">
+<div class="card-title">▦ 金模板矩阵 · 4 类 × 7 angle</div>
+<div class="legend">
+<span><span class="legend-dot" style="background:#FAECE7"></span>爆款 ≥ 50k</span>
+<span><span class="legend-dot" style="background:#EAF3DE"></span>主力 20-50k</span>
+<span><span class="legend-dot" style="background:#FAEEDA"></span>观察 ≤ 20k</span>
+<span><span class="legend-dot" style="background:var(--color-background-secondary)"></span>空格 待建</span>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:80px repeat(7, 1fr);gap:5px;font-size:11px;margin-bottom:5px">
+<div></div>
+<div style="text-align:center;padding:4px 0;color:var(--color-text-secondary)">反直觉</div>
+<div style="text-align:center;padding:4px 0;color:var(--color-text-secondary)">数据驱动</div>
+<div style="text-align:center;padding:4px 0;color:var(--color-text-secondary)">案例</div>
+<div style="text-align:center;padding:4px 0;color:var(--color-text-secondary)">KOL 蹭点</div>
+<div style="text-align:center;padding:4px 0;color:var(--color-text-secondary)">深度</div>
+<div style="text-align:center;padding:4px 0;color:var(--color-text-secondary)">教程</div>
+<div style="text-align:center;padding:4px 0;color:var(--color-text-secondary)">Thread</div>
+</div>
+
+<div style="display:grid;grid-template-columns:80px repeat(7, 1fr);gap:5px">
+
+<div style="display:flex;align-items:center;justify-content:flex-start;padding-left:6px"><span class="tag tag-A">A 赔率</span></div>
+<div class="matrix-cell solid"><div class="cell-num">5</div><div class="cell-sub">42k 均</div></div>
+<div class="matrix-cell fire selected"><span class="fire-badge">●</span><div class="cell-num">8</div><div class="cell-sub">68k 均</div></div>
+<div class="matrix-cell weak"><div class="cell-num">2</div><div class="cell-sub">12k</div></div>
+<div class="matrix-cell solid"><div class="cell-num">4</div><div class="cell-sub">38k</div></div>
+<div class="matrix-cell solid"><div class="cell-num">3</div><div class="cell-sub">31k</div></div>
+<div class="matrix-cell empty"><div class="cell-num">+</div></div>
+<div class="matrix-cell solid"><div class="cell-num">2</div><div class="cell-sub">28k</div></div>
+
+<div style="display:flex;align-items:center;justify-content:flex-start;padding-left:6px"><span class="tag tag-C">C 链上</span></div>
+<div class="matrix-cell fire"><span class="fire-badge">●</span><div class="cell-num">6</div><div class="cell-sub">82k 均</div></div>
+<div class="matrix-cell fire"><span class="fire-badge">●</span><div class="cell-num">5</div><div class="cell-sub">71k</div></div>
+<div class="matrix-cell weak"><div class="cell-num">1</div><div class="cell-sub">9k</div></div>
+<div class="matrix-cell fire"><span class="fire-badge">●</span><div class="cell-num">4</div><div class="cell-sub">58k</div></div>
+<div class="matrix-cell solid"><div class="cell-num">3</div><div class="cell-sub">44k</div></div>
+<div class="matrix-cell empty"><div class="cell-num">+</div></div>
+<div class="matrix-cell solid"><div class="cell-num">3</div><div class="cell-sub">36k</div></div>
+
+<div style="display:flex;align-items:center;justify-content:flex-start;padding-left:6px"><span class="tag tag-D">D 新合约</span></div>
+<div class="matrix-cell solid"><div class="cell-num">3</div><div class="cell-sub">26k</div></div>
+<div class="matrix-cell solid"><div class="cell-num">2</div><div class="cell-sub">21k</div></div>
+<div class="matrix-cell weak"><div class="cell-num">4</div><div class="cell-sub">8k 跌</div></div>
+<div class="matrix-cell empty"><div class="cell-num">+</div></div>
+<div class="matrix-cell solid"><div class="cell-num">2</div><div class="cell-sub">22k</div></div>
+<div class="matrix-cell weak"><div class="cell-num">2</div><div class="cell-sub">11k</div></div>
+<div class="matrix-cell empty"><div class="cell-num">+</div></div>
+
+<div style="display:flex;align-items:center;justify-content:flex-start;padding-left:6px"><span class="tag tag-E">E 现实</span></div>
+<div class="matrix-cell solid"><div class="cell-num">2</div><div class="cell-sub">29k</div></div>
+<div class="matrix-cell solid"><div class="cell-num">3</div><div class="cell-sub">33k</div></div>
+<div class="matrix-cell empty"><div class="cell-num">+</div></div>
+<div class="matrix-cell weak"><div class="cell-num">2</div><div class="cell-sub">15k</div></div>
+<div class="matrix-cell solid"><div class="cell-num">2</div><div class="cell-sub">24k</div></div>
+<div class="matrix-cell weak"><div class="cell-num">1</div><div class="cell-sub">2k 退役</div></div>
+<div class="matrix-cell empty"><div class="cell-num">+</div></div>
+
+</div>
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:10px;border-top:0.5px solid var(--color-border-tertiary);font-size:11.5px;color:var(--color-text-secondary)">
+<div>共 <span id="tpl-total">68</span> 个模板 · <span id="tpl-fire">12</span> 个爆款级 · 4 个观察 · 7 个空格待建</div>
+<div style="display:flex;gap:6px">
+<button class="btn-ghost" id="btn-from-viral" style="background:#FAECE7;color:#993C1D;border-color:#F4C7B8">✨ 从爆款提炼</button>
+<button class="btn-ghost" id="btn-from-url" style="background:#EEEDFE;color:#3C3489;border-color:#CECBF6">↥ 粘贴推文链接</button>
+<button class="btn-ghost">+ 新建模板</button>
+</div>
+</div>
+</div>
+
+<div class="card">
+<div class="card-head">
+<div class="card-title">
+<span class="tag tag-A">A 赔率</span>
+<span style="margin:0 4px;color:var(--color-text-tertiary)">×</span>
+<span style="background:#EEEDFE;color:#3C3489;padding:2px 6px;border-radius:3px;font-size:10px;font-weight:500">数据驱动</span>
+<span style="margin-left:6px;font-size:13px;font-weight:500">爆款级模板 · 8 次使用</span>
+</div>
+<div style="display:flex;align-items:center;gap:6px">
+<span style="font-size:11px;color:#993C1D;font-weight:500">🔥 当前最爆</span>
+<button class="btn-ghost">✎ 编辑</button>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:1.4fr 1fr;gap:14px">
+
+<div>
+<div class="tpl-detail-card">
+<div style="font-size:11px;color:var(--color-text-tertiary);margin-bottom:6px;letter-spacing:0.3px">模板骨架 · slot 替换式</div>
+<div class="tpl-skeleton">
+<div><span class="tpl-slot">{合约名}</span> 赔率在 <span class="tpl-slot">{时间窗}</span> 内从 <span class="tpl-slot">{起赔率}</span> 跳到 <span class="tpl-slot">{终赔率}</span>。</div>
+<div style="margin-top:6px"><span class="tpl-slot">{异常信号}</span> · <span class="tpl-slot">{反共识 takeaway}</span></div>
+<div style="margin-top:6px">→ 在 PredX 跟踪 <span class="tpl-slot">{追踪对象}</span>: <span class="tpl-slot">{产品链接}</span></div>
+</div>
+<div style="font-size:10.5px;color:var(--color-text-tertiary);margin-top:8px;line-height:1.5">必填 slot: 合约名 / 时间窗 / 起赔率 / 终赔率 / 产品链接 · 选填: 异常信号 · takeaway</div>
+</div>
+
+<div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+<div class="kv"><span class="k">最优 angle 配比</span><span>反直觉 + 数据驱动</span></div>
+<div class="kv"><span class="k">最优形式</span><span>单推 + 数据图</span></div>
+<div class="kv"><span class="k">最佳发布窗口</span><span>美东开盘前 1h</span></div>
+<div class="kv"><span class="k">配图类型</span><span>赔率轨迹截图</span></div>
+</div>
+</div>
+
+<div>
+<div style="font-size:11px;color:var(--color-text-tertiary);margin-bottom:6px;letter-spacing:0.3px">历史命中爆款 · 8 / 8</div>
+
+<div class="example-row">
+<span style="color:#D85A30">🔥</span>
+<div class="name">FOMC 前夜赔率 0.42 → 0.38</div>
+<span class="views">128k</span>
+</div>
+<div class="example-row">
+<span style="color:#D85A30">🔥</span>
+<div class="name">Trump 媒体股赔率剧变</div>
+<span class="views">87k</span>
+</div>
+<div class="example-row">
+<span style="color:#D85A30">🔥</span>
+<div class="name">SBF 上诉合约成交激增</div>
+<span class="views">71k</span>
+</div>
+<div class="example-row">
+<span style="color:#3B6D11">✓</span>
+<div class="name">苹果发布会赔率回落</div>
+<span class="views">54k</span>
+</div>
+<div class="example-row">
+<span style="color:#3B6D11">✓</span>
+<div class="name">+ 4 条 (查看全部)</div>
+<span class="views" style="color:var(--color-text-tertiary);font-weight:400">avg 47k</span>
+</div>
+
+<div style="margin-top:10px;font-size:11px;color:var(--color-text-tertiary)">命中率 100% · 平均 view 68k · 累计 view 547k</div>
+<div class="usage-bar"><div class="usage-fill" style="width:100%"></div></div>
+</div>
+
+</div>
+
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:14px;padding-top:12px;border-top:0.5px solid var(--color-border-tertiary)">
+<div style="font-size:11px;color:var(--color-text-secondary);display:flex;align-items:center;gap:14px">
+<span>⏱ v3 · 上次更新 W17 周日</span>
+<span>👤 由 Lareina 提炼</span>
+</div>
+<div style="display:flex;gap:6px">
+<button class="btn-ghost">↗ 查看版本历史</button>
+<button class="btn-ghost">↗ 复制为新模板</button>
+<a href="03-briefing.html" class="btn-primary" style="text-decoration:none">✨ 用此模板生成 angle</a>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</main>
+</div>
+
+<div class="modal-backdrop" id="tpl-modal">
+<div class="modal">
+<div class="modal-head">
+<div class="modal-title" id="tpl-modal-title">✨ 新建金模板</div>
+<button class="modal-close" id="tpl-close">✕</button>
+</div>
+
+<div class="mode-tabs">
+<button class="mode-tab" data-mode="viral">✨ 从爆款推文提炼</button>
+<button class="mode-tab" data-mode="url">↥ 粘贴推文链接</button>
+</div>
+
+<div id="mode-viral" class="modal-section">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+<label class="modal-label" style="margin:0">最近 7 天爆款推文 (≥ 50k views · 已聚类去重)</label>
+<button class="btn-ghost" id="viral-select-all" style="font-size:11px;padding:3px 8px">全选</button>
+</div>
+<div class="viral-list" id="viral-list"></div>
+</div>
+
+<div id="mode-url" class="modal-section" style="display:none">
+<label class="modal-label">推文链接 (一行一条)</label>
+<textarea class="modal-textarea" id="url-textarea" placeholder="https://x.com/JimGCryptos/status/1234567890123456789
+https://x.com/HayesEconomics/status/1234567890123456789
+https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
+<div class="modal-hint">支持 x.com / twitter.com URL · 系统会自动拉取推文内容并 AI 提炼为模板骨架</div>
+<button class="btn-ghost" id="url-parse" style="margin-top:8px;background:#534AB7;color:#fff;border-color:#534AB7">↗ 解析并提炼</button>
+</div>
+
+<div class="modal-section">
+<label class="modal-label">AI 提炼预览 <span class="muted" id="extract-summary" style="margin-left:6px;font-size:10.5px"></span></label>
+<div id="extract-preview">
+<div style="padding:24px;text-align:center;font-size:11.5px;color:var(--color-text-tertiary);background:var(--color-background-secondary);border-radius:var(--border-radius-md)">
+选中爆款 / 粘贴链接 → AI 提炼为可复用骨架
+</div>
+</div>
+</div>
+
+<div class="modal-foot">
+<div id="tpl-progress" style="flex:1;font-size:11.5px;color:var(--color-text-tertiary)"></div>
+<button class="btn-ghost" id="tpl-cancel">取消</button>
+<button class="btn-primary" id="tpl-confirm" disabled>+ 保存到模板库</button>
+</div>
+</div>
+</div>
+
+<div class="demo-banner"><span class="dot"></span>原型演示 · 数据为示例</div>
+
+<script>
+(function(){
+  const modal = document.getElementById('tpl-modal');
+  const btnViral = document.getElementById('btn-from-viral');
+  const btnUrl = document.getElementById('btn-from-url');
+  const btnClose = document.getElementById('tpl-close');
+  const btnCancel = document.getElementById('tpl-cancel');
+  const btnConfirm = document.getElementById('tpl-confirm');
+  const btnUrlParse = document.getElementById('url-parse');
+  const btnSelectAll = document.getElementById('viral-select-all');
+  const modeViral = document.getElementById('mode-viral');
+  const modeUrl = document.getElementById('mode-url');
+  const viralList = document.getElementById('viral-list');
+  const urlTextarea = document.getElementById('url-textarea');
+  const preview = document.getElementById('extract-preview');
+  const summary = document.getElementById('extract-summary');
+  const progressEl = document.getElementById('tpl-progress');
+
+  const CATEGORIES = [
+    { value: 'A', label: 'A 赔率' },
+    { value: 'C', label: 'C 链上' },
+    { value: 'D', label: 'D 新合约' },
+    { value: 'E', label: 'E 现实' },
+  ];
+  const ANGLES = ['反直觉', '数据驱动', '案例', 'KOL 蹭点', '深度', '教程', 'Thread'];
+
+  // Mock 爆款推文池
+  const VIRAL_POOL = [
+    {
+      id: 'v1', handle: '@JimGCryptos', date: '2 天前', views: '128k',
+      cat: 'A', angle: '数据驱动',
+      text: 'FOMC 前夜赔率从 0.42 跳到 0.38，38 min 内振幅 9.5%。链上 3 个胜率 ≥70% 钱包 6h 内集中买入 $691k YES。这是经典的 smart money front-running。',
+      slots: ['合约名','时间窗','起赔率','终赔率','异常信号','反共识 takeaway']
+    },
+    {
+      id: 'v2', handle: '@OnchainBob', date: '3 天前', views: '92k',
+      cat: 'C', angle: '反直觉',
+      text: 'Trump 媒体股相关合约赔率剧变前 26 分钟，5 个独立大额钱包同向操作。链上比链下信号早 23 分钟。',
+      slots: ['标的资产','钱包数','领先时长','行为描述','结论']
+    },
+    {
+      id: 'v3', handle: '@PolymarketWhale', date: '4 天前', views: '87k',
+      cat: 'C', angle: '案例',
+      text: '回测过去 12 个月：链上 smart money clustering 信号出现后 6h 内，赔率反转概率 73%。样本 N=48，胜率高于裸看 KOL 的 51%。',
+      slots: ['信号类型','观察窗口','胜率','样本量','对比基准']
+    },
+    {
+      id: 'v4', handle: '@HayesEconomics', date: '5 天前', views: '76k',
+      cat: 'A', angle: '反直觉',
+      text: '所有人都在喊鸽派转向，但 OIS 隔夜利率显示市场只 price-in 单一路径，dot plot 内部分歧到 18 个月新高。volatility 被严重低估。',
+      slots: ['主流共识','反驳数据','分歧维度','机会切入']
+    },
+    {
+      id: 'v5', handle: '@degenoeconomist', date: '5 天前', views: '64k',
+      cat: 'D', angle: '深度',
+      text: 'Polymarket 新合约 "AI 监管法案 Q1 通过" 上线 4h 内成交 $1.7M，但市值前 20 KOL 0 提及。流动性已建立但信息差还在。',
+      slots: ['合约名','上线时长','成交量','KOL 覆盖','信息差类型']
+    },
+    {
+      id: 'v6', handle: '@ElectionMaths', date: '6 天前', views: '58k',
+      cat: 'E', angle: '数据驱动',
+      text: '州层面 polls 与 Polymarket 隐含概率背离 ≥ 4 个百分点的州，过去 3 次大选预测准确率 67%（vs polls 58%）。',
+      slots: ['维度','背离阈值','样本周期','准确率对比']
+    },
+    {
+      id: 'v7', handle: '@SmartKalshi', date: '6 天前', views: '54k',
+      cat: 'A', angle: 'KOL 蹭点',
+      text: '关于昨天 @JimGCryptos 提到的 FOMC 赔率异动——补充一个数据点：Kalshi 同合约 spread 比 Polymarket 紧 18%，套利窗口 6h。',
+      slots: ['触发 KOL','补充维度','跨平台对比','可操作窗口']
+    },
+    {
+      id: 'v8', handle: '@nic__carter', date: '7 天前', views: '52k',
+      cat: 'D', angle: 'Thread',
+      text: '预测市场正在 front-run CME futures 3-4 小时。这 8 个例子展示了 2026 年以来这种领先关系是如何出现的。1/8',
+      slots: ['信号类型','领先时长','样本量','时间窗']
+    },
+  ];
+
+  let selectedViral = new Set();
+  let extractedTpls = [];
+
+  function renderViralList(){
+    viralList.innerHTML = VIRAL_POOL.map(t => `
+      <label class="viral-card ${selectedViral.has(t.id)?'selected':''}" data-id="${t.id}">
+        <input type="checkbox" data-id="${t.id}" ${selectedViral.has(t.id)?'checked':''}/>
+        <div>
+          <div class="viral-handle">${t.handle} <span class="tag tag-${t.cat}">${CATEGORIES.find(c=>c.value===t.cat).label}</span> <span style="background:#EEEDFE;color:#3C3489;padding:1px 5px;border-radius:3px;font-size:10px">${t.angle}</span></div>
+          <div class="viral-text">${t.text}</div>
+          <div class="viral-meta"><span>${t.date}</span><span>·</span><span>预估 ${t.slots.length} 个 slot</span></div>
+        </div>
+        <div class="viral-views">${t.views}<div style="font-size:10px;color:var(--color-text-tertiary);font-weight:400;margin-top:2px">views</div></div>
+      </label>
+    `).join('');
+    viralList.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.addEventListener('change', e => {
+        const id = e.target.dataset.id;
+        if (e.target.checked) selectedViral.add(id);
+        else selectedViral.delete(id);
+        viralList.querySelector(`.viral-card[data-id="${id}"]`).classList.toggle('selected', e.target.checked);
+        if (currentMode === 'viral') runExtract();
+      });
+    });
+  }
+
+  function extractFromTweet(handle, text, cat, angle, slots){
+    // Mock AI 提炼: 用 slot 名替换文本里的具体数字/实体
+    let skel = text;
+    const replacements = {
+      '0.42': '{起赔率}', '0.38': '{终赔率}', '38 min': '{时间窗}',
+      '$691k': '{金额}', '6h': '{观察窗口}', '$1.7M': '{成交量}',
+      '128k': '{views}', '12 个月': '{回测周期}', '73%': '{胜率}',
+      'FOMC': '{事件}', 'Trump': '{标的}',
+    };
+    for (const [k,v] of Object.entries(replacements)) {
+      skel = skel.split(k).join(`<span class="tpl-slot">${v}</span>`);
+    }
+    // 兜底：第一句加几个通用 slot
+    if (!skel.includes('tpl-slot')) {
+      skel = `<span class="tpl-slot">{触发事件}</span> · ${skel} → <span class="tpl-slot">{takeaway}</span>`;
+    }
+    return { handle, source: text, skeleton: skel, cat, angle, slots };
+  }
+
+  function runExtract(){
+    let sourceTweets = [];
+    if (currentMode === 'viral') {
+      sourceTweets = VIRAL_POOL.filter(t => selectedViral.has(t.id));
+    } else {
+      sourceTweets = parsedFromUrls;
+    }
+    extractedTpls = sourceTweets.map(t => extractFromTweet(t.handle, t.text, t.cat, t.angle, t.slots));
+    renderPreview();
+  }
+
+  function renderPreview(){
+    if (extractedTpls.length === 0){
+      preview.innerHTML = `<div style="padding:24px;text-align:center;font-size:11.5px;color:var(--color-text-tertiary);background:var(--color-background-secondary);border-radius:var(--border-radius-md)">${currentMode==='viral'?'勾选爆款推文 → AI 提炼为可复用骨架':'粘贴推文链接 → 点「解析并提炼」'}</div>`;
+      summary.textContent = '';
+      btnConfirm.disabled = true;
+      btnConfirm.textContent = '+ 保存到模板库';
+      return;
+    }
+    summary.textContent = `共 ${extractedTpls.length} 条候选模板`;
+    preview.innerHTML = extractedTpls.map((tpl, i) => `
+      <div class="preview-tpl">
+        <div class="preview-tpl-head">
+          <span class="tag tag-${tpl.cat}">${CATEGORIES.find(c=>c.value===tpl.cat).label}</span>
+          <span style="background:#EEEDFE;color:#3C3489;padding:1px 5px;border-radius:3px;font-size:10px;font-weight:500">${tpl.angle}</span>
+          <span style="color:var(--color-text-tertiary);font-size:11px">来源 ${tpl.handle}</span>
+        </div>
+        <div class="preview-tpl-skel">${tpl.skeleton}</div>
+        <div class="preview-tpl-meta">
+          <span style="color:var(--color-text-tertiary)">类别:</span>
+          <select data-idx="${i}" data-field="cat">${CATEGORIES.map(c=>`<option value="${c.value}" ${c.value===tpl.cat?'selected':''}>${c.label}</option>`).join('')}</select>
+          <span style="color:var(--color-text-tertiary);margin-left:6px">angle:</span>
+          <select data-idx="${i}" data-field="angle">${ANGLES.map(a=>`<option value="${a}" ${a===tpl.angle?'selected':''}>${a}</option>`).join('')}</select>
+        </div>
+      </div>
+    `).join('');
+    preview.querySelectorAll('select').forEach(sel => {
+      sel.addEventListener('change', e => {
+        const idx = +e.target.dataset.idx;
+        const field = e.target.dataset.field;
+        extractedTpls[idx][field] = e.target.value;
+        renderPreview();
+      });
+    });
+    btnConfirm.disabled = false;
+    btnConfirm.textContent = `+ 保存 ${extractedTpls.length} 个模板`;
+  }
+
+  let parsedFromUrls = [];
+  function parseUrls(){
+    const lines = urlTextarea.value.split('\n').map(l => l.trim()).filter(Boolean);
+    parsedFromUrls = lines.map((url, i) => {
+      const m = url.match(/(?:x\.com|twitter\.com)\/([A-Za-z0-9_]+)\/status\/(\d+)/i);
+      if (!m) return null;
+      // Mock: 假装从 URL 拉到推文内容，从 VIRAL_POOL 随机挑一条作为内容（演示用）
+      const seed = VIRAL_POOL[i % VIRAL_POOL.length];
+      return {
+        id: 'url-' + m[2],
+        handle: '@' + m[1],
+        text: seed.text,
+        cat: seed.cat,
+        angle: seed.angle,
+        slots: seed.slots,
+      };
+    }).filter(Boolean);
+  }
+
+  let currentMode = 'viral';
+  function switchMode(mode){
+    currentMode = mode;
+    document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+    modeViral.style.display = mode === 'viral' ? '' : 'none';
+    modeUrl.style.display = mode === 'url' ? '' : 'none';
+    extractedTpls = [];
+    renderPreview();
+    if (mode === 'viral') runExtract();
+  }
+
+  document.querySelectorAll('.mode-tab').forEach(t => t.addEventListener('click', () => switchMode(t.dataset.mode)));
+
+  btnSelectAll.addEventListener('click', () => {
+    if (selectedViral.size === VIRAL_POOL.length) selectedViral.clear();
+    else VIRAL_POOL.forEach(t => selectedViral.add(t.id));
+    btnSelectAll.textContent = selectedViral.size === VIRAL_POOL.length ? '全不选' : '全选';
+    renderViralList();
+    runExtract();
+  });
+
+  btnUrlParse.addEventListener('click', () => {
+    parseUrls();
+    if (parsedFromUrls.length === 0) {
+      preview.innerHTML = '<div style="padding:14px;text-align:center;font-size:11.5px;color:#A32D2D;background:#FCEBEB;border-radius:var(--border-radius-md)">⚠ 没有解析到有效的推文链接 · 需含 /status/{id}</div>';
+      return;
+    }
+    runExtract();
+  });
+
+  function open(mode){
+    selectedViral.clear();
+    extractedTpls = [];
+    parsedFromUrls = [];
+    urlTextarea.value = '';
+    btnSelectAll.textContent = '全选';
+    renderViralList();
+    switchMode(mode);
+    modal.classList.add('open');
+  }
+  function close(){ modal.classList.remove('open'); }
+
+  btnViral.addEventListener('click', () => open('viral'));
+  btnUrl.addEventListener('click', () => open('url'));
+  btnClose.addEventListener('click', close);
+  btnCancel.addEventListener('click', close);
+  modal.addEventListener('click', e => { if (e.target === modal) close(); });
+
+  btnConfirm.addEventListener('click', async () => {
+    btnConfirm.disabled = true;
+    let ok = 0;
+    for (const tpl of extractedTpls) {
+      // 真实环境: await fetch('/api/templates', { method:'POST', body: JSON.stringify({ category:tpl.cat, angle:tpl.angle, skeleton:tpl.skeleton, source_tweet:tpl.handle }) })
+      await new Promise(res => setTimeout(res, 50));
+      ok++;
+      progressEl.textContent = `提交中 ${ok} / ${extractedTpls.length}`;
+    }
+    progressEl.textContent = `✓ 已入库 ${ok} 个模板`;
+    progressEl.style.color = '#3B6D11';
+    // 更新页面总数
+    const totalEl = document.getElementById('tpl-total');
+    if (totalEl) totalEl.textContent = parseInt(totalEl.textContent, 10) + ok;
+    setTimeout(() => {
+      progressEl.textContent = '';
+      progressEl.style.color = '';
+      close();
+    }, 900);
+  });
+})();
+</script>
+
+</body>
+</html>

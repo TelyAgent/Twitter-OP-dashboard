@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>热点雷达 · Pallax 内容工厂</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+
+.hot-card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:11px 12px;cursor:pointer;margin-bottom:6px;}
+.hot-card:hover{border-color:var(--color-border-secondary);}
+.hot-card.selected{border-color:#185FA5;background:#E6F1FB;}
+.hot-card.hot{border-color:#D85A30;background:#FAECE7;position:relative;}
+.hot-card.hot::before{content:"";position:absolute;top:8px;right:8px;width:6px;height:6px;border-radius:50%;background:#D85A30;}
+.hot-title{font-size:13px;font-weight:500;margin-bottom:6px;line-height:1.4;padding-right:14px;}
+.hot-meta{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--color-text-secondary);}
+.score-bar{display:flex;gap:2px;align-items:center;}
+.score-dot{width:6px;height:6px;border-radius:50%;background:var(--color-background-tertiary);}
+.score-dot.on{background:#1D9E75;}
+.cap-bar{height:6px;background:var(--color-background-tertiary);border-radius:3px;overflow:hidden;display:flex;}
+.cap-fill{height:100%;}
+.cap-A{background:#EF9F27;}
+.cap-C{background:#D85A30;}
+.cap-D{background:#5DCAA5;}
+.cap-E{background:#85B7EB;}
+.src-row{display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:0.5px solid var(--color-border-tertiary);font-size:11.5px;}
+.src-row:last-child{border-bottom:none;}
+.src-icon{flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--color-background-secondary);display:flex;align-items:center;justify-content:center;color:var(--color-text-secondary);font-size:10px;}
+.src-body{flex:1;line-height:1.5;color:var(--color-text-secondary);min-width:0;}
+.src-body .top{color:var(--color-text-primary);margin-bottom:2px;}
+.intel-block{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:9px 11px;font-size:11.5px;line-height:1.55;}
+.intel-label{font-size:10px;color:var(--color-text-tertiary);margin-bottom:3px;letter-spacing:0.3px;}
+.strength{display:inline-flex;gap:2px;margin-left:6px;}
+.strength i{width:12px;height:3px;background:var(--color-background-tertiary);border-radius:1px;font-style:normal;display:inline-block;}
+.strength i.on{background:#1D9E75;}
+
+</style>
+</head>
+<body>
+<div class="app">
+<nav class="topnav">
+  <div class="topnav-brand">
+    <div class="logo">P</div>
+    <div class="name">Pallax 内容工厂</div>
+  </div>
+  <div class="topnav-tabs">
+    <a href="02-radar.html" class="nav-item active"><span class="ic">◉</span>热点雷达</a>
+    <a href="08-sources.html" class="nav-item"><span class="ic">⊙</span>监控源 list</a>
+    <a href="07-templates.html" class="nav-item"><span class="ic">◫</span>金模板库</a>
+  </div>
+</nav>
+<main class="main">
+
+<div class="page-header">
+  <div class="left">
+    <span class="ic" style="font-size:18px;color:#185FA5">◉</span>
+    <span class="title">01 热点雷达</span>
+    <span class="subtitle">实时 · 09:14 SGT</span>
+  </div>
+  <div class="right">
+    <button class="btn-ghost">⊕ 筛选</button>
+    <button class="btn-ghost">⚙ 监控源</button>
+    <div class="avatar">LR</div>
+  </div>
+</div>
+
+<div id="rd-metrics" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">
+  <div class="metric-card">
+    <div class="metric-label">谈论账号</div>
+    <div class="metric-val">1,284</div>
+    <div class="metric-delta up">↗ +312 vs 1h 前</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">互动总数</div>
+    <div class="metric-val">48.7k</div>
+    <div class="metric-delta up">↗ +18% vs 1h 前</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">热点池</div>
+    <div class="metric-val">17</div>
+    <div class="metric-delta" style="color:#D85A30">3 个 HOT 信号</div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1.1fr;gap:10px">
+
+<div class="card" style="padding:12px">
+<div class="card-head" style="margin-bottom:8px">
+<div class="card-title">▤ 热点池</div>
+<div style="display:flex;gap:4px;font-size:11px">
+<span class="tag tag-A">A</span><span class="tag tag-C">C</span><span class="tag tag-D">D</span><span class="tag tag-E">E</span>
+</div>
+</div>
+
+<div id="rd-pool" style="display:flex;flex-direction:column;gap:6px">
+
+<div class="hot-card hot">
+<div class="hot-title">3 个胜率 ≥70% 钱包 6h 内押 $691k YES</div>
+<div class="hot-meta">
+<span class="tag tag-C">C 链上</span>
+<span class="score-bar"><span class="score-dot on"></span><span class="score-dot on"></span><span class="score-dot on"></span><span class="score-dot on"></span><span class="score-dot on"></span></span>
+<span style="margin-left:auto;color:#D85A30;font-weight:500">HOT · 4 min 前</span>
+</div>
+</div>
+
+<div class="hot-card selected">
+<div class="hot-title">FOMC 前夜赔率剧烈跳动 0.42 → 0.38</div>
+<div class="hot-meta">
+<span class="tag tag-A">A 赔率</span>
+<span class="score-bar"><span class="score-dot on"></span><span class="score-dot on"></span><span class="score-dot on"></span><span class="score-dot on"></span><span class="score-dot"></span></span>
+<span style="margin-left:auto">12 min · 248 账号</span>
+</div>
+</div>
+
+<div class="hot-card hot">
+<div class="hot-title">Polymarket 新合约 "AI 监管法案 Q1 通过"</div>
+<div class="hot-meta">
+<span class="tag tag-D">D 新合约</span>
+<span class="score-bar"><span class="score-dot on"></span><span class="score-dot on"></span><span class="score-dot on"></span><span class="score-dot on"></span><span class="score-dot"></span></span>
+<span style="margin-left:auto;color:#D85A30;font-weight:500">HOT · 8 min 前</span>
+</div>
+</div>
+
+<div class="hot-card">
+<div class="hot-title">苹果 Vision Pro 二代发布会赔率剧变</div>
+<div class="hot-meta">
+<span class="tag tag-E">E 现实</span>
+<span class="score-bar"><span class="score-dot on"></span><span class="score-dot on"></span><span class="score-dot on"></span><span class="score-dot"></span><span class="score-dot"></span></span>
+<span style="margin-left:auto">23 min · 412 账号</span>
+</div>
+</div>
+
+<div class="hot-card hot">
+<div class="hot-title">Trump 媒体股大额钱包异动</div>
+<div class="hot-meta">
+<span class="tag tag-C">C 链上</span>
+<span class="score-bar"><span class="score-dot on"></span><span class="score-dot on"></span><span class="score-dot on"></span><span class="score-dot on"></span><span class="score-dot"></span></span>
+<span style="margin-left:auto;color:#D85A30;font-weight:500">HOT · 26 min 前</span>
+</div>
+</div>
+
+<div class="hot-card">
+<div class="hot-title">SBF 上诉判决相关合约成交激增</div>
+<div class="hot-meta">
+<span class="tag tag-A">A 赔率</span>
+<span class="score-bar"><span class="score-dot on"></span><span class="score-dot on"></span><span class="score-dot on"></span><span class="score-dot"></span><span class="score-dot"></span></span>
+<span style="margin-left:auto">38 min · 167 账号</span>
+</div>
+</div>
+
+<div class="hot-card">
+<div class="hot-title">Kalshi 上线美联储利率新合约</div>
+<div class="hot-meta">
+<span class="tag tag-D">D 新合约</span>
+<span class="score-bar"><span class="score-dot on"></span><span class="score-dot on"></span><span class="score-dot"></span><span class="score-dot"></span><span class="score-dot"></span></span>
+<span style="margin-left:auto">52 min · 89 账号</span>
+</div>
+</div>
+
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+
+<div id="rd-detail" class="card" style="padding:14px 16px">
+<div class="card-head">
+<div class="card-title">⊙ FOMC 前夜赔率跳动 0.42 → 0.38</div>
+<span class="tag tag-A">A 赔率</span>
+</div>
+
+<div style="font-size:12.5px;color:var(--color-text-primary);line-height:1.65;margin-bottom:12px">
+<b>2026 年 1 月 FOMC 会议前 12 小时</b>，Polymarket "Jan FOMC 降息 50bps" 合约从 <b>0.42 跌至 0.38</b>（38 min 内），同期 "降息 25bps" 从 0.51 升至 0.55。市场对鸽派转向的押注集中收敛到 25bps 路径——但与昨日 Powell "Fed will remain patient" 的表态方向背离。
+</div>
+
+<div class="intel-block" style="margin-bottom:10px">
+<div class="intel-label">3 个关键事实</div>
+<div style="line-height:1.7">
+1. 当前 CME FedWatch 隐含降息概率 <b>92%</b>，但 25bps vs 50bps 路径分歧创 18 个月新高<br>
+2. 链上 3 个 90d ROI &gt;200% 钱包在 6h 内集中买入 <span class="hl-num">$691k YES</span> 仓位（YES = 25bps）<br>
+3. Powell 昨日演讲明确 "patience on rate cuts"，但隔夜利率市场 OIS 仍 price-in 鸽派
+</div>
+</div>
+
+<div class="intel-block" style="margin-bottom:10px">
+<div class="intel-label">为什么这是机会</div>
+<div style="line-height:1.65">
+主流叙事卡在 "降几个 bps"，所有人盯 headline。<b>真正的非对称信息</b>在 dot plot 2025 路径分歧——市场只 price 单一路径，但 Fed 内部分歧已到 2024 年中以来最高。Smart money 已经在前 3h 卡位，但还没扩散到 KOL 圈。
+</div>
+</div>
+
+<div class="intel-block" style="margin-bottom:10px">
+<div class="intel-label">分歧观点</div>
+<div style="line-height:1.65">
+@HayesEconomics（1.2k 互动）：<span class="hl-bad">市场过度定价降息</span>——过去 12 个月里赔率与 Powell 表态背离 4 次，3 次最终是赔率错。可以做 NO。
+</div>
+</div>
+
+<div class="intel-block" style="margin-bottom:12px">
+<div class="intel-label">事件时间线</div>
+<div style="font-size:11.5px;line-height:1.8">
+<div><span style="color:var(--color-text-tertiary);width:62px;display:inline-block">昨 22:30</span> Powell 公开演讲，强调 patience</div>
+<div><span style="color:var(--color-text-tertiary);width:62px;display:inline-block">06:14</span> WSJ "Dot plot dispersion at 18-month high"</div>
+<div><span style="color:var(--color-text-tertiary);width:62px;display:inline-block">08:36</span> 3 个 smart money 钱包开始建仓 YES</div>
+<div><span style="color:var(--color-text-tertiary);width:62px;display:inline-block">08:54</span> @PolymarketWhale 发推，转发 487 次</div>
+<div><span style="color:var(--color-text-tertiary);width:62px;display:inline-block">09:02</span> Reuters "Powell signals patience"</div>
+<div><span style="color:#D85A30;width:62px;display:inline-block;font-weight:500">09:14</span> <b>赔率突破 0.40 关口 → HOT 触发</b></div>
+</div>
+</div>
+
+<div style="display:flex;gap:8px">
+<button class="btn-ghost" style="flex:1">观察池</button>
+<button class="btn-ghost" style="flex:1">忽略</button>
+</div>
+</div>
+
+</div>
+</div>
+
+<div id="rd-tweets-card" class="card" style="padding:14px 16px;margin-top:10px">
+<div class="card-head" style="margin-bottom:10px">
+<div class="card-title">𝕏 热门推特原文</div>
+<span class="muted" id="rd-tweets-summary">按互动排序 · top 9</span>
+</div>
+<div id="rd-tweets" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px 18px">
+
+<div>
+<div style="display:flex;align-items:center;gap:6px;font-size:11.5px;margin-bottom:4px">
+<span style="font-weight:500;color:var(--color-text-primary)">@PolymarketWhale</span>
+<span style="color:var(--color-text-tertiary)">· 41 min</span>
+</div>
+<div style="font-size:12.5px;line-height:1.55">3 个 90d ROI &gt;200% 的钱包刚在 6h 内集中买入 $691k YES 仓位。这种 smart money clustering 在前 3 次 FOMC 前都出现过，2 次方向对了。</div>
+<div style="font-size:11px;color:var(--color-text-tertiary);margin-top:6px;display:flex;gap:14px">
+<span>↻ 487</span><span>♡ 3.1k</span><span>💬 226</span><span>👁 67k</span>
+</div>
+</div>
+
+<div>
+<div style="display:flex;align-items:center;gap:6px;font-size:11.5px;margin-bottom:4px">
+<span style="font-weight:500;color:var(--color-text-primary)">@JimGCryptos</span>
+<span style="color:var(--color-text-tertiary)">· 18 min</span>
+</div>
+<div style="font-size:12.5px;line-height:1.55">FOMC 前赔率从 0.42 跌到 0.38 是经典 sell-the-news。每次都有人喊"这次不一样"，每次都不一样吗？</div>
+<div style="font-size:11px;color:var(--color-text-tertiary);margin-top:6px;display:flex;gap:14px">
+<span>↻ 312</span><span>♡ 2.4k</span><span>💬 187</span><span>👁 48k</span>
+</div>
+</div>
+
+<div>
+<div style="display:flex;align-items:center;gap:6px;font-size:11.5px;margin-bottom:4px">
+<span style="font-weight:500;color:var(--color-text-primary)">@HayesEconomics</span>
+<span style="color:var(--color-text-tertiary)">· 32 min</span>
+<span class="tag tag-C" style="margin-left:4px">反方</span>
+</div>
+<div style="font-size:12.5px;line-height:1.55">市场过度定价降息。Powell 昨天明确说 "patience"，但赔率却往鸽派方向跑——这种背离过去 12 个月出现过 4 次，3 次最终是赔率错。</div>
+<div style="font-size:11px;color:var(--color-text-tertiary);margin-top:6px;display:flex;gap:14px">
+<span>↻ 156</span><span>♡ 1.2k</span><span>💬 94</span><span>👁 22k</span>
+</div>
+</div>
+
+<div>
+<div style="display:flex;align-items:center;gap:6px;font-size:11.5px;margin-bottom:4px">
+<span style="font-weight:500;color:var(--color-text-primary)">@degenoeconomist</span>
+<span style="color:var(--color-text-tertiary)">· 56 min</span>
+</div>
+<div style="font-size:12.5px;line-height:1.55">25bps 降息已经 priced in 到 92%。真正的非对称机会是 dot plot——市场只看 headline 数字，全员忽略 2025 路径分歧。</div>
+<div style="font-size:11px;color:var(--color-text-tertiary);margin-top:6px;display:flex;gap:14px">
+<span>↻ 198</span><span>♡ 1.6k</span><span>💬 73</span><span>👁 31k</span>
+</div>
+</div>
+
+<div>
+<div style="display:flex;align-items:center;gap:6px;font-size:11.5px;margin-bottom:4px">
+<span style="font-weight:500;color:var(--color-text-primary)">@zhusu</span>
+<span style="color:var(--color-text-tertiary)">· 1h</span>
+</div>
+<div style="font-size:12.5px;line-height:1.55">Dot plot dispersion at 18-month high. The market is trading FOMC like a single-path event but the Fed is internally a 2026 path debate. Volatility is mispriced.</div>
+<div style="font-size:11px;color:var(--color-text-tertiary);margin-top:6px;display:flex;gap:14px">
+<span>↻ 624</span><span>♡ 4.8k</span><span>💬 312</span><span>👁 92k</span>
+</div>
+</div>
+
+<div>
+<div style="display:flex;align-items:center;gap:6px;font-size:11.5px;margin-bottom:4px">
+<span style="font-weight:500;color:var(--color-text-primary)">@ramahluwalia</span>
+<span style="color:var(--color-text-tertiary)">· 1h</span>
+</div>
+<div style="font-size:12.5px;line-height:1.55">FedWatch shows 92% odds of a cut, but Polymarket is the cleaner read: 25 vs 50 split is where the real disagreement lives. Watch the 6pm settle.</div>
+<div style="font-size:11px;color:var(--color-text-tertiary);margin-top:6px;display:flex;gap:14px">
+<span>↻ 241</span><span>♡ 1.9k</span><span>💬 118</span><span>👁 38k</span>
+</div>
+</div>
+
+<div>
+<div style="display:flex;align-items:center;gap:6px;font-size:11.5px;margin-bottom:4px">
+<span style="font-weight:500;color:var(--color-text-primary)">@nic__carter</span>
+<span style="color:var(--color-text-tertiary)">· 1h</span>
+</div>
+<div style="font-size:12.5px;line-height:1.55">Polymarket FOMC volume already $4.2M, +68% vs 30d avg. Predictive markets are now front-running CME futures by 3-4 hours on rate decisions.</div>
+<div style="font-size:11px;color:var(--color-text-tertiary);margin-top:6px;display:flex;gap:14px">
+<span>↻ 389</span><span>♡ 2.7k</span><span>💬 164</span><span>👁 54k</span>
+</div>
+</div>
+
+<div>
+<div style="display:flex;align-items:center;gap:6px;font-size:11.5px;margin-bottom:4px">
+<span style="font-weight:500;color:var(--color-text-primary)">@arampage</span>
+<span style="color:var(--color-text-tertiary)">· 1h 20min</span>
+<span class="tag tag-C" style="margin-left:4px">反方</span>
+</div>
+<div style="font-size:12.5px;line-height:1.55">Smart money clustering 在 FOMC 前不是新事。回测过去 8 次类似 setup，胜率 50%——这次链上信号被过度赋权了。别 FOMO。</div>
+<div style="font-size:11px;color:var(--color-text-tertiary);margin-top:6px;display:flex;gap:14px">
+<span>↻ 178</span><span>♡ 1.4k</span><span>💬 142</span><span>👁 28k</span>
+</div>
+</div>
+
+<div>
+<div style="display:flex;align-items:center;gap:6px;font-size:11.5px;margin-bottom:4px">
+<span style="font-weight:500;color:var(--color-text-primary)">@cobie</span>
+<span style="color:var(--color-text-tertiary)">· 1h 35min</span>
+</div>
+<div style="font-size:12.5px;line-height:1.55">25 bps is consensus now. The trade isn't the headline, it's the SEP dots. Every cycle since 2022 has had the dispersion mispriced going in.</div>
+<div style="font-size:11px;color:var(--color-text-tertiary);margin-top:6px;display:flex;gap:14px">
+<span>↻ 412</span><span>♡ 3.6k</span><span>💬 209</span><span>👁 78k</span>
+</div>
+</div>
+
+</div>
+</div>
+
+</main>
+</div>
+<div class="demo-banner" id="rd-banner"><span class="dot"></span>原型演示 · 数据为示例</div>
+
+<script>
+(function(){
+  const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  const CAT_LABEL = { A:'A 赔率', C:'C 链上', D:'D 新合约', E:'E 现实' };
+
+  // 兜底 mock (未登录或 DB 报错时用) ─────────────────────────────────────────
+  const MOCK_HOTSPOTS = [
+    { id:'mock_wallets', title:'3 个胜率 ≥70% 钱包 6h 内押 $691k YES', category:'C', status:'hot', score:5, hot_signal:true,
+      metrics:{talk_accounts:156, engagements:8200, detected_min:4}, intel:{}, tweets:[] },
+    { id:'mock_fomc', title:'FOMC 前夜赔率剧烈跳动 0.42 → 0.38', category:'A', status:'watching', score:4, hot_signal:false,
+      metrics:{talk_accounts:248, engagements:12400, detected_min:12, amplitude:'9.5%', duration_min:38},
+      intel:{
+        summary:'<b>2026 年 1 月 FOMC 会议前 12 小时</b>，Polymarket "Jan FOMC 降息 50bps" 合约从 <b>0.42 跌至 0.38</b>（38 min 内）。市场对鸽派转向的押注集中收敛到 25bps 路径——但与昨日 Powell "Fed will remain patient" 的表态方向背离。',
+        facts:[
+          '当前 CME FedWatch 隐含降息概率 <b>92%</b>，但 25bps vs 50bps 路径分歧创 18 个月新高',
+          '链上 3 个 90d ROI &gt;200% 钱包在 6h 内集中买入 <span class="hl-num">$691k YES</span> 仓位',
+          'Powell 昨日演讲明确 "patience on rate cuts"，但 OIS 仍 price-in 鸽派'
+        ],
+        opportunity:'主流叙事卡在 "降几个 bps"，所有人盯 headline。<b>真正的非对称信息</b>在 dot plot 2025 路径分歧。',
+        dissent:{handle:'@HayesEconomics', interactions:'1.2k', stance:'市场过度定价降息', detail:'过去 12 个月里赔率与 Powell 表态背离 4 次，3 次最终是赔率错。'},
+        timeline:[
+          {time:'昨 22:30', event:'Powell 公开演讲，强调 patience'},
+          {time:'06:14', event:'WSJ "Dot plot dispersion at 18-month high"'},
+          {time:'08:36', event:'3 个 smart money 钱包开始建仓 YES'},
+          {time:'09:14', event:'<b>赔率突破 0.40 关口 → HOT 触发</b>', hot:true}
+        ]
+      },
+      tweets:[
+        {handle:'@PolymarketWhale', time:'41 min', text:'3 个 90d ROI >200% 的钱包刚在 6h 内集中买入 $691k YES 仓位。这种 smart money clustering 在前 3 次 FOMC 前都出现过，2 次方向对了。', stats:{rt:487,like:3100,reply:226,view:67000}},
+        {handle:'@JimGCryptos', time:'18 min', text:'FOMC 前赔率从 0.42 跌到 0.38 是经典 sell-the-news。', stats:{rt:312,like:2400,reply:187,view:48000}},
+        {handle:'@HayesEconomics', time:'32 min', text:'市场过度定价降息。Powell 昨天明确说 "patience"，但赔率却往鸽派方向跑。', tag:'反方', stats:{rt:156,like:1200,reply:94,view:22000}}
+      ]
+    },
+    { id:'mock_ai_reg', title:'Polymarket 新合约 "AI 监管法案 Q1 通过"', category:'D', status:'hot', score:4, hot_signal:true,
+      metrics:{talk_accounts:189, engagements:9600, detected_min:8}, intel:{}, tweets:[] },
+    { id:'mock_vision', title:'苹果 Vision Pro 二代发布会赔率剧变', category:'E', status:'pool', score:3, hot_signal:false,
+      metrics:{talk_accounts:412, engagements:15800, detected_min:23}, intel:{}, tweets:[] },
+    { id:'mock_trump', title:'Trump 媒体股大额钱包异动', category:'C', status:'hot', score:4, hot_signal:true,
+      metrics:{talk_accounts:91, engagements:5400, detected_min:26}, intel:{}, tweets:[] },
+    { id:'mock_sbf', title:'SBF 上诉判决相关合约成交激增', category:'A', status:'pool', score:3, hot_signal:false,
+      metrics:{talk_accounts:167, engagements:4200, detected_min:38}, intel:{}, tweets:[] },
+    { id:'mock_kalshi', title:'Kalshi 上线美联储利率新合约', category:'D', status:'pool', score:2, hot_signal:false,
+      metrics:{talk_accounts:89, engagements:1900, detected_min:52}, intel:{}, tweets:[] },
+  ];
+
+  let hotspots = [];
+  let selectedId = null;
+  let dbReady = false;
+
+  function fmt(n){
+    if (n == null) return '—';
+    if (n >= 1000) return (n/1000).toFixed(n>=10000?0:1) + 'k';
+    return String(n);
+  }
+  function scoreDots(score){
+    const total = 5;
+    return Array.from({length: total}, (_,i) => `<span class="score-dot ${i < score ? 'on' : ''}"></span>`).join('');
+  }
+  function metaRight(hs){
+    if (hs.hot_signal) return `<span style="margin-left:auto;color:#D85A30;font-weight:500">HOT · ${hs.metrics?.detected_min ?? '?'} min 前</span>`;
+    return `<span style="margin-left:auto">${hs.metrics?.detected_min ?? '?'} min · ${hs.metrics?.talk_accounts ?? 0} 账号</span>`;
+  }
+
+  function renderMetrics(){
+    const totalTalk = hotspots.reduce((s,h) => s + (h.metrics?.talk_accounts || 0), 0);
+    const totalEng = hotspots.reduce((s,h) => s + (h.metrics?.engagements || 0), 0);
+    const pool = hotspots.filter(h => ['pool','hot','watching'].includes(h.status)).length;
+    const hot = hotspots.filter(h => h.hot_signal).length;
+    document.getElementById('rd-metrics').innerHTML = `
+      <div class="metric-card">
+        <div class="metric-label">谈论账号</div>
+        <div class="metric-val">${totalTalk.toLocaleString()}</div>
+        <div class="metric-delta up">↗ 实时聚合</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">互动总数</div>
+        <div class="metric-val">${fmt(totalEng)}</div>
+        <div class="metric-delta up">↗ 实时聚合</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">热点池</div>
+        <div class="metric-val">${pool}</div>
+        <div class="metric-delta" style="color:${hot>0?'#D85A30':'var(--color-text-tertiary)'}">${hot} 个 HOT 信号</div>
+      </div>`;
+  }
+
+  function renderPool(){
+    document.getElementById('rd-pool').innerHTML = hotspots.map(h => {
+      const cls = ['hot-card'];
+      if (h.hot_signal) cls.push('hot');
+      if (h.id === selectedId) cls.push('selected');
+      return `
+        <div class="${cls.join(' ')}" data-id="${h.id}">
+          <div class="hot-title">${h.title}</div>
+          <div class="hot-meta">
+            <span class="tag tag-${h.category}">${CAT_LABEL[h.category]}</span>
+            <span class="score-bar">${scoreDots(h.score)}</span>
+            ${metaRight(h)}
+          </div>
+        </div>`;
+    }).join('');
+    document.querySelectorAll('#rd-pool .hot-card').forEach(el => {
+      el.addEventListener('click', () => {
+        selectedId = el.dataset.id;
+        renderPool(); renderDetail(); renderTweets();
+      });
+    });
+  }
+
+  function renderDetail(){
+    const hs = hotspots.find(h => h.id === selectedId);
+    if (!hs) {
+      document.getElementById('rd-detail').innerHTML = '<div style="padding:18px;text-align:center;color:var(--color-text-tertiary);font-size:12px">未选择热点</div>';
+      return;
+    }
+    const intel = hs.intel || {};
+    const hasIntel = intel.summary || (intel.facts && intel.facts.length);
+
+    let html = `
+      <div class="card-head">
+        <div class="card-title">⊙ ${hs.title}</div>
+        <span class="tag tag-${hs.category}">${CAT_LABEL[hs.category]}</span>
+      </div>`;
+
+    if (!hasIntel) {
+      html += `
+        <div style="padding:24px;text-align:center;font-size:12px;color:var(--color-text-tertiary);background:var(--color-background-secondary);border-radius:var(--border-radius-md);margin-top:8px">
+          该热点暂无详细情报 (intel JSONB 为空)<br>
+          <span style="font-size:11px">点其他热点查看完整数据</span>
+        </div>`;
+    } else {
+      if (intel.summary) html += `<div style="font-size:12.5px;color:var(--color-text-primary);line-height:1.65;margin:8px 0 12px">${intel.summary}</div>`;
+      if (intel.facts?.length) {
+        html += `<div class="intel-block" style="margin-bottom:10px">
+          <div class="intel-label">${intel.facts.length} 个关键事实</div>
+          <div style="line-height:1.7">${intel.facts.map((f,i) => `${i+1}. ${f}`).join('<br>')}</div>
+        </div>`;
+      }
+      if (intel.opportunity) html += `<div class="intel-block" style="margin-bottom:10px"><div class="intel-label">为什么这是机会</div><div style="line-height:1.65">${intel.opportunity}</div></div>`;
+      if (intel.dissent) html += `<div class="intel-block" style="margin-bottom:10px"><div class="intel-label">分歧观点</div><div style="line-height:1.65">${intel.dissent.handle}（${intel.dissent.interactions} 互动）：<span class="hl-bad">${intel.dissent.stance}</span>——${intel.dissent.detail}</div></div>`;
+      if (intel.timeline?.length) {
+        html += `<div class="intel-block" style="margin-bottom:12px"><div class="intel-label">事件时间线</div><div style="font-size:11.5px;line-height:1.8">${
+          intel.timeline.map(t => {
+            const color = t.hot ? '#D85A30' : 'var(--color-text-tertiary)';
+            const fw = t.hot ? 'font-weight:500;' : '';
+            return `<div><span style="color:${color};${fw}width:62px;display:inline-block">${t.time}</span> ${t.event}</div>`;
+          }).join('')
+        }</div></div>`;
+      }
+    }
+
+    html += `
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn-ghost" style="flex:1">观察池</button>
+        <button class="btn-ghost" style="flex:1">忽略</button>
+      </div>`;
+
+    document.getElementById('rd-detail').innerHTML = html;
+  }
+
+  function renderTweets(){
+    const hs = hotspots.find(h => h.id === selectedId);
+    const tweets = hs?.tweets || [];
+    const summary = document.getElementById('rd-tweets-summary');
+    if (tweets.length === 0) {
+      document.getElementById('rd-tweets').innerHTML = `
+        <div style="grid-column:1/-1;padding:20px;text-align:center;font-size:11.5px;color:var(--color-text-tertiary);background:var(--color-background-secondary);border-radius:var(--border-radius-md)">
+          该热点暂无关联推文
+        </div>`;
+      summary.textContent = '0 条';
+      return;
+    }
+    summary.textContent = `按互动排序 · top ${tweets.length}`;
+    document.getElementById('rd-tweets').innerHTML = tweets.map(t => {
+      const s = t.stats || {};
+      const tag = t.tag ? `<span class="tag tag-C" style="margin-left:4px">${t.tag}</span>` : '';
+      return `
+        <div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:11.5px;margin-bottom:4px">
+            <span style="font-weight:500;color:var(--color-text-primary)">${t.handle}</span>
+            <span style="color:var(--color-text-tertiary)">· ${t.time}</span>
+            ${tag}
+          </div>
+          <div style="font-size:12.5px;line-height:1.55">${t.text}</div>
+          <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:6px;display:flex;gap:14px">
+            <span>↻ ${fmt(s.rt)}</span><span>♡ ${fmt(s.like)}</span><span>💬 ${fmt(s.reply)}</span><span>👁 ${fmt(s.view)}</span>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function renderAll(){ renderMetrics(); renderPool(); renderDetail(); renderTweets(); }
+
+  function pickInitialSelected(list){
+    // 优先选 intel 非空 (有故事可讲), 否则取 score 最高
+    const withIntel = list.find(h => h.intel && (h.intel.summary || (h.intel.facts && h.intel.facts.length)));
+    return withIntel?.id || list[0]?.id || null;
+  }
+
+  async function loadHotspotsFromDB(){
+    try {
+      const { data, error } = await sb.from('hotspots').select('*').order('score', { ascending: false }).order('hot_signal', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    } catch (e) {
+      console.warn('DB load failed, fallback to mock:', e.message);
+      return null;
+    }
+  }
+
+  async function bootstrap(){
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) {
+      // 当前用户头像
+      const { data: profile } = await sb.from('user_profiles').select('initials,display_name').eq('id', session.user.id).single();
+      if (profile) document.querySelector('.page-header .avatar').textContent = profile.initials;
+
+      const rows = await loadHotspotsFromDB();
+      if (rows !== null && rows.length > 0) {
+        dbReady = true;
+        hotspots = rows;
+        selectedId = pickInitialSelected(rows);
+        renderAll();
+        document.getElementById('rd-banner').innerHTML = `<span class="dot" style="background:#3B6D11"></span>☁ 已同步 · ${rows.length} 热点 · ${profile?.display_name || session.user.email}`;
+      } else if (rows !== null && rows.length === 0) {
+        dbReady = true;
+        hotspots = [];
+        renderAll();
+        document.getElementById('rd-banner').innerHTML = `<span class="dot"></span>DB 空表 · 跑 seed_hotspots.sql 添加数据`;
+      } else {
+        hotspots = MOCK_HOTSPOTS;
+        selectedId = pickInitialSelected(hotspots);
+        renderAll();
+      }
+    } else {
+      hotspots = MOCK_HOTSPOTS;
+      selectedId = pickInitialSelected(hotspots);
+      renderAll();
+      document.getElementById('rd-banner').innerHTML = `<span class="dot"></span>⚠ 未登录 · <a href="../pallax_weekly_dashboard.html" style="color:#185FA5">去登录</a> · 当前数据为 mock`;
+    }
+  }
+
+  bootstrap();
+})();
+</script>
+
+</body>
+</html>

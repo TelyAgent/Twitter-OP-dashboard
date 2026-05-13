@@ -137,7 +137,7 @@ button:hover { background: var(--bg-soft); }
 
 .wr-ns-meta { display: flex; gap: 20px; flex-wrap: wrap; font-size: 12px; color: var(--nsm-amber-text); padding-top: 8px; }
 .wr-ns-meta-item { display: flex; flex-direction: column; gap: 4px; }
-.wr-ns-meta-item label { font-size: 10px; color: var(--nsm-amber-label); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+.wr-ns-meta-item label { font-size: 11px; color: var(--nsm-amber-label); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
 .wr-ns-meta-item input { width: 110px; font-size: 14px; height: 28px; padding: 2px 8px; background: rgba(255,255,255,0.55); border-color: transparent; color: var(--nsm-amber-deep); }
 .wr-ns-meta-item input:focus { background: #fff; border-color: var(--line-2); box-shadow: none; }
 
@@ -176,7 +176,7 @@ button:hover { background: var(--bg-soft); }
 
 .wr-input-row { display: grid; grid-template-columns: 1.3fr 60px 80px 80px 80px 80px 90px 32px; gap: 6px; align-items: center; margin-bottom: 6px; }
 .wr-input-row input, .wr-input-row select { font-size: 12px; }
-.wr-input-row .wr-h { font-size: 10px; color: var(--ink-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.wr-input-row .wr-h { font-size: 11px; color: var(--ink-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
 .wr-chart-wrap { position: relative; width: 100%; height: 240px; margin-top: 16px; }
 
 /* ========== Retro ========== */
@@ -222,7 +222,7 @@ textarea.wr-area { width: 100%; min-height: 70px; font-size: 13px; resize: verti
 .wr-ovw-team-name { font-size: 15px; font-weight: 600; letter-spacing: 0; }
 .wr-ovw-team-nsm-name { font-size: 12px; color: var(--ink-3); }
 .wr-ovw-team-row { display: grid; grid-template-columns: 1.2fr 1fr 1fr 90px; gap: 14px; align-items: center; margin-top: 6px; }
-.wr-ovw-team-val { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.wr-ovw-team-val { font-size: 24px; font-weight: 600; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
 .wr-ovw-team-sub { font-size: 11px; color: var(--ink-3); }
 .wr-ovw-bar-wrap { background: var(--bg-soft); border-radius: 4px; height: 8px; overflow: hidden; margin-top: 6px; }
 .wr-ovw-bar { height: 100%; background: var(--info); transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1); }
@@ -310,7 +310,7 @@ textarea.wr-area { width: 100%; min-height: 70px; font-size: 13px; resize: verti
 .wr-metric-chip.health-warn .wr-metric-chip-name::before { background: var(--nsm-amber-mid); }
 .wr-metric-chip.health-bad .wr-metric-chip-name::before { background: var(--bad); }
 .wr-metric-chip-delta {
-  font-size: 10px; font-weight: 600;
+  font-size: 11px; font-weight: 600;
   padding: 1px 6px; border-radius: 99px;
   background: var(--bg-soft); color: var(--ink-3);
   white-space: nowrap; font-variant-numeric: tabular-nums;
@@ -385,7 +385,7 @@ details.wr-collapsible summary::-webkit-details-marker { display: none; }
 details.wr-collapsible summary::before {
   content: "▸"; display: inline-block;
   margin-right: 6px; transition: transform 0.15s;
-  font-size: 10px;
+  font-size: 11px;
 }
 details.wr-collapsible[open] summary::before { transform: rotate(90deg); }
 details.wr-collapsible[open] summary { color: var(--ink-2); margin-bottom: 8px; }
@@ -394,7 +394,7 @@ details.wr-collapsible[open] summary { color: var(--ink-2); margin-bottom: 8px; 
 .wr-ns-left { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .wr-ns-right { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .wr-ns-label-row { display: flex; align-items: center; gap: 8px; }
-.wr-ns-pin { font-size: 10px; letter-spacing: 0.12em; font-weight: 600; padding: 3px 8px; border-radius: 99px; background: rgba(133, 79, 11, 0.18); color: var(--nsm-amber-label); text-transform: uppercase; flex-shrink: 0; }
+.wr-ns-pin { font-size: 11px; letter-spacing: 0.12em; font-weight: 600; padding: 3px 8px; border-radius: 99px; background: rgba(133, 79, 11, 0.18); color: var(--nsm-amber-label); text-transform: uppercase; flex-shrink: 0; }
 .wr-ns-bignum-row { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
 .wr-ns-delta-pill { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 99px; font-size: 12px; font-weight: 600; background: rgba(255,255,255,0.6); color: var(--nsm-amber-deep); font-variant-numeric: tabular-nums; }
 .wr-ns-delta-pill.up { background: var(--ok-bg); color: var(--ok); }
@@ -410,8 +410,8 @@ details.wr-collapsible[open] summary { color: var(--ink-2); margin-bottom: 8px; 
 .wr-ns-ring-fill.warn { stroke: var(--nsm-amber-mid); }
 .wr-ns-ring-fill.bad { stroke: var(--bad); }
 .wr-ns-ring-label { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 600; }
-.wr-ns-ring-label .v { font-size: 22px; color: var(--nsm-amber-deep); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-.wr-ns-ring-label .l { font-size: 10px; color: var(--nsm-amber-label); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; }
+.wr-ns-ring-label .v { font-size: 24px; color: var(--nsm-amber-deep); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.wr-ns-ring-label .l { font-size: 11px; color: var(--nsm-amber-label); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; }
 .wr-ns-ring-side { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--nsm-amber-text); }
 .wr-ns-ring-side .k { color: var(--nsm-amber-label); font-weight: 500; }
 .wr-ns-ring-side .v { font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -454,7 +454,7 @@ details.wr-collapsible[open] summary { color: var(--ink-2); margin-bottom: 8px; 
 .wr-ovw-team-card.health-ok .wr-ovw-team-name-row::before { background: var(--ok); }
 .wr-ovw-team-card.health-warn .wr-ovw-team-name-row::before { background: var(--nsm-amber-mid); }
 .wr-ovw-team-card.health-bad .wr-ovw-team-name-row::before { background: var(--bad); }
-.wr-ovw-team-flag { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; padding: 2px 7px; border-radius: 99px; text-transform: uppercase; }
+.wr-ovw-team-flag { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; padding: 2px 7px; border-radius: 99px; text-transform: uppercase; }
 .wr-ovw-team-flag.hot { background: var(--ok-bg); color: var(--ok); }
 .wr-ovw-team-flag.attention { background: var(--bad-bg); color: var(--bad); }
 
@@ -463,7 +463,7 @@ details.wr-collapsible[open] summary { color: var(--ink-2); margin-bottom: 8px; 
 .wr-ovw-highlight.kind-good { background: linear-gradient(180deg, var(--ok-bg) 0%, var(--bg-card) 38%); }
 .wr-ovw-highlight.kind-bad { background: linear-gradient(180deg, var(--bad-bg) 0%, var(--bg-card) 38%); }
 .wr-ovw-highlight.kind-info { background: linear-gradient(180deg, var(--nsm-amber-soft) 0%, var(--bg-card) 38%); }
-.wr-ovw-highlight-tag { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; border-radius: 99px; display: inline-block; margin-bottom: 8px; }
+.wr-ovw-highlight-tag { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; border-radius: 99px; display: inline-block; margin-bottom: 8px; }
 .wr-ovw-highlight.kind-good .wr-ovw-highlight-tag { background: var(--ok-bg); color: var(--ok); }
 .wr-ovw-highlight.kind-bad .wr-ovw-highlight-tag { background: var(--bad-bg); color: var(--bad); }
 .wr-ovw-highlight.kind-info .wr-ovw-highlight-tag { background: var(--info-bg); color: var(--info); }
@@ -492,7 +492,7 @@ details.wr-collapsible[open] summary { color: var(--ink-2); margin-bottom: 8px; 
 .wr-tweaks-close { background: transparent; border: none; color: #f4f4f0; cursor: pointer; font-size: 16px; padding: 0 4px; }
 .wr-tweaks-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 14px; }
 .wr-tweak-group { display: flex; flex-direction: column; gap: 6px; }
-.wr-tweak-group-lbl { font-size: 10px; color: #9a9a9a; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
+.wr-tweak-group-lbl { font-size: 11px; color: #9a9a9a; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
 .wr-tweak-seg { display: flex; background: rgba(255,255,255,0.08); border-radius: 6px; padding: 2px; gap: 2px; }
 .wr-tweak-seg button { flex: 1; padding: 6px 8px; font-size: 11px; border: none; background: transparent; color: #b8b8b8; border-radius: 4px; cursor: pointer; }
 .wr-tweak-seg button:hover { color: #fff; }

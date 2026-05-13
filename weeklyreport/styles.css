@@ -86,7 +86,7 @@ input, textarea, select { font-family: inherit; }
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 .nav-item .ic { font-size: 14px; flex-shrink: 0; }
-.nav-item .step { font-size: 10px; color: var(--color-text-tertiary); margin-left: 2px; }
+.nav-item .step { font-size: 11px; color: var(--color-text-tertiary); margin-left: 2px; }
 .nav-item.active .step { color: var(--color-text-secondary); }
 
 .main { padding: 28px 32px 80px; max-width: 1440px; width: 100%; margin: 0 auto; }
@@ -117,7 +117,7 @@ input, textarea, select { font-family: inherit; }
 .card-title { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
 .muted { font-size: 12px; color: var(--color-text-tertiary); }
 
-.tag { display: inline-flex; align-items: center; font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 500; }
+.tag { display: inline-flex; align-items: center; font-size: 11px; padding: 2px 6px; border-radius: 3px; font-weight: 500; }
 .tag-A { background: #FAEEDA; color: #854F0B; }
 .tag-C { background: #FAECE7; color: #993C1D; }
 .tag-D { background: #E1F5EE; color: #0F6E56; }
@@ -133,7 +133,7 @@ input, textarea, select { font-family: inherit; }
 .metric-delta.warn { color: #854F0B; }
 .metric-delta.info { color: var(--color-text-secondary); }
 
-.btn-primary { background: #185FA5; color: #fff; border: none; border-radius: var(--border-radius-md); padding: 8px 14px; font-size: 12.5px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+.btn-primary { background: #185FA5; color: #fff; border: none; border-radius: var(--border-radius-md); padding: 8px 14px; font-size: 13px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
 .btn-primary:disabled { background: var(--color-background-tertiary); color: var(--color-text-tertiary); cursor: not-allowed; }
 .btn-primary:hover:not(:disabled) { background: #0C447C; }
 .btn-ghost { background: transparent; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); padding: 7px 12px; font-size: 12px; cursor: pointer; color: var(--color-text-primary); }

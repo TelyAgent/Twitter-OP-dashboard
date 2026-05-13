@@ -503,6 +503,13 @@ details.wr-collapsible[open] summary { color: var(--ink-2); margin-bottom: 8px; 
 }
 .wr-cu-anim { animation: valueShimmer 0.5s cubic-bezier(0.22, 1, 0.36, 1); }
 
+/* ========== Page-level top nav (周报 / 热点雷达 / 金模板库 / 监控源) ========== */
+.pg-topnav { display: flex; gap: 4px; padding-bottom: 16px; margin-bottom: 18px; border-bottom: 0.5px solid var(--line); flex-wrap: wrap; position: relative; z-index: 210; }
+.pg-tab { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: var(--r-md); font-size: 13px; color: var(--ink-2); text-decoration: none; transition: background 0.15s, color 0.15s; font-weight: 500; }
+.pg-tab:hover { background: var(--bg-soft); color: var(--ink); }
+.pg-tab.active { background: var(--ink); color: #fff; }
+.pg-tab .ic { font-size: 14px; line-height: 1; }
+
 /* ========== Responsive ========== */
 @media (max-width: 880px) {
   .wr-ns-row { grid-template-columns: 1fr; }
@@ -513,6 +520,12 @@ details.wr-collapsible[open] summary { color: var(--ink-2); margin-bottom: 8px; 
 </style>
 </head>
 <body>
+<nav class="pg-topnav">
+  <a href="./" class="pg-tab active"><span class="ic">▢</span>周报</a>
+  <a href="weeklyreport/02-radar.html" class="pg-tab"><span class="ic">◉</span>热点雷达</a>
+  <a href="weeklyreport/07-templates.html" class="pg-tab"><span class="ic">◫</span>金模板库</a>
+  <a href="weeklyreport/08-sources.html" class="pg-tab"><span class="ic">⊙</span>监控源</a>
+</nav>
 <div class="wr-auth-bg" id="wr-auth" style="display: none;">
   <div class="wr-auth-card">
     <h3>Pallax 周报登录</h3>

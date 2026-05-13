@@ -52,7 +52,7 @@ input, textarea, select { font-family: inherit; }
 .topnav-brand { display: flex; align-items: center; gap: 8px; padding-right: 18px; border-right: 0.5px solid var(--color-border-tertiary); }
 .topnav-brand .logo {
   width: 24px; height: 24px; border-radius: 6px;
-  background: #185FA5; color: #fff;
+  background: var(--color-text-primary); color: var(--color-background-primary);
   display: flex; align-items: center; justify-content: center;
   font-weight: 600; font-size: 13px;
 }
@@ -65,10 +65,10 @@ input, textarea, select { font-family: inherit; }
   cursor: pointer; text-decoration: none;
 }
 .nav-item:hover { background: var(--color-background-secondary); }
-.nav-item.active { background: #E6F1FB; color: #0C447C; font-weight: 500; }
+.nav-item.active { background: var(--color-text-primary); color: var(--color-background-primary); font-weight: 500; }
 .nav-item .ic { font-size: 14px; flex-shrink: 0; }
 .nav-item .step { font-size: 10px; color: var(--color-text-tertiary); margin-left: 2px; }
-.nav-item.active .step { color: #185FA5; }
+.nav-item.active .step { color: var(--color-background-primary); }
 
 .main { padding: 20px 26px 60px; max-width: 1200px; width: 100%; margin: 0 auto; }
 .page-header {

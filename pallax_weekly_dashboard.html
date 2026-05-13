@@ -64,11 +64,9 @@ body {
   color: var(--ink);
   font-feature-settings: "ss01", "cv11", "tnum";
   -webkit-font-smoothing: antialiased;
-  padding: 28px 28px 80px;
-  max-width: 1240px;
-  margin: 0 auto;
   font-size: 14px;
 }
+.wr-shell { padding: 24px 28px 80px; max-width: 1240px; margin: 0 auto; }
 input, select, textarea, button { font-family: inherit; color: inherit; }
 input[type="text"], input[type="number"], input[type="week"], input[type="email"], select, textarea {
   border: 0.5px solid var(--line);
@@ -504,11 +502,21 @@ details.wr-collapsible[open] summary { color: var(--ink-2); margin-bottom: 8px; 
 .wr-cu-anim { animation: valueShimmer 0.5s cubic-bezier(0.22, 1, 0.36, 1); }
 
 /* ========== Page-level top nav (周报 / 热点雷达 / 金模板库 / 监控源) ========== */
-.pg-topnav { display: flex; gap: 4px; padding-bottom: 16px; margin-bottom: 18px; border-bottom: 0.5px solid var(--line); flex-wrap: wrap; position: relative; z-index: 210; }
-.pg-tab { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: var(--r-md); font-size: 13px; color: var(--ink-2); text-decoration: none; transition: background 0.15s, color 0.15s; font-weight: 500; }
+.pg-topnav {
+  background: var(--bg-card);
+  border-bottom: 0.5px solid var(--line);
+  padding: 12px 26px;
+  position: sticky; top: 0; z-index: 210;
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+}
+.pg-brand { display: flex; align-items: center; gap: 8px; padding-right: 18px; border-right: 0.5px solid var(--line); }
+.pg-brand .logo { width: 24px; height: 24px; border-radius: 6px; background: var(--ink); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 13px; }
+.pg-brand .name { font-size: 13px; font-weight: 500; }
+.pg-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.pg-tab { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: var(--r-md); font-size: 13px; color: var(--ink-2); text-decoration: none; transition: background 0.15s, color 0.15s; }
 .pg-tab:hover { background: var(--bg-soft); color: var(--ink); }
-.pg-tab.active { background: var(--ink); color: #fff; }
-.pg-tab .ic { font-size: 14px; line-height: 1; }
+.pg-tab.active { background: var(--ink); color: #fff; font-weight: 500; }
+.pg-tab .ic { font-size: 14px; line-height: 1; flex-shrink: 0; }
 
 /* ========== Responsive ========== */
 @media (max-width: 880px) {
@@ -521,11 +529,18 @@ details.wr-collapsible[open] summary { color: var(--ink-2); margin-bottom: 8px; 
 </head>
 <body>
 <nav class="pg-topnav">
-  <a href="./" class="pg-tab active"><span class="ic">▢</span>周报</a>
-  <a href="weeklyreport/02-radar.html" class="pg-tab"><span class="ic">◉</span>热点雷达</a>
-  <a href="weeklyreport/07-templates.html" class="pg-tab"><span class="ic">◫</span>金模板库</a>
-  <a href="weeklyreport/08-sources.html" class="pg-tab"><span class="ic">⊙</span>监控源</a>
+  <div class="pg-brand">
+    <div class="logo">P</div>
+    <div class="name">Pallax 周报</div>
+  </div>
+  <div class="pg-tabs">
+    <a href="./" class="pg-tab active"><span class="ic">▢</span>周报</a>
+    <a href="weeklyreport/02-radar.html" class="pg-tab"><span class="ic">◉</span>热点雷达</a>
+    <a href="weeklyreport/07-templates.html" class="pg-tab"><span class="ic">◫</span>金模板库</a>
+    <a href="weeklyreport/08-sources.html" class="pg-tab"><span class="ic">⊙</span>监控源</a>
+  </div>
 </nav>
+<div class="wr-shell">
 <div class="wr-auth-bg" id="wr-auth" style="display: none;">
   <div class="wr-auth-card">
     <h3>Pallax 周报登录</h3>
@@ -1836,5 +1851,6 @@ details.wr-collapsible[open] summary { color: var(--ink-2); margin-bottom: 8px; 
   </div>
 </div>
 
+</div><!-- /.wr-shell -->
 </body>
 </html>

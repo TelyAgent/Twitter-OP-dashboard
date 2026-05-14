@@ -491,11 +491,47 @@
       </div>`;
 
     if (!hasIntel) {
-      html += `
-        <div style="padding:24px;text-align:center;font-size:12px;color:var(--color-text-tertiary);background:var(--color-background-secondary);border-radius:var(--border-radius-md);margin-top:8px">
-          该热点暂无详细情报 (intel JSONB 为空)<br>
-          <span style="font-size:11px">点其他热点查看完整数据</span>
-        </div>`;
+      // 没 AI 萃取的 intel - 用 tweet 本身的数据自动生成 detail
+      const t = normalizeTweet(hs.tweets?.[0]);
+      if (t) {
+        const escText = String(t.text || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        const s = t.stats;
+        const eng = (s.rt || 0) + (s.like || 0) + (s.reply || 0);
+        const tagKind = t.tag ? `<span style="font-size:11px;background:#EEEDFE;color:#3C3489;padding:2px 6px;border-radius:3px">${t.tag}</span>` : '';
+        const sourceIds = Array.isArray(hs.sources) ? hs.sources : [];
+        const sourceLine = sourceIds.length > 0
+          ? `由 ${sourceIds.length} 个监控源标记到`
+          : '未关联监控源';
+        const openLink = t.url ? `<a href="${t.url}" target="_blank" rel="noopener" style="color:#185FA5;text-decoration:underline">↗ 去 X 看原推</a>` : '';
+        html += `
+          <div style="font-size: 13px;color:var(--color-text-primary);line-height:1.65;margin:8px 0 12px">${escText}</div>
+          <div class="intel-block" style="margin-bottom:10px">
+            <div class="intel-label">原推</div>
+            <div style="font-size:12px;line-height:1.7">
+              <div><span style="font-weight:500">作者</span>: ${t.handle} · ${t.time} ${tagKind}</div>
+              <div style="margin-top:4px"><span style="font-weight:500">${sourceLine}</span></div>
+              <div style="margin-top:6px">${openLink}</div>
+            </div>
+          </div>
+          <div class="intel-block" style="margin-bottom:10px">
+            <div class="intel-label">互动指标</div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:12px">
+              <div><span style="color:var(--color-text-tertiary)">views</span> <span style="font-weight:600;color:#27500A">${fmt(s.view)}</span></div>
+              <div><span style="color:var(--color-text-tertiary)">likes</span> <span style="font-weight:600">${fmt(s.like)}</span></div>
+              <div><span style="color:var(--color-text-tertiary)">retweets</span> <span style="font-weight:600">${fmt(s.rt)}</span></div>
+              <div><span style="color:var(--color-text-tertiary)">replies</span> <span style="font-weight:600">${fmt(s.reply)}</span></div>
+            </div>
+            ${eng > 0 ? `<div style="margin-top:6px;font-size:11px;color:var(--color-text-tertiary)">总互动 = like + RT + reply = <span class="hl-num">${fmt(eng)}</span></div>` : ''}
+          </div>
+          <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:6px;line-height:1.5">
+            ⓘ 这条 hotspot 没有 AI 萃取的 summary/facts/分歧/时间线。要看深度分析需接入 LLM 自动生成 intel JSONB.
+          </div>`;
+      } else {
+        html += `
+          <div style="padding:24px;text-align:center;font-size:12px;color:var(--color-text-tertiary);background:var(--color-background-secondary);border-radius:var(--border-radius-md);margin-top:8px">
+            该热点暂无关联推文 + intel
+          </div>`;
+      }
     } else {
       if (intel.summary) html += `<div style="font-size: 13px;color:var(--color-text-primary);line-height:1.65;margin:8px 0 12px">${intel.summary}</div>`;
       if (intel.facts?.length) {

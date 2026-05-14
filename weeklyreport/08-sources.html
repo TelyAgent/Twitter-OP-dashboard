@@ -365,6 +365,10 @@ theblock.co
     };
     const st = STATUS_MAP[s.status] || STATUS_MAP.observe;
     const action = s.status === 'retired' ? '<span class="act-link danger">✕ 移除</span>' : (s.status === 'observe' ? '<span class="act-link">↗ 调整</span>' : '<span class="act-link">↗ 详情</span>');
+    // 同步按钮 — 仅对 twitter 类型显示 (其它类型暂不支持自动拉)
+    const syncBtn = (s.type === 'twitter')
+      ? `<button class="act-link sync-btn" data-handle="${s.handle.replace(/^@/, '')}" data-source-id="${s.id}" style="background:transparent;border:0;color:#185FA5;cursor:pointer;font-size:11px;padding:0;margin-right:8px">↻ 同步</button>`
+      : '';
     return `
       <tr ${st.rowBg ? `style="${st.rowBg}"` : ''} data-id="${s.id}">
         <td>
@@ -376,7 +380,7 @@ theblock.co
         <td>${fireCell}</td>
         <td><span class="status ${st.cls}">${st.label}</span></td>
         <td><span class="uploader"><span class="uploader-av${uClass}">${u.initials}</span><span>${u.display_name}<div class="uploader-date">${dateStr}</div></span></span></td>
-        <td>${action}</td>
+        <td>${syncBtn}${action}</td>
       </tr>
     `;
   }
@@ -462,6 +466,13 @@ theblock.co
   }
 
   bootstrap();
+
+  // 暴露给 sync IIFE: 同步完后重新拉表 + 重渲
+  window.__reloadSourcesTable = async () => {
+    if (!dbReady) return;
+    const rows = await loadSourcesFromDB();
+    if (rows) renderTable(rows);
+  };
 
   const modal = document.getElementById('bulk-modal');
   const btnOpen = document.getElementById('btn-bulk-import');
@@ -730,6 +741,134 @@ theblock.co
       progressEl.style.color = '';
       close();
     }, 1100);
+  });
+})();
+
+// ====== ↻ 同步: 拉 @handle 近 7 天推文 → 写 hotspots (via RPC merge) ======
+(function(){
+  const API_BASE = `http://${location.hostname}:8081`;
+  const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const SYNC_HOURS = 168; // 7 天
+
+  // 简单 toast 替代 alert
+  function toast(msg, type='info', dur=4000) {
+    const colors = { info:'#185FA5', success:'#3B6D11', warn:'#854F0B', error:'#A32D2D' };
+    let el = document.getElementById('sync-toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'sync-toast';
+      el.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:10px 16px;border-radius:8px;color:#fff;font-size:13px;z-index:300;box-shadow:0 4px 12px rgba(0,0,0,0.15);max-width:560px;line-height:1.5';
+      document.body.appendChild(el);
+    }
+    el.style.background = colors[type] || colors.info;
+    el.textContent = msg;
+    el.style.display = '';
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.style.display = 'none'; }, dur);
+  }
+
+  async function syncHandle(handle, sourceId, btn) {
+    // 1. 拉 X
+    btn.disabled = true;
+    btn.textContent = '↻ 拉取中…';
+    let res;
+    try {
+      const r = await fetch(`${API_BASE}/api/twitter/handle/${encodeURIComponent(handle)}/recent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hours: SYNC_HOURS }),
+      });
+      res = await r.json();
+      if (!res.ok) {
+        toast(`✕ 拉 @${handle} 失败: ${res.error || r.status}`, 'error');
+        return;
+      }
+    } catch (e) {
+      toast(`✕ 网络错误: ${e.message}`, 'error');
+      return;
+    } finally {
+      btn.disabled = false;
+    }
+
+    const tweets = res.tweets || [];
+    if (tweets.length === 0) {
+      btn.textContent = '↻ 同步';
+      toast(`@${handle}: 近 7 天 0 条推文 (可能账号沉默或被保护)`, 'warn');
+      return;
+    }
+
+    // 2. 调 RPC 入库 (合并 sources)
+    btn.textContent = `↻ 入库 0/${tweets.length}`;
+    let inserted = 0, errors = 0;
+    for (const t of tweets) {
+      const eng = (t.metrics.likes || 0) + (t.metrics.retweets || 0) + (t.metrics.replies || 0);
+      const { error } = await sb.rpc('upsert_hotspot_with_source', {
+        p_id:          `hs_tw_${t.id}`,
+        p_title:       (t.text || '').slice(0, 120),
+        p_category:    'E',                                  // 默认 E, 用户后续手调
+        p_hot_signal:  (t.metrics.views || 0) > 50000,
+        p_source_id:   sourceId,
+        p_tweet:       t,
+        p_metrics:     { ...t.metrics, engagements: eng },
+      });
+      if (error) { errors++; console.warn('rpc fail', t.id, error.message); }
+      else inserted++;
+      btn.textContent = `↻ 入库 ${inserted+errors}/${tweets.length}`;
+    }
+
+    btn.textContent = '↻ 同步';
+    const rateLeft = res.rate_limit?.remaining;
+    const rateNote = rateLeft != null ? `  · 配额剩 ${rateLeft}` : '';
+
+    // 3. 回写源的 metrics_4w (基于刚拉到的 tweets, 不再查 hotspots — 避免 JSONB contains 查询问题)
+    try {
+      // 用本次 sync 拉到的 tweets 直接算
+      const hits = tweets.length;
+      const fire = tweets.filter(t => (t.metrics?.views || 0) > 50000).length;
+      // spark: 4 周, 按 tweet.created_at 分桶
+      const now = Date.now();
+      const spark = [0, 0, 0, 0];
+      for (const t of tweets) {
+        const wks = Math.floor((now - new Date(t.created_at).getTime()) / (7 * 24 * 3600 * 1000));
+        if (wks >= 0 && wks < 4) spark[3 - wks]++;  // 越新越右
+      }
+      const maxV = Math.max(1, ...spark);
+      const sparkPx = spark.map(c => Math.round(3 + (c / maxV) * 15));
+      console.log(`[sync] ${handle} metrics:`, { hits, fire, spark: sparkPx });
+
+      const { error: updErr } = await sb.from('sources').update({
+        metrics_4w: { hits, fire, spark: sparkPx },
+        last_active_at: new Date().toISOString(),
+      }).eq('id', sourceId);
+      if (updErr) {
+        console.warn('[sync] sources.update 失败:', updErr);
+      } else if (window.__reloadSourcesTable) {
+        await window.__reloadSourcesTable();
+        console.log('[sync] sources 表已重渲');
+      }
+    } catch (e) {
+      console.warn('[sync] 回写 source.metrics_4w 失败:', e);
+    }
+
+    if (errors === 0) {
+      toast(`✓ @${handle}: 拉 ${tweets.length} 条 · 入库 ${inserted} 条${rateNote}`, 'success');
+    } else {
+      toast(`⚠ @${handle}: 拉 ${tweets.length} 条 · 入库 ${inserted} · 失败 ${errors}${rateNote}`, 'warn', 6000);
+    }
+  }
+
+  // 事件委托 (tbody 重渲也能命中)
+  document.getElementById('sources-tbody').addEventListener('click', async (e) => {
+    const btn = e.target.closest('.sync-btn');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const handle = btn.getAttribute('data-handle');
+    const sourceId = btn.getAttribute('data-source-id');
+    if (!handle || !sourceId) return;
+    await syncHandle(handle, sourceId, btn);
   });
 })();
 </script>

@@ -120,6 +120,48 @@ app.post('/api/twitter/handle/:handle/recent', async (req, reply) => {
   }
 });
 
+// 拉一个 X List 的所有成员 (不限数量, 安全上限 2000)
+app.post('/api/twitter/list/:listId/members', async (req, reply) => {
+  const listId = String(req.params.listId || '').trim();
+  if (!/^\d{1,25}$/.test(listId)) {
+    return reply.code(400).send({ ok: false, error: 'invalid list id' });
+  }
+  let client;
+  try { client = getClient(); }
+  catch (e) { return reply.code(503).send({ ok: false, error: e.message }); }
+
+  const HARD_CAP = 2000;
+  try {
+    const paginator = await client.v2.listMembers(listId, {
+      max_results: 100,
+      'user.fields': ['username', 'name', 'description', 'public_metrics'],
+    });
+    const members = [];
+    for await (const u of paginator) {
+      members.push({
+        id: u.id,
+        username: u.username,
+        name: u.name,
+        bio: u.description || null,
+        followers: u.public_metrics?.followers_count ?? null,
+      });
+      if (members.length >= HARD_CAP) break;
+    }
+    return { ok: true, list_id: listId, count: members.length, members };
+  } catch (err) {
+    if (err instanceof ApiResponseError) {
+      const code = err.code || 500;
+      return reply.code(code === 429 ? 429 : code === 401 ? 401 : code === 404 ? 404 : 502).send({
+        ok: false,
+        error: err.data?.detail || err.message || 'twitter api error',
+        twitterCode: code,
+      });
+    }
+    req.log.error(err);
+    return reply.code(500).send({ ok: false, error: err.message || 'internal' });
+  }
+});
+
 app.post('/api/twitter/tweet', async (req, reply) => {
   const body = req.body || {};
   const id = extractTweetId(body.url || body.id);

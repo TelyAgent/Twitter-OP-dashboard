@@ -252,6 +252,15 @@
 
 </div>
 
+<!-- ============ 🔥 爆款推文 (从所有监控源同步出的 hot_signal=true 推文) ============ -->
+<div id="fire-card" class="card" style="padding:14px 16px;margin-top:14px">
+  <div class="card-head" style="margin-bottom:10px">
+    <div class="card-title">🔥 爆款推文 · 来自监控源</div>
+    <span class="muted" id="fire-summary">加载中…</span>
+  </div>
+  <div id="fire-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px 18px"></div>
+</div>
+
 </main>
 </div>
 
@@ -744,13 +753,89 @@ theblock.co
   });
 })();
 
-// ====== ↻ 同步: 拉 @handle 近 7 天推文 → 写 hotspots (via RPC merge) ======
+// ====== ↻ 同步: 拉 @handle 近 7 天推文 → 写 hotspots (via RPC merge) + 🔥 爆款 feed ======
 (function(){
   const API_BASE = `http://${location.hostname}:8081`;
   const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   const SYNC_HOURS = 168; // 7 天
+
+  // ─── 工具 ─────────────────────────────────────────────────────────────
+  function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function fmt(n) {
+    if (n == null) return '—';
+    n = Number(n);
+    if (n >= 1e6) return (n/1e6).toFixed(1).replace(/\.0$/, '') + 'M';
+    if (n >= 1e3) return (n/1e3).toFixed(1).replace(/\.0$/, '') + 'k';
+    return String(n);
+  }
+  function timeAgo(ts) {
+    if (!ts) return '';
+    const diff = Date.now() - new Date(ts).getTime();
+    if (diff < 60_000) return '刚刚';
+    if (diff < 3.6e6) return Math.floor(diff/60_000) + ' min';
+    if (diff < 8.64e7) return Math.floor(diff/3.6e6) + ' h';
+    return Math.floor(diff/8.64e7) + ' d';
+  }
+
+  // ─── 🔥 爆款 feed ────────────────────────────────────────────────────
+  async function loadFireFeed() {
+    const summaryEl = document.getElementById('fire-summary');
+    const grid = document.getElementById('fire-grid');
+    if (!summaryEl || !grid) return;
+
+    summaryEl.textContent = '加载中…';
+    const { data, error } = await sb.from('hotspots')
+      .select('id, tweets, metrics, created_at, sources')
+      .eq('hot_signal', true)
+      .order('created_at', { ascending: false })
+      .limit(60);
+
+    if (error) {
+      summaryEl.textContent = '加载失败';
+      grid.innerHTML = `<div style="grid-column:1/-1;padding:16px;color:#A32D2D;font-size:12px">${escapeHtml(error.message)}</div>`;
+      return;
+    }
+
+    const posts = (data || []).map(h => h.tweets?.[0]).filter(Boolean);
+    if (posts.length === 0) {
+      summaryEl.textContent = '0 条';
+      grid.innerHTML = `<div style="grid-column:1/-1;padding:24px;text-align:center;font-size:13px;color:var(--color-text-tertiary);background:var(--color-background-secondary);border-radius:var(--border-radius-md)">暂无爆款 · 点 KOL 的 ↻ 同步 拉取，views &gt; 50k 的会自动标记</div>`;
+      return;
+    }
+    posts.sort((a, b) => (b.metrics?.views || 0) - (a.metrics?.views || 0));
+    summaryEl.textContent = `按 views 降序 · top ${posts.length}`;
+    grid.innerHTML = posts.map(t => {
+      const m = t.metrics || {};
+      const handle = t.author?.username ? `@${t.author.username}` : '(unknown)';
+      const url = t.url || `https://x.com/i/status/${t.id}`;
+      const kindBadge = (t.kind && t.kind !== 'original')
+        ? `<span style="font-size:10px;background:#EEEDFE;color:#3C3489;padding:1px 5px;border-radius:3px;margin-left:4px">${t.kind}</span>` : '';
+      return `
+        <a href="${url}" target="_blank" rel="noopener" style="display:block;text-decoration:none;color:inherit">
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:4px">
+            <span style="font-weight:500;color:var(--color-text-primary)">${escapeHtml(handle)}</span>
+            <span style="color:var(--color-text-tertiary)">· ${timeAgo(t.created_at)}</span>${kindBadge}
+          </div>
+          <div style="font-size:13px;line-height:1.55">${escapeHtml(t.text || '')}</div>
+          <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:6px;display:flex;gap:14px">
+            <span>↻ ${fmt(m.retweets)}</span>
+            <span>♡ ${fmt(m.likes)}</span>
+            <span>💬 ${fmt(m.replies)}</span>
+            <span>👁 ${fmt(m.views)}</span>
+          </div>
+        </a>`;
+    }).join('');
+  }
+
+  // 暴露给外部调用
+  window.__reloadFireFeed = loadFireFeed;
+
+  // 初次加载 + 登录后立刻拉一次
+  loadFireFeed();
 
   // 简单 toast 替代 alert
   function toast(msg, type='info', dur=4000) {
@@ -857,6 +942,9 @@ theblock.co
     } else {
       toast(`⚠ @${handle}: 拉 ${tweets.length} 条 · 入库 ${inserted} · 失败 ${errors}${rateNote}`, 'warn', 6000);
     }
+
+    // 4. 刷新 🔥 爆款 feed
+    if (window.__reloadFireFeed) await window.__reloadFireFeed();
   }
 
   // 事件委托 (tbody 重渲也能命中)

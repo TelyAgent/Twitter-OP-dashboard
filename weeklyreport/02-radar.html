@@ -339,6 +339,43 @@
 
   const CAT_LABEL = { A:'A 赔率', C:'C 链上', D:'D 新合约', E:'E 现实' };
 
+  // 抄自 content-factory radar-pull.js: 用于评分 fit 项 + 兜底自动分类
+  const CAT_KW = {
+    A: ['odds','polymarket','kalshi','manifold','prediction market','bet','probability','resolves','contract','yes/no'],
+    C: ['smart money','whale','wallet','0x','on-chain','onchain','defi','position','buys','sells','moves funds'],
+    D: ['new market','new contract','launching','listed','just added','first trade','new listing'],
+    E: ['fomc','fed','cpi','inflation','rate cut','rate hike','election','trump','powell','bitcoin','btc','crypto'],
+  };
+  const ALL_KW = Object.values(CAT_KW).flat();
+
+  // 三维评分: fit / viral / fresh → score (加权和), 抄 content-factory 思路
+  // viral 改成不依赖 followers 的版本: 互动占 views 的比例 (likes+RT+reply)/views
+  function computeScore(hs) {
+    const t = hs.tweets?.[0] || {};
+    const m = t.metrics || hs.metrics || {};
+    const text = String(t.text || hs.title || '').toLowerCase();
+
+    // fit: 命中 CAT_KW 词的密度 (单条推 N=1, max 命中 3 个就满分)
+    let matchCnt = 0;
+    for (const kw of ALL_KW) if (text.includes(kw)) matchCnt++;
+    const fit = Math.min(1, matchCnt / 3);
+
+    // viral: 互动率 (likes+RT+reply) / views, 没 followers 时的简化版
+    const eng = (m.likes || 0) + (m.retweets || 0) + (m.replies || 0);
+    const views = m.views || 0;
+    const viral = views > 0
+      ? Math.min(1, eng / Math.max(views * 0.02, 50))  // 期望 2% 互动率为满分, max(views*2%,50) 防止小 views 虚高
+      : Math.min(1, eng / 200);                          // 没 views 数据时 fallback (老推)
+
+    // fresh: 72h 半衰期, 跟周报节奏匹配 (content-factory 24h 太激进)
+    const ts = t.created_at || hs.created_at;
+    const ageHours = ts ? (Date.now() - new Date(ts).getTime()) / 3.6e6 : 9999;
+    const fresh = Math.max(0, 1 - ageHours / 72);
+
+    const score = +(fit * 0.3 + viral * 0.4 + fresh * 0.3).toFixed(3);
+    return { fit: +fit.toFixed(2), viral: +viral.toFixed(2), fresh: +fresh.toFixed(2), score };
+  }
+
   // 兜底 mock (未登录或 DB 报错时用) ─────────────────────────────────────────
   const MOCK_HOTSPOTS = [
     { id:'mock_wallets', title:'3 个胜率 ≥70% 钱包 6h 内押 $691k YES', category:'C', status:'hot', score:5, hot_signal:true,
@@ -402,10 +439,10 @@
   }
 
   function metaRight(hs){
-    // detected_min: 优先用 mock 字段, 否则从 created_at 算
     const ago = hs.metrics?.detected_min != null ? `${hs.metrics.detected_min} min` : timeAgo(hs.created_at);
-    if (hs.hot_signal) return `<span style="margin-left:auto;color:#D85A30;font-weight:500">HOT · ${ago} 前</span>`;
-    // 右侧次要信息: 优先 talk_accounts, 否则从第一条 tweet 的 views
+    // _isHot 是 loadHotspotsFromDB 算的; 没算过则 fallback 到原 hot_signal
+    const isHot = hs._isHot ?? hs.hot_signal;
+    if (isHot) return `<span style="margin-left:auto;color:#D85A30;font-weight:500">HOT · ${ago} 前</span>`;
     const v = hs.metrics?.talk_accounts ?? (hs.tweets?.[0]?.metrics?.views ?? hs.metrics?.views);
     const label = hs.metrics?.talk_accounts != null ? '账号' : 'views';
     return `<span style="margin-left:auto">${ago} · ${fmt(v || 0)} ${label}</span>`;
@@ -430,39 +467,52 @@
   }
 
   function renderMetrics(){
-    const totalTalk = hotspots.reduce((s,h) => s + (h.metrics?.talk_accounts || 0), 0);
-    const totalEng = hotspots.reduce((s,h) => s + (h.metrics?.engagements || 0), 0);
+    // 聚合: views/likes/RT/replies 跨所有 hotspots
+    let views = 0, eng = 0;
+    for (const h of hotspots) {
+      const m = h.tweets?.[0]?.metrics || h.metrics || {};
+      views += m.views || 0;
+      eng += (m.likes || 0) + (m.retweets || 0) + (m.replies || 0);
+    }
     const pool = hotspots.filter(h => ['pool','hot','watching'].includes(h.status)).length;
-    const hot = hotspots.filter(h => h.hot_signal).length;
+    const hot = hotspots.filter(h => (h._isHot ?? h.hot_signal)).length;
+    // 24h 内新鲜热点
+    const fresh = hotspots.filter(h => {
+      const ts = h.tweets?.[0]?.created_at || h.created_at;
+      return ts && (Date.now() - new Date(ts).getTime()) < 86_400_000;
+    }).length;
     document.getElementById('rd-metrics').innerHTML = `
       <div class="metric-card">
-        <div class="metric-label">谈论账号</div>
-        <div class="metric-val">${totalTalk.toLocaleString()}</div>
-        <div class="metric-delta up">↗ 实时聚合</div>
+        <div class="metric-label">总互动 (likes+RT+reply)</div>
+        <div class="metric-val">${fmt(eng)}</div>
+        <div class="metric-delta info">总曝光 ${fmt(views)} views</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label">互动总数</div>
-        <div class="metric-val">${fmt(totalEng)}</div>
-        <div class="metric-delta up">↗ 实时聚合</div>
+        <div class="metric-label">24h 新鲜热点</div>
+        <div class="metric-val">${fresh}</div>
+        <div class="metric-delta info">占池子 ${pool ? Math.round(fresh/pool*100) : 0}%</div>
       </div>
       <div class="metric-card">
         <div class="metric-label">热点池</div>
         <div class="metric-val">${pool}</div>
-        <div class="metric-delta" style="color:${hot>0?'#D85A30':'var(--color-text-tertiary)'}">${hot} 个 HOT 信号</div>
+        <div class="metric-delta" style="color:${hot>0?'#D85A30':'var(--color-text-tertiary)'}">${hot} 个 HOT 信号 (top 15%)</div>
       </div>`;
   }
 
   function renderPool(){
     document.getElementById('rd-pool').innerHTML = hotspots.map(h => {
       const cls = ['hot-card'];
-      if (h.hot_signal) cls.push('hot');
+      const isHot = h._isHot ?? h.hot_signal;
+      if (isHot) cls.push('hot');
       if (h.id === selectedId) cls.push('selected');
+      // 5 颗点: 用 _score (0-1) 或 fallback 到 h.score (int 0-5)
+      const dotCount = h._score != null ? Math.round(h._score * 5) : (h.score || 0);
       return `
         <div class="${cls.join(' ')}" data-id="${h.id}">
           <div class="hot-title">${h.title}</div>
           <div class="hot-meta">
             <span class="tag tag-${h.category}">${CAT_LABEL[h.category]}</span>
-            <span class="score-bar">${scoreDots(h.score)}</span>
+            <span class="score-bar" title="score=${h._score ?? '-'}  fit=${h._fit ?? '-'}  viral=${h._viral ?? '-'}  fresh=${h._fresh ?? '-'}">${scoreDots(dotCount)}</span>
             ${metaRight(h)}
           </div>
         </div>`;
@@ -484,11 +534,22 @@
     const intel = hs.intel || {};
     const hasIntel = intel.summary || (intel.facts && intel.facts.length);
 
+    // 评分分项 (鼠标移上去看完整分数)
+    const scoreLine = hs._score != null ? `
+      <div style="display:flex;gap:10px;font-size:11px;color:var(--color-text-tertiary);margin:6px 0 2px;flex-wrap:wrap">
+        <span title="0.3 × fit + 0.4 × viral + 0.3 × fresh"><b style="color:var(--color-text-primary)">score ${hs._score.toFixed(3)}</b></span>
+        <span title="关键词命中密度">fit ${hs._fit}</span>
+        <span title="互动占曝光比 (likes+RT+reply)/views">viral ${hs._viral}</span>
+        <span title="72h 半衰期">fresh ${hs._fresh}</span>
+        ${hs._isHot ? '<span style="color:#D85A30;font-weight:500">HOT (top 15%)</span>' : ''}
+      </div>` : '';
+
     let html = `
       <div class="card-head">
         <div class="card-title">⊙ ${hs.title}</div>
         <span class="tag tag-${hs.category}">${CAT_LABEL[hs.category]}</span>
-      </div>`;
+      </div>
+      ${scoreLine}`;
 
     if (!hasIntel) {
       // 没 AI 萃取的 intel - 用 tweet 本身的数据自动生成 detail
@@ -609,9 +670,26 @@
 
   async function loadHotspotsFromDB(){
     try {
-      const { data, error } = await sb.from('hotspots').select('*').order('score', { ascending: false }).order('hot_signal', { ascending: false });
+      // DB 端按 created_at 拉, 客户端再按计算分排
+      const { data, error } = await sb.from('hotspots')
+        .select('*').order('created_at', { ascending: false }).limit(500);
       if (error) throw error;
-      return data || [];
+      // 计算分数, 写到 hotspot._score / ._fit / ._viral / ._fresh
+      const rows = data || [];
+      for (const h of rows) {
+        const sc = computeScore(h);
+        h._fit = sc.fit; h._viral = sc.viral; h._fresh = sc.fresh; h._score = sc.score;
+        // 用计算分覆盖原 score 字段, 让 hot_signal 显示也跟着算分走
+        // (top 15% 为 hot)
+      }
+      // 按计算分降序排
+      rows.sort((a, b) => b._score - a._score);
+      // 算 hot_signal: top 15% 标 hot
+      const cutoff = rows[Math.floor(rows.length * 0.15)]?._score ?? 0.5;
+      for (const h of rows) {
+        h._isHot = h._score >= Math.max(cutoff, 0.35);  // 至少 0.35 才能 hot
+      }
+      return rows;
     } catch (e) {
       console.warn('DB load failed, fallback to mock:', e.message);
       return null;

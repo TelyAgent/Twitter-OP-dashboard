@@ -772,13 +772,130 @@ theblock.co
   });
 })();
 
-// ====== ↻ 同步: 拉 @handle 近 7 天推文 → 写 hotspots (via RPC merge) + 🔥 爆款 feed ======
+// ====== ↻ 同步: 拉 @handle 近 7 天 → 聚类 → cluster hotspot (RPC) + 🔥 爆款 feed ======
 (function(){
   const API_BASE = `http://${location.hostname}:8081`;
   const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-  const SYNC_HOURS = 168; // 7 天
+  const SYNC_HOURS = 168;             // 7 天
+  const CLUSTER_WINDOW_MS = 4 * 3600e3; // 4h 聚类窗口
+  const MIN_CLUSTER_SCORE = 0.10;       // 低于此分丢弃 (无主题的孤立推默认会很低)
+  const HOT_THRESHOLD = 0.35;           // ≥ 0.35 标 HOT
+
+  // ── 主实体词典 + 分类词典 (从 content-factory radar-pull.js 抄)
+  const CLUSTER_KEYS = [
+    'polymarket','kalshi','manifold','metaculus','predictit',
+    'fomc','cpi','nfp','pce','gdp','payroll',
+    'powell','trump','biden','harris','musk','lagarde','yellen','sbf',
+    'bitcoin','btc','ethereum','eth','solana','sol','xrp','bnb',
+    'smart money','whale','on-chain','onchain','defi','tvl',
+    'inflation','interest rate','rate cut','rate hike',
+    'election','congress','senate',
+    'hack','exploit','rug','scam',
+  ];
+  const CAT_KW = {
+    A: ['odds','polymarket','kalshi','manifold','prediction market','bet','probability','resolves','contract','yes/no'],
+    C: ['smart money','whale','wallet','0x','on-chain','onchain','defi','position','buys','sells','moves funds'],
+    D: ['new market','new contract','launching','listed','just added','first trade','new listing'],
+    E: ['fomc','fed','cpi','inflation','rate cut','rate hike','election','trump','powell','bitcoin','btc','crypto'],
+  };
+  const ALL_KW = Object.values(CAT_KW).flat();
+
+  function extractKey(text) {
+    const lower = (text || '').toLowerCase();
+    for (const k of CLUSTER_KEYS) if (lower.includes(k)) return k;
+    const m = (text || '').match(/\$[\d,.]+[kKmMbB]?/);
+    return m ? m[0].toLowerCase() : null;
+  }
+  function classifyCategory(text) {
+    const lower = (text || '').toLowerCase();
+    for (const [cat, kws] of Object.entries(CAT_KW)) {
+      if (kws.some(kw => lower.includes(kw))) return cat;
+    }
+    return 'E';
+  }
+
+  // ── 聚类: 同 key + 4h 窗口为一簇; 无 key 的每条自成一簇 (会被低分过滤掉)
+  function clusterTweets(tweets) {
+    const byKey = new Map();
+    const orphans = [];
+    for (const t of tweets) {
+      const k = extractKey(t.text);
+      if (k) {
+        if (!byKey.has(k)) byKey.set(k, []);
+        byKey.get(k).push(t);
+      } else {
+        orphans.push(t);
+      }
+    }
+    const clusters = [];
+    for (const [key, group] of byKey) {
+      group.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      let curr = [group[0]];
+      for (let i = 1; i < group.length; i++) {
+        const dt = new Date(group[i].created_at) - new Date(curr[curr.length - 1].created_at);
+        if (dt <= CLUSTER_WINDOW_MS) curr.push(group[i]);
+        else { clusters.push({ key, tweets: curr }); curr = [group[i]]; }
+      }
+      clusters.push({ key, tweets: curr });
+    }
+    for (const t of orphans) clusters.push({ key: 'misc', tweets: [t] });
+    return clusters;
+  }
+
+  // ── cluster 评分 (fit / viral / fresh / score)
+  function scoreCluster(tweets) {
+    const allText = tweets.map(t => t.text || '').join(' ').toLowerCase();
+    let matches = 0; for (const kw of ALL_KW) if (allText.includes(kw)) matches++;
+    const fit = Math.min(1, matches / Math.max(tweets.length * 3, 3));
+
+    let totalEng = 0, totalViews = 0;
+    for (const t of tweets) {
+      const m = t.metrics || {};
+      totalEng += (m.likes || 0) + (m.retweets || 0) + (m.replies || 0);
+      totalViews += m.views || 0;
+    }
+    const avgEng = totalEng / tweets.length;
+    const avgViews = totalViews / tweets.length;
+    const viral = avgViews > 0
+      ? Math.min(1, avgEng / Math.max(avgViews * 0.02, 50))
+      : Math.min(1, avgEng / 200);
+
+    const newest = Math.max(...tweets.map(t => new Date(t.created_at).getTime() || 0));
+    const hoursOld = (Date.now() - newest) / 3.6e6;
+    const fresh = Math.max(0, 1 - hoursOld / 72);
+
+    const score = +(fit * 0.3 + viral * 0.4 + fresh * 0.3).toFixed(3);
+    return {
+      fit: +fit.toFixed(2), viral: +viral.toFixed(2), fresh: +fresh.toFixed(2), score,
+      cluster_size: tweets.length, total_views: totalViews, total_engagement: totalEng,
+      avg_views: Math.round(avgViews), avg_engagement: Math.round(avgEng),
+    };
+  }
+
+  // ── 构造 hotspot 行 (准备调 RPC)
+  function buildHotspotFromCluster(cluster) {
+    const tweets = [...cluster.tweets].sort((a, b) => (b.metrics?.views || 0) - (a.metrics?.views || 0));
+    const top = tweets[0];
+    const allText = tweets.map(t => t.text || '').join(' ');
+    const cat = classifyCategory(allText);
+    const sc = scoreCluster(tweets);
+
+    // 4h time bucket from earliest tweet
+    const earliest = Math.min(...tweets.map(t => new Date(t.created_at).getTime() || Date.now()));
+    const bucket = Math.floor(earliest / CLUSTER_WINDOW_MS);
+    const keySlug = cluster.key.replace(/[^a-z0-9]+/gi, '_').slice(0, 30);
+
+    return {
+      id: `hs_c_${keySlug}_${bucket}`,
+      title: (top.text || '').slice(0, 120),
+      category: cat,
+      hot_signal: sc.score >= HOT_THRESHOLD,
+      tweets,
+      metrics: sc,
+    };
+  }
 
   // ─── 工具 ─────────────────────────────────────────────────────────────
   function escapeHtml(s) {
@@ -903,23 +1020,28 @@ theblock.co
       return;
     }
 
-    // 2. 调 RPC 入库 (合并 sources)
-    btn.textContent = `↻ 入库 0/${tweets.length}`;
+    // 2. 聚类 → 评分 → 过滤 → 调 RPC
+    const clusters = clusterTweets(tweets);
+    const candidates = clusters.map(buildHotspotFromCluster);
+    const kept = candidates.filter(h => h.metrics.score >= MIN_CLUSTER_SCORE);
+    const dropped = candidates.length - kept.length;
+    console.log(`[sync] ${handle}: ${tweets.length} 推 → ${clusters.length} 簇 → 保留 ${kept.length} (丢 ${dropped} low-score)`);
+
+    btn.textContent = `↻ 入库 0/${kept.length}`;
     let inserted = 0, errors = 0;
-    for (const t of tweets) {
-      const eng = (t.metrics.likes || 0) + (t.metrics.retweets || 0) + (t.metrics.replies || 0);
-      const { error } = await sb.rpc('upsert_hotspot_with_source', {
-        p_id:          `hs_tw_${t.id}`,
-        p_title:       (t.text || '').slice(0, 120),
-        p_category:    'E',                                  // 默认 E, 用户后续手调
-        p_hot_signal:  (t.metrics.views || 0) > 50000,
+    for (const h of kept) {
+      const { error } = await sb.rpc('upsert_cluster_hotspot', {
+        p_id:          h.id,
+        p_title:       h.title,
+        p_category:    h.category,
+        p_hot_signal:  h.hot_signal,
         p_source_id:   sourceId,
-        p_tweet:       t,
-        p_metrics:     { ...t.metrics, engagements: eng },
+        p_tweets:      h.tweets,
+        p_metrics:     h.metrics,
       });
-      if (error) { errors++; console.warn('rpc fail', t.id, error.message); }
+      if (error) { errors++; console.warn('[sync] rpc fail', h.id, error.message); }
       else inserted++;
-      btn.textContent = `↻ 入库 ${inserted+errors}/${tweets.length}`;
+      btn.textContent = `↻ 入库 ${inserted+errors}/${kept.length}`;
     }
 
     btn.textContent = '↻ 同步';
@@ -957,9 +1079,9 @@ theblock.co
     }
 
     if (errors === 0) {
-      toast(`✓ @${handle}: 拉 ${tweets.length} 条 · 入库 ${inserted} 条${rateNote}`, 'success');
+      toast(`✓ @${handle}: ${tweets.length} 推 → ${kept.length} 簇 hotspot${dropped ? ` (丢 ${dropped} low-score)` : ''}${rateNote}`, 'success', 5000);
     } else {
-      toast(`⚠ @${handle}: 拉 ${tweets.length} 条 · 入库 ${inserted} · 失败 ${errors}${rateNote}`, 'warn', 6000);
+      toast(`⚠ @${handle}: ${tweets.length} 推 → ${kept.length} 簇 · 入库 ${inserted} · 失败 ${errors}${rateNote}`, 'warn', 6000);
     }
 
     // 4. 刷新 🔥 爆款 feed

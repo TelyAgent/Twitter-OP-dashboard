@@ -348,28 +348,49 @@
   };
   const ALL_KW = Object.values(CAT_KW).flat();
 
-  // 三维评分: fit / viral / fresh → score (加权和), 抄 content-factory 思路
-  // viral 改成不依赖 followers 的版本: 互动占 views 的比例 (likes+RT+reply)/views
+  // 三维评分: fit / viral / fresh → score
+  // - fit / viral: 来源数据不变, 优先用 hotspot.metrics 里已存的 (cluster 同步时算好)
+  // - fresh: 始终现算 (会随时间衰减)
+  // 兼容 single-tweet seed hotspot, multi-tweet cluster, 无 metrics 的旧 mock 数据
   function computeScore(hs) {
-    const t = hs.tweets?.[0] || {};
-    const m = t.metrics || hs.metrics || {};
-    const text = String(t.text || hs.title || '').toLowerCase();
+    const tweets = hs.tweets || [];
+    const text = tweets.length > 0
+      ? tweets.map(t => t.text || '').join(' ').toLowerCase()
+      : (hs.title || '').toLowerCase();
 
-    // fit: 命中 CAT_KW 词的密度 (单条推 N=1, max 命中 3 个就满分)
-    let matchCnt = 0;
-    for (const kw of ALL_KW) if (text.includes(kw)) matchCnt++;
-    const fit = Math.min(1, matchCnt / 3);
+    // fit: 优先用 metrics 存的, 否则现算
+    let fit = hs.metrics?.fit;
+    if (fit == null) {
+      let matchCnt = 0;
+      for (const kw of ALL_KW) if (text.includes(kw)) matchCnt++;
+      fit = Math.min(1, matchCnt / Math.max(tweets.length * 3, 3));
+    }
 
-    // viral: 互动率 (likes+RT+reply) / views, 没 followers 时的简化版
-    const eng = (m.likes || 0) + (m.retweets || 0) + (m.replies || 0);
-    const views = m.views || 0;
-    const viral = views > 0
-      ? Math.min(1, eng / Math.max(views * 0.02, 50))  // 期望 2% 互动率为满分, max(views*2%,50) 防止小 views 虚高
-      : Math.min(1, eng / 200);                          // 没 views 数据时 fallback (老推)
+    // viral: 优先用 metrics 存的
+    let viral = hs.metrics?.viral;
+    if (viral == null) {
+      let totalEng = 0, totalViews = 0;
+      const ts = tweets.length > 0 ? tweets : [{ metrics: hs.metrics || {} }];
+      for (const t of ts) {
+        const m = t.metrics || {};
+        totalEng += (m.likes || 0) + (m.retweets || 0) + (m.replies || 0);
+        totalViews += m.views || 0;
+      }
+      const avgEng = totalEng / ts.length;
+      const avgViews = totalViews / ts.length;
+      viral = avgViews > 0
+        ? Math.min(1, avgEng / Math.max(avgViews * 0.02, 50))
+        : Math.min(1, avgEng / 200);
+    }
 
-    // fresh: 72h 半衰期, 跟周报节奏匹配 (content-factory 24h 太激进)
-    const ts = t.created_at || hs.created_at;
-    const ageHours = ts ? (Date.now() - new Date(ts).getTime()) / 3.6e6 : 9999;
+    // fresh: 总是现算, 用最新 tweet 的 created_at (或 hs.created_at fallback)
+    let newest = 0;
+    for (const t of tweets) {
+      const ts = new Date(t.created_at || 0).getTime();
+      if (ts > newest) newest = ts;
+    }
+    if (newest === 0) newest = new Date(hs.created_at || 0).getTime();
+    const ageHours = newest > 0 ? (Date.now() - newest) / 3.6e6 : 9999;
     const fresh = Math.max(0, 1 - ageHours / 72);
 
     const score = +(fit * 0.3 + viral * 0.4 + fresh * 0.3).toFixed(3);

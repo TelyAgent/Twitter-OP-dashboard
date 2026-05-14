@@ -163,7 +163,7 @@
 </div>
 <div style="display:flex;align-items:center;gap:6px">
 <input style="border:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:6px 10px;font-size: 12px;width:160px" placeholder="搜索 @handle..."/>
-<button class="btn-ghost">+ 手动添加</button>
+<button class="btn-ghost" id="btn-manual-add">+ 手动添加</button>
 <button class="btn-ghost" id="btn-bulk-import" style="background:#EEEDFE;color:#3C3489;border-color:#CECBF6">↥ 批量导入</button>
 </div>
 </div>
@@ -406,7 +406,24 @@ theblock.co
     }
   }
 
+  function setWriteButtonsEnabled(enabled, reason) {
+    ['btn-manual-add', 'btn-bulk-import'].forEach(id => {
+      const b = document.getElementById(id);
+      if (!b) return;
+      b.disabled = !enabled;
+      if (enabled) {
+        b.style.cursor = ''; b.style.opacity = ''; b.removeAttribute('title');
+      } else {
+        b.style.cursor = 'not-allowed'; b.style.opacity = '0.55';
+        b.title = reason || '请先登录后才能写入数据库';
+      }
+    });
+  }
+
   async function bootstrap(){
+    // 默认：禁用写按钮直到确认 DB 可写
+    setWriteButtonsEnabled(false, '加载中…');
+
     // 1. 复用 weekly_dashboard 的 session (同 supabase URL → localStorage 共享)
     const { data: { session } } = await sb.auth.getSession();
     currentSession = session;
@@ -427,15 +444,20 @@ theblock.co
         renderTable(rows);
         const muted = document.querySelector('.page-header .right .muted');
         if (muted) muted.textContent = `☁ 已同步 · ${rows.length} 条 · ${profile?.display_name || session.user.email}`;
+        setWriteButtonsEnabled(true);
       } else {
-        // DB 报错 (表不存在 / RLS 没过等) → 降级 mock
+        // DB 报错 (表不存在 / RLS 没过等) → 降级 mock + 禁用写
         renderTable(MOCK_SOURCES);
+        setWriteButtonsEnabled(false, 'DB 读取失败，无法写入（请联系管理员）');
+        const muted = document.querySelector('.page-header .right .muted');
+        if (muted) muted.innerHTML = '⚠ DB 读取失败 · 当前数据为 mock · 写入已禁用';
       }
     } else {
-      // 未登录 → 渲染 mock + 顶部提示
+      // 未登录 → 渲染 mock + 顶部提示 + 禁用写
       const muted = document.querySelector('.page-header .right .muted');
-      if (muted) muted.innerHTML = '⚠ 未登录 · <a href="../" style="color:#185FA5;text-decoration:underline">去登录</a> · 当前数据为 mock';
+      if (muted) muted.innerHTML = '⚠ 未登录 · <a href="../" style="color:#185FA5;text-decoration:underline">去登录</a> · 当前数据为 mock · 写入已禁用';
       renderTable(MOCK_SOURCES);
+      setWriteButtonsEnabled(false, '请先登录后才能导入到数据库');
     }
   }
 

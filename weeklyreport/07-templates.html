@@ -647,6 +647,25 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
 
   let lastFetched = null;
   let templatesLoaded = false;
+  let hasSession = false;
+
+  // 登录检查 + UI 锁定
+  (async () => {
+    btnOpen.disabled = true;
+    btnOpen.title = '检查登录状态…';
+    btnOpen.style.opacity = '0.55';
+    const { data: { session } } = await sb.auth.getSession();
+    hasSession = !!session;
+    if (hasSession) {
+      btnOpen.disabled = false;
+      btnOpen.style.opacity = '';
+      btnOpen.removeAttribute('title');
+    } else {
+      btnOpen.title = '请先到 dashboard 登录后才能记录使用';
+      btnOpen.style.cursor = 'not-allowed';
+      statusEl.innerHTML = '⚠ 未登录 · <a href="../" style="color:#185FA5;text-decoration:underline">去登录</a> · 写入已禁用';
+    }
+  })();
 
   async function loadTemplates() {
     if (templatesLoaded) return;

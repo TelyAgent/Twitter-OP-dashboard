@@ -8,6 +8,10 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 
+#rd-pool::-webkit-scrollbar{width:6px;}
+#rd-pool::-webkit-scrollbar-track{background:transparent;}
+#rd-pool::-webkit-scrollbar-thumb{background:var(--color-border-secondary);border-radius:3px;}
+#rd-pool::-webkit-scrollbar-thumb:hover{background:var(--color-text-tertiary);}
 .hot-card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:11px 12px;cursor:pointer;margin-bottom:6px;}
 .hot-card:hover{border-color:var(--color-border-secondary);}
 .hot-card.selected{border-color:#185FA5;background:#E6F1FB;}
@@ -88,7 +92,7 @@
 </div>
 </div>
 
-<div id="rd-pool" style="display:flex;flex-direction:column;gap:6px">
+<div id="rd-pool" style="display:flex;flex-direction:column;gap:6px;max-height:720px;overflow-y:auto;padding-right:6px">
 
 <div class="hot-card hot">
 <div class="hot-title">3 个胜率 ≥70% 钱包 6h 内押 $691k YES</div>

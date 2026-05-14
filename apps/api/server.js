@@ -24,8 +24,8 @@ function getClient() {
 function extractTweetId(input) {
   if (!input) return null;
   const s = String(input).trim();
-  if (/^\d{10,25}$/.test(s)) return s;
-  const m = s.match(/(?:twitter|x)\.com\/[^/]+\/status(?:es)?\/(\d{10,25})/i);
+  if (/^\d{1,25}$/.test(s)) return s;
+  const m = s.match(/(?:twitter|x)\.com\/[^/]+\/status(?:es)?\/(\d{1,25})/i);
   return m ? m[1] : null;
 }
 

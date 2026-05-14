@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>金模板库 · Pallax 内容工厂</title>
 <link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 
 .config-nav-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--border-radius-md);font-size:12px;color:var(--color-text-secondary);cursor:pointer;margin-bottom:2px;}
@@ -92,7 +93,8 @@
 
 <div class="page-header">
   <div class="right">
-    <span class="muted">最近更新 1 小时前</span>
+    <span class="muted" id="tpl-track-status">最近更新 1 小时前</span>
+    <button class="btn-primary" id="btn-track-usage" style="background:#3C3489">+ 记录使用</button>
     <div class="avatar">LR</div>
   </div>
 </div>
@@ -310,6 +312,57 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
 </div>
 
 <div class="demo-banner"><span class="dot"></span>原型演示 · 数据为示例</div>
+
+<!-- ====== 记录使用 弹窗 (写真实数据 → template_uses 表) ====== -->
+<div class="modal-backdrop" id="usage-modal">
+  <div class="modal" style="width:560px">
+    <div class="modal-head">
+      <div class="modal-title">+ 记录模板使用 (写真实数据)</div>
+      <button class="modal-close" id="usage-close">×</button>
+    </div>
+
+    <div class="modal-section">
+      <label class="modal-label">选模板</label>
+      <select class="modal-select" id="usage-tpl">
+        <option value="">加载中…</option>
+      </select>
+      <div class="modal-hint" id="usage-tpl-hint">从 templates 表加载</div>
+    </div>
+
+    <div class="modal-section">
+      <label class="modal-label">推文 URL 或 ID</label>
+      <input class="modal-input" id="usage-url" placeholder="https://x.com/user/status/1234567890..." />
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+        <button class="btn-ghost" id="usage-fetch">↗ 抓取指标</button>
+        <span id="usage-fetch-msg" style="font-size:12px;color:var(--color-text-tertiary)"></span>
+      </div>
+    </div>
+
+    <div class="modal-section" id="usage-result" style="display:none">
+      <label class="modal-label">抓取结果</label>
+      <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:12px;font-size:13px;line-height:1.6">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+          <span id="usage-author" style="font-weight:600"></span>
+          <span id="usage-time" style="color:var(--color-text-tertiary);font-size:11px"></span>
+        </div>
+        <div id="usage-text" style="margin-bottom:10px;color:var(--color-text-primary)"></div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px">
+          <div><span style="color:var(--color-text-tertiary)">views</span> <span id="usage-views" style="font-weight:600;color:#27500A"></span></div>
+          <div><span style="color:var(--color-text-tertiary)">likes</span> <span id="usage-likes" style="font-weight:600"></span></div>
+          <div><span style="color:var(--color-text-tertiary)">RT</span> <span id="usage-rt" style="font-weight:600"></span></div>
+          <div><span style="color:var(--color-text-tertiary)">replies</span> <span id="usage-replies" style="font-weight:600"></span></div>
+          <div><span style="color:var(--color-text-tertiary)">quotes</span> <span id="usage-quotes" style="font-weight:600"></span></div>
+          <div><span style="color:var(--color-text-tertiary)">bookmarks</span> <span id="usage-bookmarks" style="font-weight:600"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-foot">
+      <button class="btn-ghost" id="usage-cancel">取消</button>
+      <button class="btn-primary" id="usage-save" disabled>保存到 template_uses</button>
+    </div>
+  </div>
+</div>
 
 <script>
 (function(){
@@ -568,6 +621,135 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
       progressEl.style.color = '';
       close();
     }, 900);
+  });
+})();
+
+// ====== 记录使用 (real backend: pallax-api + Supabase template_uses) ======
+(function(){
+  const API_BASE = `http://${location.hostname}:8081`;
+  const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  const el = (id) => document.getElementById(id);
+  const modal       = el('usage-modal');
+  const btnOpen     = el('btn-track-usage');
+  const btnClose    = el('usage-close');
+  const btnCancel   = el('usage-cancel');
+  const btnFetch    = el('usage-fetch');
+  const btnSave     = el('usage-save');
+  const tplSelect   = el('usage-tpl');
+  const tplHint     = el('usage-tpl-hint');
+  const urlInput    = el('usage-url');
+  const fetchMsg    = el('usage-fetch-msg');
+  const resultBox   = el('usage-result');
+  const statusEl    = el('tpl-track-status');
+
+  let lastFetched = null;
+  let templatesLoaded = false;
+
+  async function loadTemplates() {
+    if (templatesLoaded) return;
+    const { data, error } = await sb
+      .from('templates')
+      .select('id, category, angle, uses, avg_views, status')
+      .order('updated_at', { ascending: false })
+      .limit(200);
+    if (error) {
+      tplHint.textContent = 'templates 加载失败: ' + error.message;
+      return;
+    }
+    tplSelect.innerHTML = '<option value="">— 选一个模板 —</option>' + (data || []).map(t => {
+      const tag = `${t.category}·${t.angle}`;
+      const stats = `(uses ${t.uses ?? 0}, avg ${(t.avg_views ?? 0).toLocaleString()})`;
+      return `<option value="${t.id}">${tag}  ${stats}</option>`;
+    }).join('');
+    tplHint.textContent = `共 ${data?.length || 0} 个模板`;
+    templatesLoaded = true;
+  }
+
+  function open() {
+    modal.classList.add('open');
+    loadTemplates();
+    urlInput.value = '';
+    fetchMsg.textContent = '';
+    resultBox.style.display = 'none';
+    btnSave.disabled = true;
+    lastFetched = null;
+  }
+  function close() { modal.classList.remove('open'); }
+
+  btnOpen.addEventListener('click', open);
+  btnClose.addEventListener('click', close);
+  btnCancel.addEventListener('click', close);
+  modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+
+  btnFetch.addEventListener('click', async () => {
+    const url = urlInput.value.trim();
+    if (!url) { fetchMsg.textContent = '请粘贴推文 URL'; fetchMsg.style.color = '#A32D2D'; return; }
+    fetchMsg.style.color = ''; fetchMsg.textContent = '抓取中…';
+    btnFetch.disabled = true; btnSave.disabled = true;
+    try {
+      const res = await fetch(`${API_BASE}/api/twitter/tweet`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const json = await res.json();
+      if (!json.ok) {
+        fetchMsg.textContent = '失败: ' + (json.error || res.status);
+        fetchMsg.style.color = '#A32D2D';
+        return;
+      }
+      lastFetched = json.tweet;
+      const t = json.tweet;
+      el('usage-author').textContent = t.author ? `@${t.author.username}` : '(unknown)';
+      el('usage-time').textContent   = t.created_at ? new Date(t.created_at).toLocaleString('zh-CN') : '';
+      el('usage-text').textContent   = t.text || '';
+      el('usage-views').textContent     = (t.metrics.views ?? 0).toLocaleString();
+      el('usage-likes').textContent     = (t.metrics.likes ?? 0).toLocaleString();
+      el('usage-rt').textContent        = (t.metrics.retweets ?? 0).toLocaleString();
+      el('usage-replies').textContent   = (t.metrics.replies ?? 0).toLocaleString();
+      el('usage-quotes').textContent    = (t.metrics.quotes ?? 0).toLocaleString();
+      el('usage-bookmarks').textContent = (t.metrics.bookmarks ?? 0).toLocaleString();
+      resultBox.style.display = '';
+      btnSave.disabled = !tplSelect.value;
+      fetchMsg.textContent = '✓ 已抓取';
+      fetchMsg.style.color = '#27500A';
+    } catch (e) {
+      fetchMsg.textContent = '网络错误: ' + e.message;
+      fetchMsg.style.color = '#A32D2D';
+    } finally {
+      btnFetch.disabled = false;
+    }
+  });
+
+  tplSelect.addEventListener('change', () => {
+    btnSave.disabled = !(tplSelect.value && lastFetched);
+  });
+
+  btnSave.addEventListener('click', async () => {
+    if (!lastFetched || !tplSelect.value) return;
+    btnSave.disabled = true; btnSave.textContent = '保存中…';
+    const row = {
+      template_id: tplSelect.value,
+      tweet_url:   lastFetched.url,
+      views:       lastFetched.metrics.views ?? lastFetched.metrics.likes ?? 0,
+    };
+    const { error } = await sb.from('template_uses').insert(row);
+    if (error) {
+      btnSave.textContent = '保存失败';
+      fetchMsg.textContent = error.message;
+      fetchMsg.style.color = '#A32D2D';
+      btnSave.disabled = false;
+      return;
+    }
+    btnSave.textContent = '✓ 已保存';
+    statusEl.textContent = `✓ 已记录使用 (${new Date().toLocaleTimeString('zh-CN')})`;
+    setTimeout(() => {
+      btnSave.textContent = '保存到 template_uses';
+      close();
+    }, 800);
   });
 })();
 </script>

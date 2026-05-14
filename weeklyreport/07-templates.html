@@ -754,6 +754,13 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
       template_id: tplSelect.value,
       tweet_url:   lastFetched.url,
       views:       lastFetched.metrics.views ?? lastFetched.metrics.likes ?? 0,
+      snapshot: {
+        text:       lastFetched.text,
+        author:     lastFetched.author,
+        created_at: lastFetched.created_at,
+        metrics:    lastFetched.metrics,
+        fetched_at: new Date().toISOString(),
+      },
     };
     const { error } = await sb.from('template_uses').insert(row);
     if (error) {

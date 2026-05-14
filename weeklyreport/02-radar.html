@@ -392,9 +392,41 @@
     const total = 5;
     return Array.from({length: total}, (_,i) => `<span class="score-dot ${i < score ? 'on' : ''}"></span>`).join('');
   }
+  function timeAgo(ts) {
+    if (!ts) return '?';
+    const diff = Date.now() - new Date(ts).getTime();
+    if (diff < 60_000) return '刚刚';
+    if (diff < 3.6e6) return Math.floor(diff/60_000) + ' min';
+    if (diff < 8.64e7) return Math.floor(diff/3.6e6) + ' h';
+    return Math.floor(diff/8.64e7) + ' d';
+  }
+
   function metaRight(hs){
-    if (hs.hot_signal) return `<span style="margin-left:auto;color:#D85A30;font-weight:500">HOT · ${hs.metrics?.detected_min ?? '?'} min 前</span>`;
-    return `<span style="margin-left:auto">${hs.metrics?.detected_min ?? '?'} min · ${hs.metrics?.talk_accounts ?? 0} 账号</span>`;
+    // detected_min: 优先用 mock 字段, 否则从 created_at 算
+    const ago = hs.metrics?.detected_min != null ? `${hs.metrics.detected_min} min` : timeAgo(hs.created_at);
+    if (hs.hot_signal) return `<span style="margin-left:auto;color:#D85A30;font-weight:500">HOT · ${ago} 前</span>`;
+    // 右侧次要信息: 优先 talk_accounts, 否则从第一条 tweet 的 views
+    const v = hs.metrics?.talk_accounts ?? (hs.tweets?.[0]?.metrics?.views ?? hs.metrics?.views);
+    const label = hs.metrics?.talk_accounts != null ? '账号' : 'views';
+    return `<span style="margin-left:auto">${ago} · ${fmt(v || 0)} ${label}</span>`;
+  }
+
+  // 把同步存的 tweet 形状映射到旧 mock 形状, 兼容 renderTweets
+  function normalizeTweet(t) {
+    if (!t) return null;
+    return {
+      handle: t.handle ?? (t.author?.username ? '@' + t.author.username : '@?'),
+      time:   t.time   ?? timeAgo(t.created_at),
+      text:   t.text   || '',
+      url:    t.url    || (t.id ? `https://x.com/i/status/${t.id}` : null),
+      tag:    t.tag    ?? (t.kind && t.kind !== 'original' ? t.kind : null),
+      stats: t.stats ?? {
+        rt:    t.metrics?.retweets ?? 0,
+        like:  t.metrics?.likes    ?? 0,
+        reply: t.metrics?.replies  ?? 0,
+        view:  t.metrics?.views    ?? 0,
+      },
+    };
   }
 
   function renderMetrics(){
@@ -496,7 +528,8 @@
 
   function renderTweets(){
     const hs = hotspots.find(h => h.id === selectedId);
-    const tweets = hs?.tweets || [];
+    const rawTweets = hs?.tweets || [];
+    const tweets = rawTweets.map(normalizeTweet).filter(Boolean);
     const summary = document.getElementById('rd-tweets-summary');
     if (tweets.length === 0) {
       document.getElementById('rd-tweets').innerHTML = `
@@ -506,22 +539,27 @@
       summary.textContent = '0 条';
       return;
     }
+    // 按 view 降序排
+    tweets.sort((a, b) => (b.stats.view || 0) - (a.stats.view || 0));
     summary.textContent = `按互动排序 · top ${tweets.length}`;
     document.getElementById('rd-tweets').innerHTML = tweets.map(t => {
-      const s = t.stats || {};
+      const s = t.stats;
       const tag = t.tag ? `<span class="tag tag-C" style="margin-left:4px">${t.tag}</span>` : '';
+      const escText = String(t.text || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      const openLink = t.url ? `<a href="${t.url}" target="_blank" rel="noopener" style="display:block;text-decoration:none;color:inherit">` : '<div>';
+      const closeLink = t.url ? '</a>' : '</div>';
       return `
-        <div>
+        ${openLink}
           <div style="display:flex;align-items:center;gap:6px;font-size: 12px;margin-bottom:4px">
             <span style="font-weight:500;color:var(--color-text-primary)">${t.handle}</span>
             <span style="color:var(--color-text-tertiary)">· ${t.time}</span>
             ${tag}
           </div>
-          <div style="font-size: 13px;line-height:1.55">${t.text}</div>
+          <div style="font-size: 13px;line-height:1.55">${escText}</div>
           <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:6px;display:flex;gap:14px">
             <span>↻ ${fmt(s.rt)}</span><span>♡ ${fmt(s.like)}</span><span>💬 ${fmt(s.reply)}</span><span>👁 ${fmt(s.view)}</span>
           </div>
-        </div>`;
+        ${closeLink}`;
     }).join('');
   }
 

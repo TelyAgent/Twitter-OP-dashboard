@@ -393,7 +393,22 @@
     const ageHours = newest > 0 ? (Date.now() - newest) / 3.6e6 : 9999;
     const fresh = Math.max(0, 1 - ageHours / 72);
 
-    const score = +(fit * 0.3 + viral * 0.4 + fresh * 0.3).toFixed(3);
+    // 总互动 — 用于 viral 地板判断
+    let totalEng = 0;
+    for (const t of tweets) {
+      const m = t.metrics || {};
+      totalEng += (m.likes || 0) + (m.retweets || 0) + (m.replies || 0);
+    }
+    if (totalEng === 0 && hs.metrics) {
+      totalEng = (hs.metrics.likes || 0) + (hs.metrics.retweets || 0) + (hs.metrics.replies || 0);
+    }
+
+    let score = fit * 0.3 + viral * 0.4 + fresh * 0.3;
+    // 地板: 0 互动 = 噪声 (直接 0); 极低互动 = 重罚
+    if (totalEng < 10)       score = 0;
+    else if (viral < 0.05)    score *= 0.3;
+    score = +score.toFixed(3);
+
     return { fit: +fit.toFixed(2), viral: +viral.toFixed(2), fresh: +fresh.toFixed(2), score };
   }
 
@@ -460,8 +475,11 @@
   }
 
   function metaRight(hs){
-    const ago = hs.metrics?.detected_min != null ? `${hs.metrics.detected_min} min` : timeAgo(hs.created_at);
-    // _isHot 是 loadHotspotsFromDB 算的; 没算过则 fallback 到原 hot_signal
+    // 时间用真实推文的 created_at, 不是 DB 行插入时间
+    const tweetTs = hs.tweets?.[0]?.created_at;
+    const ago = hs.metrics?.detected_min != null
+      ? `${hs.metrics.detected_min} min`
+      : timeAgo(tweetTs || hs.created_at);
     const isHot = hs._isHot ?? hs.hot_signal;
     if (isHot) return `<span style="margin-left:auto;color:#D85A30;font-weight:500">HOT · ${ago} 前</span>`;
     const v = hs.metrics?.talk_accounts ?? (hs.tweets?.[0]?.metrics?.views ?? hs.metrics?.views);

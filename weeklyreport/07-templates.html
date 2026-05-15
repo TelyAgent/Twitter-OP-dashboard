@@ -245,6 +245,9 @@
   .recent-tpl-card .skel{font-size:12px;color:var(--color-text-primary);margin:4px 0;white-space:pre-wrap;word-break:break-word;max-height:80px;overflow:hidden;}
   .recent-tpl-card .use-btn{margin-top:6px;background:#3C3489;color:#fff;border:0;padding:4px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-family:inherit;width:100%;}
   .recent-tpl-card .use-btn:hover{background:#534AB7;}
+  .recent-tpl-card .del-tpl{opacity:0.35;transition:opacity 0.15s, background 0.15s;}
+  .recent-tpl-card:hover .del-tpl{opacity:1;}
+  .recent-tpl-card .del-tpl:hover{background:#FCEBEB;}
 </style>
 
 <!-- AI 套模板 modal -->
@@ -1030,8 +1033,9 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
         const ago = timeAgo(t.created_at);
         const slots = Array.isArray(t.required_slots) ? t.required_slots : [];
         return `
-          <div class="recent-tpl-card">
-            <div style="display:flex;gap:4px;align-items:center;font-size:10px;color:var(--color-text-tertiary)">
+          <div class="recent-tpl-card" style="position:relative">
+            <button class="del-tpl" data-tpl-id="${escapeHtml(t.id)}" title="删除此模板" style="position:absolute;top:4px;right:4px;background:transparent;border:0;cursor:pointer;color:#A32D2D;font-size:13px;line-height:1;padding:2px 6px;border-radius:4px;font-family:inherit">✕</button>
+            <div style="display:flex;gap:4px;align-items:center;font-size:10px;color:var(--color-text-tertiary);padding-right:22px">
               <span class="tag tag-${t.category}" style="font-size:10px;padding:1px 5px">${t.category}</span>
               <span style="background:#ECEAE0;color:#888780;padding:1px 5px;border-radius:3px">${t.status}</span>
               <span style="margin-left:auto">${ago}</span>
@@ -1097,58 +1101,93 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
   const exSummary = document.getElementById('extract-summary');
   const exMsg     = document.getElementById('extract-msg');
 
-  function openExtract() {
+  async function openExtract() {
     const items = (currentAngle === '全部' ? allFire : allFire.filter(t => t._angle === currentAngle))
       .slice()
       .sort((a, b) => (b.metrics?.views || 0) - (a.metrics?.views || 0))
-      .slice(0, 5);  // 取 top 5 by views
+      .slice(0, 5);
     if (items.length === 0) {
       alert(`当前 ${currentAngle} 类没有爆款可提炼.`);
       return;
     }
-    exSummary.textContent = `从 ${currentAngle === '全部' ? '全部' : currentAngle} 类的 top ${items.length} 条爆款 (按 views 排序), 自动生成模板骨架. 你可以编辑、勾选要保存的.`;
+
+    // 先用启发式占位填充, 然后异步调 LLM 用真抽象覆盖
+    exSummary.textContent = `从 ${currentAngle === '全部' ? '全部' : currentAngle} 类的 top ${items.length} 条爆款, 调 AI 抽象模板...`;
+    renderCards(items, items.map(t => ({ skeleton: extractSkeleton(t.text || ''), slots: slotsOf(extractSkeleton(t.text || '')) })), 'regex');
+    exMsg.textContent = '';
+    exModal.classList.add('open');
+    exModal._tweets = items;
+    exModal._angle = currentAngle;
+    updateSaveBtn();
+
+    // 异步: 调 LLM
+    try {
+      const apiBase = `http://${location.hostname}:8081`;
+      const r = await fetch(`${apiBase}/api/ai/extract-template`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tweets: items.map(t => ({ text: t.text, views: t.metrics?.views })),
+          angle: currentAngle === '全部' ? null : currentAngle,
+          category: null,
+        }),
+      });
+      const res = await r.json();
+      if (res.ok && Array.isArray(res.templates) && res.templates.length === items.length) {
+        renderCards(items, res.templates, 'ai');
+        exSummary.textContent = `从 ${currentAngle} 类的 top ${items.length} 条爆款, ✨ AI 抽象 (${res.model}). 你可以编辑、勾选要保存的.`;
+      } else {
+        exSummary.textContent = `${exSummary.textContent} · ⚠ AI 提炼失败, 用启发式占位 (${res.error || 'unknown'})`;
+      }
+    } catch (e) {
+      exSummary.textContent = `${exSummary.textContent} · ⚠ AI 提炼网络错误, 用启发式占位`;
+    }
+  }
+
+  function renderCards(items, extracted, sourceTag) {
     exListEl.innerHTML = items.map((t, i) => {
-      const skel = extractSkeleton(t.text || '');
-      const slots = slotsOf(skel);
+      const ext = extracted[i] || { skeleton: extractSkeleton(t.text || ''), slots: slotsOf(extractSkeleton(t.text || '')) };
+      const skel = ext.skeleton || extractSkeleton(t.text || '');
+      const slots = ext.slots && ext.slots.length > 0 ? ext.slots : slotsOf(skel);
       const cat = classifyCategory(t.text || '');
       const angle = t._angle || 'Other';
       const handle = t.author?.username ? '@' + t.author.username : '?';
-      return `
-        <div data-i="${i}" style="border:0.5px solid var(--color-border-tertiary);border-radius:8px;padding:12px;margin-bottom:10px;background:var(--color-background-primary)">
-          <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer">
-            <input type="checkbox" class="ex-check" checked style="margin-top:4px" />
-            <div style="flex:1;min-width:0">
-              <div style="font-size:11px;color:var(--color-text-tertiary);margin-bottom:4px">
-                原推 · ${escapeHtml(handle)} · 👁 ${fmt(t.metrics?.views)} · ${escapeHtml(angle)}
-              </div>
-              <div style="font-size:12px;color:var(--color-text-secondary);background:var(--color-background-secondary);border-radius:6px;padding:8px;margin-bottom:8px;line-height:1.55">${escapeHtml(t.text || '')}</div>
-              <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;font-size:11px">
-                <span style="color:var(--color-text-tertiary)">分类:</span>
-                <select class="ex-cat" style="font-size:11px;padding:2px 6px;border-radius:4px;border:0.5px solid var(--color-border-tertiary);font-family:inherit">
-                  ${['A','C','D','E'].map(c => `<option value="${c}"${c===cat?' selected':''}>${c} ${['A','赔率'][0]==='A'?'':''}${ {A:'赔率',C:'链上',D:'新合约',E:'现实'}[c]}</option>`).join('')}
-                </select>
-                <span style="color:var(--color-text-tertiary);margin-left:6px">角度:</span>
-                <span style="background:#FAEEDA;color:#854F0B;padding:1px 6px;border-radius:3px;font-weight:500;font-size:11px">${escapeHtml(angle === 'Other' ? '反直觉' : angle)}</span>
-              </div>
-              <label style="display:block;font-size:11px;color:var(--color-text-tertiary);margin-bottom:4px">模板骨架 (编辑)</label>
-              <textarea class="ex-skel" style="width:100%;min-height:60px;border:0.5px solid var(--color-border-secondary);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit;line-height:1.5;resize:vertical;box-sizing:border-box">${escapeHtml(skel)}</textarea>
-              <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:4px">命中槽位: ${slots.map(s => '{'+s+'}').join(' · ') || '(无)'}</div>
-            </div>
-          </label>
-        </div>`;
+      const tagBg = sourceTag === 'ai' ? '#EEEDFE' : '#FAEEDA';
+      const tagFg = sourceTag === 'ai' ? '#3C3489' : '#854F0B';
+      const tagLabel = sourceTag === 'ai' ? '✨ AI 抽象' : 'regex 占位';
+      return _renderCard(i, t, skel, slots, cat, angle, handle, tagBg, tagFg, tagLabel);
     }).join('');
     exListEl.querySelectorAll('.ex-check, .ex-skel').forEach(el => {
       el.addEventListener('input', updateSaveBtn);
       el.addEventListener('change', updateSaveBtn);
     });
-    exMsg.textContent = '';
-    exMsg.style.color = '';
-    exSave.textContent = '保存选中的';
-    exModal.classList.add('open');
-    updateSaveBtn();
-    // 缓存源 tweets 给 save 用
-    exModal._tweets = items;
-    exModal._angle = currentAngle;
+  }
+
+  function _renderCard(i, t, skel, slots, cat, angle, handle, tagBg, tagFg, tagLabel) {
+    return `
+        <div data-i="${i}" style="border:0.5px solid var(--color-border-tertiary);border-radius:8px;padding:12px;margin-bottom:10px;background:var(--color-background-primary)">
+          <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer">
+            <input type="checkbox" class="ex-check" checked style="margin-top:4px" />
+            <div style="flex:1;min-width:0">
+              <div style="font-size:11px;color:var(--color-text-tertiary);margin-bottom:4px;display:flex;align-items:center;gap:6px">
+                <span>原推 · ${escapeHtml(handle)} · 👁 ${fmt(t.metrics?.views)} · ${escapeHtml(angle)}</span>
+                <span style="background:${tagBg};color:${tagFg};padding:1px 6px;border-radius:3px;font-size:10px;font-weight:500;margin-left:auto">${tagLabel}</span>
+              </div>
+              <div style="font-size:12px;color:var(--color-text-secondary);background:var(--color-background-secondary);border-radius:6px;padding:8px;margin-bottom:8px;line-height:1.55">${escapeHtml(t.text || '')}</div>
+              <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;font-size:11px">
+                <span style="color:var(--color-text-tertiary)">分类:</span>
+                <select class="ex-cat" style="font-size:11px;padding:2px 6px;border-radius:4px;border:0.5px solid var(--color-border-tertiary);font-family:inherit">
+                  ${['A','C','D','E'].map(c => `<option value="${c}"${c===cat?' selected':''}>${c} ${ {A:'赔率',C:'链上',D:'新合约',E:'现实'}[c]}</option>`).join('')}
+                </select>
+                <span style="color:var(--color-text-tertiary);margin-left:6px">角度:</span>
+                <span style="background:#FAEEDA;color:#854F0B;padding:1px 6px;border-radius:3px;font-weight:500;font-size:11px">${escapeHtml(angle === 'Other' ? '反直觉' : angle)}</span>
+              </div>
+              <label style="display:block;font-size:11px;color:var(--color-text-tertiary);margin-bottom:4px">模板骨架 (可编辑)</label>
+              <textarea class="ex-skel" style="width:100%;min-height:60px;border:0.5px solid var(--color-border-secondary);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit;line-height:1.5;resize:vertical;box-sizing:border-box">${escapeHtml(skel)}</textarea>
+              <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:4px">命中槽位: ${slots.map(s => '{'+s+'}').join(' · ') || '(无)'}</div>
+            </div>
+          </label>
+        </div>`;
   }
 
   function updateSaveBtn() {
@@ -1298,6 +1337,71 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
       msgEl.textContent = '✕ 复制失败';
       msgEl.style.color = '#A32D2D';
     }
+  });
+
+  // ====== ✕ 删除模板 (anchored confirm popover) ======
+  const sbDel = window.supabase.createClient(
+    'https://snflonpxmzkeytzytqpg.supabase.co',
+    'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD'
+  );
+
+  function confirmDelAt(anchorEl, tplId) {
+    let pop = document.getElementById('tpl-del-pop');
+    if (!pop) {
+      pop = document.createElement('div');
+      pop.id = 'tpl-del-pop';
+      pop.style.cssText = 'position:fixed;z-index:9999;display:none;background:#fff;border:0.5px solid rgba(0,0,0,0.16);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.14);padding:10px 12px;width:240px;font-size:12px;line-height:1.5';
+      document.body.appendChild(pop);
+    }
+    pop.innerHTML = `
+      <div style="font-weight:500;margin-bottom:4px">确认删除此模板?</div>
+      <div style="color:#888780;font-size:11px;margin-bottom:8px">硬删除, 不可恢复</div>
+      <div style="display:flex;justify-content:flex-end;gap:6px">
+        <button data-role="cancel" style="font-size:11px;padding:3px 10px;border:0.5px solid rgba(0,0,0,0.16);background:#F5F4EE;color:#1a1a17;border-radius:5px;cursor:pointer">取消</button>
+        <button data-role="ok"     style="font-size:11px;padding:3px 10px;border:0;background:#A32D2D;color:#fff;border-radius:5px;cursor:pointer">删除</button>
+      </div>`;
+    const rect = anchorEl.getBoundingClientRect();
+    const W = 260, H = 80;
+    let top  = rect.bottom + 6;
+    let left = rect.right - W;
+    if (left < 8) left = 8;
+    if (left + W > window.innerWidth - 8) left = window.innerWidth - W - 8;
+    if (top + H > window.innerHeight - 8) top = rect.top - H - 6;
+    pop.style.top = top + 'px';
+    pop.style.left = left + 'px';
+    pop.style.display = '';
+
+    const close = () => {
+      pop.style.display = 'none';
+      document.removeEventListener('click', outside, true);
+      document.removeEventListener('keydown', esc);
+    };
+    const outside = (e) => { if (!pop.contains(e.target) && e.target !== anchorEl) close(); };
+    const esc = (e) => { if (e.key === 'Escape') close(); };
+    pop.querySelector('[data-role="cancel"]').onclick = close;
+    pop.querySelector('[data-role="ok"]').onclick = async () => {
+      close();
+      const { error } = await sbDel.from('templates').delete().eq('id', tplId);
+      if (error) {
+        if (window.__toast) window.__toast('删除失败: ' + error.message, 'error');
+        else alert('删除失败: ' + error.message);
+        return;
+      }
+      if (window.__reloadTplMatrix) await window.__reloadTplMatrix();
+    };
+    setTimeout(() => {
+      document.addEventListener('click', outside, true);
+      document.addEventListener('keydown', esc);
+    }, 0);
+  }
+
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.del-tpl');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const id = btn.getAttribute('data-tpl-id');
+    if (id) confirmDelAt(btn, id);
   });
 })();
 </script>

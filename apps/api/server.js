@@ -45,97 +45,162 @@ function classifyTweetKind(referenced) {
   return 'original';
 }
 
-// ====== AI 套模板填充 ======
-// 优先 Anthropic Claude, fallback DeepSeek
-app.post('/api/ai/fill-template', async (req, reply) => {
-  const { skeleton, slots, material, angle, category } = req.body || {};
-  if (!skeleton || !material) {
-    return reply.code(400).send({ ok: false, error: 'skeleton + material required' });
-  }
-
+// ====== AI 工具 ======
+async function callLLM(prompt, maxTokens = 800) {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   const deepseekKey  = process.env.DEEPSEEK_API_KEY;
   if (!anthropicKey && !deepseekKey) {
-    return reply.code(503).send({
-      ok: false,
-      error: 'AI key not configured. Set ANTHROPIC_API_KEY or DEEPSEEK_API_KEY in /root/pallax-api/.env then restart pallax-api.service',
-    });
+    const err = new Error('AI key not configured. Set ANTHROPIC_API_KEY or DEEPSEEK_API_KEY in /root/pallax-api/.env then restart pallax-api.service');
+    err.code = 503;
+    throw err;
   }
+  if (anthropicKey) {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': anthropicKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-5-20250929',
+        max_tokens: maxTokens,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    const json = await resp.json();
+    if (!resp.ok) {
+      const err = new Error(json.error?.message || 'anthropic error');
+      err.code = 502;
+      err.upstream = json;
+      throw err;
+    }
+    return {
+      text: (json.content || []).map(b => b.text || '').join('').trim(),
+      model: json.model || 'claude',
+    };
+  }
+  const resp = await fetch('https://api.deepseek.com/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${deepseekKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'deepseek-chat',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: maxTokens,
+    }),
+  });
+  const json = await resp.json();
+  if (!resp.ok) {
+    const err = new Error(json.error?.message || 'deepseek error');
+    err.code = 502;
+    err.upstream = json;
+    throw err;
+  }
+  return {
+    text: json.choices?.[0]?.message?.content?.trim() || '',
+    model: json.model || 'deepseek-chat',
+  };
+}
+
+// ====== AI 提炼金模板 (从爆款推文里抽象出可复用骨架) ======
+app.post('/api/ai/extract-template', async (req, reply) => {
+  const { tweets, angle, category } = req.body || {};
+  if (!Array.isArray(tweets) || tweets.length === 0) {
+    return reply.code(400).send({ ok: false, error: 'tweets array required' });
+  }
+  const sample = tweets.slice(0, 5).map((t, i) => `${i + 1}. ${(t.text || '').replace(/\s+/g, ' ').trim()}`).join('\n');
+
+  const prompt = `你是 Twitter 营销文案的"金模板"提炼专家. 给你 ${tweets.length} 条爆款推文 (都属于角度: ${angle || '未指定'}, 分类: ${category || '未指定'}), 请抽象出对应数量的可复用金模板骨架.
+
+抽象原则:
+- 把具体实体 (产品名/平台名/项目名) 替换为类别占位, 例如 "Polymarket" → {预测市场平台}, "Claude" → {AI 产品}, "Hollywood" → {目标行业}
+- 把具体数字/时间/金额/比例 替换为占位, 例如 "$2.4M" → {结果金额}, "2 Hours" → {时长}, "$300" → {起始金额}
+- 把具体人名 / @handle 替换为 {KOL} / {用户}
+- 保留原句式结构、语气、情绪转折
+- 占位用中文方括号: {xxx}, 名字要表达"这一格放什么", 越具体越好 (不要写 {数据}, 写 {成交量} / {账号数} / {互动量})
+
+举例:
+原推: "Claude Bot on Polymarket - 2 Hours Full Guide. The same setup turned $300 into $2.4M."
+骨架: "{AI 产品} on {预测市场平台} - {时长} {内容类型}. {同款配置} turned {起始金额} into {结果金额}."
+
+原推: "FOMC 前夜赔率从 0.42 跳到 0.38, 38 min 内振幅 9.5%."
+骨架: "{事件} 前夜赔率从 {起赔率} 跳到 {终赔率}, {时间窗口} 内振幅 {振幅比例}."
+
+【${tweets.length} 条爆款推文】
+${sample}
+
+【输出要求】
+输出**严格的 JSON 数组**, 每条对应一个推文, 顺序一致. 每个对象包含:
+- "skeleton": 抽象后的模板骨架字符串
+- "slots": ["xxx", "yyy", ...] 出现的所有占位符名字 (不带 {})
+
+不要输出 markdown 代码块标记, 不要解释, 只输出可被 JSON.parse 的纯 JSON 数组.`;
+
+  try {
+    const out = await callLLM(prompt, 1500);
+    // 尝试解析 JSON
+    let parsed;
+    try {
+      // 容错: 剥掉 ```json ... ``` 包裹
+      let raw = out.text.trim();
+      if (raw.startsWith('```')) raw = raw.replace(/^```(json)?/i, '').replace(/```$/, '').trim();
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      return reply.code(502).send({ ok: false, error: 'LLM returned non-JSON', raw: out.text });
+    }
+    if (!Array.isArray(parsed)) {
+      return reply.code(502).send({ ok: false, error: 'LLM returned non-array', raw: out.text });
+    }
+    // 校正: 给每个对象补齐 slots
+    const templates = parsed.map(p => {
+      const skel = String(p.skeleton || '');
+      const slots = Array.isArray(p.slots) && p.slots.length > 0
+        ? p.slots.map(String)
+        : Array.from(new Set((skel.match(/\{([^}]+)\}/g) || []).map(m => m.slice(1, -1))));
+      return { skeleton: skel, slots };
+    });
+    return { ok: true, model: out.model, templates };
+  } catch (err) {
+    return reply.code(err.code || 500).send({ ok: false, error: err.message, upstream: err.upstream });
+  }
+});
+
+// ====== AI 套模板填充 ======
+app.post('/api/ai/fill-template', async (req, reply) => {
+  const { skeleton, slots, material, angle, category } = req.body || {};
+  if (!skeleton || !material) return reply.code(400).send({ ok: false, error: 'skeleton + material required' });
 
   const slotsText = Array.isArray(slots) && slots.length > 0
     ? '骨架槽位: ' + slots.map(s => '{' + s + '}').join(' · ')
-    : '骨架无显式槽位, 但里面的具体名词/数据可以替换';
+    : '骨架无显式槽位, 里面的具体名词/数据可被替换';
 
-  const prompt = `你是 Polymarket / 预测市场 / 加密 Twitter 营销文案专家. 给你一个金模板骨架和一些原始素材, 请用素材里的具体信息填充骨架, 写一条可发布的推文.
+  const prompt = `你是 Polymarket / 预测市场 / 加密 Twitter 营销文案专家. 给你一个金模板骨架和原始素材, 请用素材里的具体信息填充骨架写一条可发布推文.
 
-【模板骨架】 (含 {槽位}/具体名词, 这些是要被替换的占位)
+【模板骨架】
 ${skeleton}
 
 【${slotsText}】
 
-【角度】 ${angle || '未指定'}
-【分类】 ${category || '未指定'}
+【角度】 ${angle || '未指定'}   【分类】 ${category || '未指定'}
 
-【原始素材】 (用这些信息填充骨架)
+【原始素材】
 ${material}
 
 【输出要求】
-1. 保持骨架原有的句式结构和叙事节奏
-2. 用素材中的具体数字/名词/事件替换骨架里的占位符或泛指名词
-3. 推文必须可独立成立, 不要加 "以下是" / "Output:" 之类的前缀
-4. 控制在 280 字符以内 (Twitter 限制)
-5. 不要加 emoji 满天飞, 一两个克制使用即可
-6. 直接给出最终推文, 一行起头, 不要解释
+1. 保持骨架的句式结构和叙事节奏
+2. 用素材中的具体数字/名词/事件替换骨架里的 {占位} 或泛指词
+3. 推文独立成立, 不要 "以下是" 之类前缀
+4. 控制 280 字符以内
+5. emoji 克制使用 (一两个)
+6. 直接给最终推文, 不解释
 
 【填充后的推文】:`;
 
   try {
-    let text = '';
-    let model = '';
-    if (anthropicKey) {
-      const resp = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'x-api-key': anthropicKey,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-5-20250929',
-          max_tokens: 600,
-          messages: [{ role: 'user', content: prompt }],
-        }),
-      });
-      const json = await resp.json();
-      if (!resp.ok) {
-        return reply.code(502).send({ ok: false, error: json.error?.message || 'anthropic error', upstream: json });
-      }
-      text = (json.content || []).map(b => b.text || '').join('').trim();
-      model = json.model || 'claude';
-    } else {
-      const resp = await fetch('https://api.deepseek.com/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${deepseekKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'deepseek-chat',
-          messages: [{ role: 'user', content: prompt }],
-          max_tokens: 600,
-        }),
-      });
-      const json = await resp.json();
-      if (!resp.ok) {
-        return reply.code(502).send({ ok: false, error: json.error?.message || 'deepseek error', upstream: json });
-      }
-      text = json.choices?.[0]?.message?.content?.trim() || '';
-      model = json.model || 'deepseek-chat';
-    }
-    return { ok: true, text, model };
+    const out = await callLLM(prompt, 600);
+    return { ok: true, text: out.text, model: out.model };
   } catch (err) {
-    req.log.error(err);
-    return reply.code(500).send({ ok: false, error: err.message || 'internal' });
+    return reply.code(err.code || 500).send({ ok: false, error: err.message, upstream: err.upstream });
   }
 });
 

@@ -268,8 +268,28 @@
     <div class="card-title">🔥 爆款推文池 · 按角度分类</div>
     <span class="muted" id="fire-pool-count">加载中…</span>
   </div>
-  <div id="fire-angle-tabs" style="display:inline-flex;gap:2px;margin-bottom:12px;flex-wrap:wrap;background:var(--color-background-secondary);padding:4px;border-radius:8px"></div>
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+    <div id="fire-angle-tabs" style="display:inline-flex;gap:2px;flex-wrap:wrap;background:var(--color-background-secondary);padding:4px;border-radius:8px"></div>
+    <button id="btn-extract-tpl" style="background:#3C3489;color:#fff;border:0;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit">✨ 提炼金模板</button>
+  </div>
   <div id="fire-angle-list" style="max-height:520px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:6px"></div>
+</div>
+
+<!-- 提炼金模板 modal -->
+<div class="modal-backdrop" id="extract-modal">
+  <div class="modal" style="width:720px">
+    <div class="modal-head">
+      <div class="modal-title">✨ 从爆款推文提炼金模板</div>
+      <button class="modal-close" id="extract-close">×</button>
+    </div>
+    <div id="extract-summary" style="font-size:12px;color:var(--color-text-tertiary);margin-bottom:14px"></div>
+    <div id="extract-list" style="max-height:60vh;overflow-y:auto;padding-right:4px"></div>
+    <div class="modal-foot">
+      <span id="extract-msg" style="font-size:12px;color:var(--color-text-tertiary);margin-right:auto"></span>
+      <button class="btn-ghost" id="extract-cancel">取消</button>
+      <button class="btn-primary" id="extract-save" style="background:#3C3489" disabled>保存选中的</button>
+    </div>
+  </div>
 </div>
 <style>
   #fire-angle-list::-webkit-scrollbar{width:6px;}
@@ -896,6 +916,147 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
   }
 
   load();
+
+  // ====== ✨ 提炼金模板 (启发式: 数字/URL/@/$ → 槽位) ======
+  const CAT_KW = {
+    A: ['odds','polymarket','kalshi','manifold','prediction market','bet','probability','resolves','contract','yes/no'],
+    C: ['smart money','whale','wallet','0x','on-chain','onchain','defi','position','buys','sells','moves funds'],
+    D: ['new market','new contract','launching','listed','just added','first trade','new listing'],
+    E: ['fomc','fed','cpi','inflation','rate cut','rate hike','election','trump','powell','bitcoin','btc','crypto'],
+  };
+  function classifyCategory(text) {
+    const lower = String(text || '').toLowerCase();
+    for (const [cat, kws] of Object.entries(CAT_KW)) {
+      if (kws.some(kw => lower.includes(kw))) return cat;
+    }
+    return 'E';
+  }
+  function extractSkeleton(text) {
+    let t = String(text || '');
+    t = t.replace(/https?:\/\/\S+/g, '{链接}');
+    t = t.replace(/@\w+/g, '{账号}');
+    t = t.replace(/\$[\d,.]+\s?[kKmMbB]?(\/(month|day|hour|hr))?/g, '{金额}');
+    t = t.replace(/\b\d{1,3}%/g, '{比例}');
+    t = t.replace(/\b\d+x\b/g, '{倍数}');
+    t = t.replace(/\b\d{4,}\b/g, '{数据}');
+    return t;
+  }
+  function slotsOf(skeleton) {
+    return Array.from(new Set((skeleton.match(/\{[^}]+\}/g) || []).map(m => m.slice(1,-1))));
+  }
+
+  const exModal   = document.getElementById('extract-modal');
+  const exClose   = document.getElementById('extract-close');
+  const exCancel  = document.getElementById('extract-cancel');
+  const exSave    = document.getElementById('extract-save');
+  const exListEl  = document.getElementById('extract-list');
+  const exSummary = document.getElementById('extract-summary');
+  const exMsg     = document.getElementById('extract-msg');
+
+  function openExtract() {
+    const items = (currentAngle === '全部' ? allFire : allFire.filter(t => t._angle === currentAngle))
+      .slice()
+      .sort((a, b) => (b.metrics?.views || 0) - (a.metrics?.views || 0))
+      .slice(0, 5);  // 取 top 5 by views
+    if (items.length === 0) {
+      alert(`当前 ${currentAngle} 类没有爆款可提炼.`);
+      return;
+    }
+    exSummary.textContent = `从 ${currentAngle === '全部' ? '全部' : currentAngle} 类的 top ${items.length} 条爆款 (按 views 排序), 自动生成模板骨架. 你可以编辑、勾选要保存的.`;
+    exListEl.innerHTML = items.map((t, i) => {
+      const skel = extractSkeleton(t.text || '');
+      const slots = slotsOf(skel);
+      const cat = classifyCategory(t.text || '');
+      const angle = t._angle || 'Other';
+      const handle = t.author?.username ? '@' + t.author.username : '?';
+      return `
+        <div data-i="${i}" style="border:0.5px solid var(--color-border-tertiary);border-radius:8px;padding:12px;margin-bottom:10px;background:var(--color-background-primary)">
+          <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer">
+            <input type="checkbox" class="ex-check" checked style="margin-top:4px" />
+            <div style="flex:1;min-width:0">
+              <div style="font-size:11px;color:var(--color-text-tertiary);margin-bottom:4px">
+                原推 · ${escapeHtml(handle)} · 👁 ${fmt(t.metrics?.views)} · ${escapeHtml(angle)}
+              </div>
+              <div style="font-size:12px;color:var(--color-text-secondary);background:var(--color-background-secondary);border-radius:6px;padding:8px;margin-bottom:8px;line-height:1.55">${escapeHtml(t.text || '')}</div>
+              <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;font-size:11px">
+                <span style="color:var(--color-text-tertiary)">分类:</span>
+                <select class="ex-cat" style="font-size:11px;padding:2px 6px;border-radius:4px;border:0.5px solid var(--color-border-tertiary);font-family:inherit">
+                  ${['A','C','D','E'].map(c => `<option value="${c}"${c===cat?' selected':''}>${c} ${['A','赔率'][0]==='A'?'':''}${ {A:'赔率',C:'链上',D:'新合约',E:'现实'}[c]}</option>`).join('')}
+                </select>
+                <span style="color:var(--color-text-tertiary);margin-left:6px">角度:</span>
+                <span style="background:#FAEEDA;color:#854F0B;padding:1px 6px;border-radius:3px;font-weight:500;font-size:11px">${escapeHtml(angle === 'Other' ? '反直觉' : angle)}</span>
+              </div>
+              <label style="display:block;font-size:11px;color:var(--color-text-tertiary);margin-bottom:4px">模板骨架 (编辑)</label>
+              <textarea class="ex-skel" style="width:100%;min-height:60px;border:0.5px solid var(--color-border-secondary);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit;line-height:1.5;resize:vertical;box-sizing:border-box">${escapeHtml(skel)}</textarea>
+              <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:4px">命中槽位: ${slots.map(s => '{'+s+'}').join(' · ') || '(无)'}</div>
+            </div>
+          </label>
+        </div>`;
+    }).join('');
+    exListEl.querySelectorAll('.ex-check, .ex-skel').forEach(el => {
+      el.addEventListener('input', updateSaveBtn);
+      el.addEventListener('change', updateSaveBtn);
+    });
+    exMsg.textContent = '';
+    exMsg.style.color = '';
+    exSave.textContent = '保存选中的';
+    exModal.classList.add('open');
+    updateSaveBtn();
+    // 缓存源 tweets 给 save 用
+    exModal._tweets = items;
+    exModal._angle = currentAngle;
+  }
+
+  function updateSaveBtn() {
+    const checked = exListEl.querySelectorAll('.ex-check:checked').length;
+    exSave.disabled = checked === 0;
+    exSave.textContent = `保存选中的 ${checked > 0 ? '('+checked+')' : ''}`;
+  }
+
+  function closeExtract() { exModal.classList.remove('open'); }
+  exClose.addEventListener('click', closeExtract);
+  exCancel.addEventListener('click', closeExtract);
+  exModal.addEventListener('click', e => { if (e.target === exModal) closeExtract(); });
+  document.getElementById('btn-extract-tpl').addEventListener('click', openExtract);
+
+  exSave.addEventListener('click', async () => {
+    const items = exModal._tweets || [];
+    const cards = Array.from(exListEl.querySelectorAll('[data-i]'));
+    const rows = [];
+    for (const card of cards) {
+      const i = +card.getAttribute('data-i');
+      if (!card.querySelector('.ex-check').checked) continue;
+      const skel = card.querySelector('.ex-skel').value.trim();
+      const cat  = card.querySelector('.ex-cat').value;
+      const t = items[i];
+      if (!skel) continue;
+      const slots = slotsOf(skel);
+      const angleVal = (t._angle && t._angle !== 'Other') ? t._angle : '反直觉';
+      rows.push({
+        id: 'tpl_' + (crypto.randomUUID ? crypto.randomUUID().slice(0,8) : Math.random().toString(36).slice(2,10)),
+        category: cat,
+        angle: angleVal,
+        skeleton: skel,
+        required_slots: slots,
+        source_tweet_url: t.url || null,
+        status: 'observe',
+      });
+    }
+    if (rows.length === 0) return;
+    exSave.disabled = true;
+    exSave.textContent = '保存中…';
+    const { error } = await sb.from('templates').insert(rows);
+    if (error) {
+      exMsg.textContent = '✕ 保存失败: ' + error.message;
+      exMsg.style.color = '#A32D2D';
+      exSave.disabled = false;
+      exSave.textContent = '保存选中的';
+      return;
+    }
+    exMsg.textContent = `✓ 已写入 ${rows.length} 个模板到 templates 表`;
+    exMsg.style.color = '#27500A';
+    setTimeout(() => { closeExtract(); }, 1100);
+  });
 })();
 </script>
 

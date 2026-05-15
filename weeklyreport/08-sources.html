@@ -987,7 +987,8 @@ theblock.co
     // 7. 深度 (长 original)
     if (text.length > 200 && t.kind === 'original') return '深度';
 
-    return null;
+    // 都没命中 → Other 兜底
+    return 'Other';
   }
 
   // ─── 🔥 爆款 feed ────────────────────────────────────────────────────
@@ -1024,8 +1025,11 @@ theblock.co
       const kindBadge = (t.kind && t.kind !== 'original')
         ? `<span style="font-size:10px;background:#EEEDFE;color:#3C3489;padding:1px 5px;border-radius:3px;margin-left:4px">${t.kind}</span>` : '';
       const angle = classifyAngle(t);
-      const angleBadge = angle
-        ? `<span style="font-size:10px;background:#FAEEDA;color:#854F0B;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:500">${angle}</span>` : '';
+      const angleBadge = angle ? (() => {
+        const bg = angle === 'Other' ? '#ECEAE0' : '#FAEEDA';
+        const fg = angle === 'Other' ? '#888780' : '#854F0B';
+        return `<span style="font-size:10px;background:${bg};color:${fg};padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:500">${angle}</span>`;
+      })() : '';
       return `
         <a href="${url}" target="_blank" rel="noopener" style="display:block;text-decoration:none;color:inherit">
           <div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:4px;flex-wrap:wrap">

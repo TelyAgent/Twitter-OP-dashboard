@@ -501,7 +501,7 @@
     if (t.kind === 'quote' || t.kind === 'reply' || t.kind === 'retweet'
         || (text.match(/@\w+/g) || []).length >= 2) return 'KOL 蹭点';
     if (text.length > 200 && t.kind === 'original') return '深度';
-    return null;
+    return 'Other';
   }
 
   // 把同步存的 tweet 形状映射到旧 mock 形状, 兼容 renderTweets
@@ -699,8 +699,11 @@
     document.getElementById('rd-tweets').innerHTML = tweets.map(t => {
       const s = t.stats;
       const tag = t.tag ? `<span class="tag tag-C" style="margin-left:4px">${t.tag}</span>` : '';
-      const angleBadge = t.angle
-        ? `<span style="font-size:10px;background:#FAEEDA;color:#854F0B;padding:1px 6px;border-radius:3px;font-weight:500;margin-left:4px">${t.angle}</span>` : '';
+      const angleBadge = t.angle ? (() => {
+        const bg = t.angle === 'Other' ? '#ECEAE0' : '#FAEEDA';
+        const fg = t.angle === 'Other' ? '#888780' : '#854F0B';
+        return `<span style="font-size:10px;background:${bg};color:${fg};padding:1px 6px;border-radius:3px;font-weight:500;margin-left:4px">${t.angle}</span>`;
+      })() : '';
       const escText = String(t.text || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
       const openLink = t.url ? `<a href="${t.url}" target="_blank" rel="noopener" style="display:block;text-decoration:none;color:inherit">` : '<div>';
       const closeLink = t.url ? '</a>' : '</div>';

@@ -138,18 +138,6 @@
 </div>
 
 <!-- ✨ 最近提炼模板 (real DB-driven list) -->
-<div class="card" id="recent-tpl-card" style="margin-top:14px">
-  <div class="card-head">
-    <div class="card-title">✨ 最近提炼模板</div>
-    <span class="muted" id="recent-tpl-count">加载中…</span>
-  </div>
-  <div id="recent-tpl-list" style="display:flex;flex-direction:column;gap:8px;max-height:480px;overflow-y:auto;padding-right:6px"></div>
-</div>
-<style>
-  #recent-tpl-list::-webkit-scrollbar{width:6px;}
-  #recent-tpl-list::-webkit-scrollbar-track{background:transparent;}
-  #recent-tpl-list::-webkit-scrollbar-thumb{background:var(--color-border-secondary);border-radius:3px;}
-</style>
 
 <div class="card">
 <div class="card-head">
@@ -236,6 +224,58 @@
 </div>
 
 </div>
+</div>
+
+<!-- ====== ✨ 最近提炼模板 · 按 7 角度分块 ====== -->
+<div class="card" id="recent-tpl-card" style="margin-top:14px;padding:16px 18px">
+  <div class="card-head" style="margin-bottom:12px">
+    <div class="card-title">✨ 最近提炼模板 · 按角度分块</div>
+    <span class="muted" id="recent-tpl-count">加载中…</span>
+  </div>
+  <div id="recent-tpl-grid-1" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px"></div>
+  <div id="recent-tpl-grid-2" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px"></div>
+</div>
+<style>
+  .recent-angle-col{background:var(--color-background-secondary);border-radius:8px;padding:10px;display:flex;flex-direction:column;height:380px;}
+  .recent-angle-col .col-head{font-size:12px;font-weight:600;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
+  .recent-angle-col .col-list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-right:4px;}
+  .recent-angle-col .col-list::-webkit-scrollbar{width:5px;}
+  .recent-angle-col .col-list::-webkit-scrollbar-thumb{background:var(--color-border-secondary);border-radius:3px;}
+  .recent-tpl-card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:6px;padding:8px 10px;font-size:11px;line-height:1.5;}
+  .recent-tpl-card .skel{font-size:12px;color:var(--color-text-primary);margin:4px 0;white-space:pre-wrap;word-break:break-word;max-height:80px;overflow:hidden;}
+  .recent-tpl-card .use-btn{margin-top:6px;background:#3C3489;color:#fff;border:0;padding:4px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-family:inherit;width:100%;}
+  .recent-tpl-card .use-btn:hover{background:#534AB7;}
+</style>
+
+<!-- AI 套模板 modal -->
+<div class="modal-backdrop" id="ai-fill-modal">
+  <div class="modal" style="width:680px">
+    <div class="modal-head">
+      <div class="modal-title">✨ 用此模板写一条推</div>
+      <button class="modal-close" id="ai-fill-close">×</button>
+    </div>
+    <div class="modal-section">
+      <label class="modal-label">模板骨架 (只读)</label>
+      <div id="ai-fill-skel" style="font-size:13px;color:var(--color-text-primary);background:var(--color-background-secondary);border-radius:6px;padding:10px;line-height:1.55;white-space:pre-wrap"></div>
+      <div id="ai-fill-slots" style="font-size:11px;color:var(--color-text-tertiary);margin-top:6px"></div>
+    </div>
+    <div class="modal-section">
+      <label class="modal-label">原始素材 · 推文 / 新闻 / 数据点</label>
+      <textarea class="modal-textarea" id="ai-fill-input" placeholder="粘贴 1-3 段相关素材, 比如最新推文 / 链上事件 / 一段新闻摘要..."></textarea>
+    </div>
+    <div class="modal-section" id="ai-fill-output-wrap" style="display:none">
+      <label class="modal-label">AI 生成结果 (可编辑)</label>
+      <textarea class="modal-textarea" id="ai-fill-output" style="background:#F1E8D0;border-color:#EFD8A8"></textarea>
+      <div style="display:flex;gap:6px;margin-top:6px;font-size:11px">
+        <button class="btn-ghost" id="ai-fill-copy">📋 复制</button>
+        <span id="ai-fill-msg" style="color:var(--color-text-tertiary);align-self:center"></span>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost" id="ai-fill-cancel">关闭</button>
+      <button class="btn-primary" id="ai-fill-gen" style="background:#3C3489">✨ 生成</button>
+    </div>
+  </div>
 </div>
 
 <!-- ====== 🔥 爆款推文池 · 按 7 角度分类 ====== -->
@@ -956,46 +996,66 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
     await renderRecentTemplates();
   }
 
+  const RECENT_ANGLES_ROW1 = ['反直觉','数据驱动','案例','KOL 蹭点'];
+  const RECENT_ANGLES_ROW2 = ['深度','教程','Thread'];
+
   async function renderRecentTemplates() {
-    const list = document.getElementById('recent-tpl-list');
     const cnt  = document.getElementById('recent-tpl-count');
-    if (!list) return;
+    const g1   = document.getElementById('recent-tpl-grid-1');
+    const g2   = document.getElementById('recent-tpl-grid-2');
+    if (!g1 || !g2) return;
+
     const { data, error } = await sb.from('templates')
       .select('id, category, angle, status, skeleton, required_slots, source_tweet_url, uses, avg_views, fire_count, created_at')
       .order('created_at', { ascending: false })
-      .limit(30);
+      .limit(200);
     if (error) {
       cnt.textContent = '加载失败';
-      list.innerHTML = `<div style="padding:16px;color:#A32D2D;font-size:12px">${escapeHtml(error.message)}</div>`;
+      g1.innerHTML = `<div style="padding:16px;color:#A32D2D;font-size:12px;grid-column:1/-1">${escapeHtml(error.message)}</div>`;
       return;
     }
     const tpls = data || [];
-    cnt.textContent = `共 ${tpls.length} 个模板 · 按提炼时间倒序 · top 30`;
-    if (tpls.length === 0) {
-      list.innerHTML = `<div style="padding:24px;text-align:center;font-size:12px;color:var(--color-text-tertiary);background:var(--color-background-secondary);border-radius:8px">还没提炼过模板. 滚到下方 🔥 模块, 点 ✨ 提炼金模板</div>`;
-      return;
+    cnt.textContent = `共 ${tpls.length} 个模板 · 按角度分块`;
+    // 按 angle 分组
+    const byAngle = {};
+    for (const t of tpls) {
+      const a = t.angle;
+      if (!byAngle[a]) byAngle[a] = [];
+      byAngle[a].push(t);
     }
-    list.innerHTML = tpls.map(t => {
-      const ago = timeAgo(t.created_at);
-      const slots = Array.isArray(t.required_slots) ? t.required_slots : [];
-      const statusColors = { fire: ['#FAECE7', '#993C1D'], solid: ['#EAF3DE', '#27500A'], observe: ['#FAEEDA', '#854F0B'], retired: ['#ECEAE0', '#888780'] };
-      const [statBg, statFg] = statusColors[t.status] || statusColors.observe;
-      const linkBtn = t.source_tweet_url
-        ? `<a href="${escapeHtml(t.source_tweet_url)}" target="_blank" rel="noopener" style="font-size:11px;color:#185FA5;text-decoration:none">↗ 原推</a>`
-        : '';
+
+    function renderCol(angle) {
+      const items = byAngle[angle] || [];
+      const cards = items.map(t => {
+        const ago = timeAgo(t.created_at);
+        const slots = Array.isArray(t.required_slots) ? t.required_slots : [];
+        return `
+          <div class="recent-tpl-card">
+            <div style="display:flex;gap:4px;align-items:center;font-size:10px;color:var(--color-text-tertiary)">
+              <span class="tag tag-${t.category}" style="font-size:10px;padding:1px 5px">${t.category}</span>
+              <span style="background:#ECEAE0;color:#888780;padding:1px 5px;border-radius:3px">${t.status}</span>
+              <span style="margin-left:auto">${ago}</span>
+            </div>
+            <div class="skel" title="${escapeHtml(t.skeleton || '')}">${escapeHtml(t.skeleton || '')}</div>
+            ${slots.length > 0 ? `<div style="font-size:10px;color:var(--color-text-tertiary)">槽位: ${slots.map(s => '{'+escapeHtml(s)+'}').join(' · ')}</div>` : ''}
+            <button class="use-btn" data-tpl-id="${escapeHtml(t.id)}">✨ 使用此模板</button>
+          </div>`;
+      }).join('') || `<div style="text-align:center;color:var(--color-text-tertiary);font-size:11px;padding:20px">暂无</div>`;
       return `
-        <div style="border:0.5px solid var(--color-border-tertiary);border-radius:8px;padding:10px 12px;background:var(--color-background-primary)">
-          <div style="display:flex;align-items:center;gap:6px;font-size:11px;margin-bottom:6px;flex-wrap:wrap">
-            <span class="tag tag-${t.category}">${t.category}</span>
-            <span style="background:#FAEEDA;color:#854F0B;padding:1px 6px;border-radius:3px;font-weight:500">${escapeHtml(t.angle)}</span>
-            <span style="background:${statBg};color:${statFg};padding:1px 6px;border-radius:3px;font-weight:500">${t.status}</span>
-            <span style="color:var(--color-text-tertiary);margin-left:4px">${ago} · 使用 ${t.uses ?? 0} · avg ${fmt(t.avg_views ?? 0)}</span>
-            <span style="margin-left:auto">${linkBtn}</span>
+        <div class="recent-angle-col">
+          <div class="col-head">
+            <span>${escapeHtml(angle)}</span>
+            <span style="color:var(--color-text-tertiary);font-weight:400">${items.length}</span>
           </div>
-          <div style="font-size:13px;color:var(--color-text-primary);line-height:1.55;background:var(--color-background-secondary);border-radius:6px;padding:8px;white-space:pre-wrap;word-break:break-word">${escapeHtml(t.skeleton || '')}</div>
-          ${slots.length > 0 ? `<div style="font-size:11px;color:var(--color-text-tertiary);margin-top:4px">槽位: ${slots.map(s => '{'+escapeHtml(s)+'}').join(' · ')}</div>` : ''}
+          <div class="col-list">${cards}</div>
         </div>`;
-    }).join('');
+    }
+
+    g1.innerHTML = RECENT_ANGLES_ROW1.map(renderCol).join('');
+    g2.innerHTML = RECENT_ANGLES_ROW2.map(renderCol).join('');
+
+    // 缓存 templates 给 AI 套用 modal 用
+    window.__tplsById = Object.fromEntries(tpls.map(t => [t.id, t]));
   }
 
   window.__reloadTplMatrix = loadMatrix;
@@ -1141,6 +1201,103 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
     exMsg.style.color = '#27500A';
     if (window.__reloadTplMatrix) await window.__reloadTplMatrix();
     setTimeout(() => { closeExtract(); }, 1100);
+  });
+})();
+
+// ====== ✨ 使用此模板 (AI 套模板填充) ======
+(function(){
+  const API_BASE = `http://${location.hostname}:8081`;
+  const modal   = document.getElementById('ai-fill-modal');
+  const skelEl  = document.getElementById('ai-fill-skel');
+  const slotsEl = document.getElementById('ai-fill-slots');
+  const inputEl = document.getElementById('ai-fill-input');
+  const outWrap = document.getElementById('ai-fill-output-wrap');
+  const outEl   = document.getElementById('ai-fill-output');
+  const msgEl   = document.getElementById('ai-fill-msg');
+  const btnClose  = document.getElementById('ai-fill-close');
+  const btnCancel = document.getElementById('ai-fill-cancel');
+  const btnGen    = document.getElementById('ai-fill-gen');
+  const btnCopy   = document.getElementById('ai-fill-copy');
+
+  let currentTpl = null;
+
+  function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+  function open(tpl) {
+    currentTpl = tpl;
+    skelEl.textContent = tpl.skeleton || '(空骨架)';
+    const slots = Array.isArray(tpl.required_slots) ? tpl.required_slots : [];
+    slotsEl.textContent = slots.length > 0 ? '槽位: ' + slots.map(s => '{'+s+'}').join(' · ') : '(无槽位)';
+    inputEl.value = '';
+    outEl.value = '';
+    outWrap.style.display = 'none';
+    msgEl.textContent = '';
+    btnGen.disabled = false;
+    btnGen.textContent = '✨ 生成';
+    modal.classList.add('open');
+  }
+  function close() { modal.classList.remove('open'); currentTpl = null; }
+
+  btnClose.addEventListener('click', close);
+  btnCancel.addEventListener('click', close);
+  modal.addEventListener('click', e => { if (e.target === modal) close(); });
+
+  // 事件委托: tbody 重渲也命中
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.use-btn');
+    if (!btn) return;
+    const id = btn.getAttribute('data-tpl-id');
+    const tpl = (window.__tplsById || {})[id];
+    if (!tpl) { alert('模板未找到 (刷新页面?)'); return; }
+    open(tpl);
+  });
+
+  btnGen.addEventListener('click', async () => {
+    if (!currentTpl) return;
+    const material = inputEl.value.trim();
+    if (!material) { msgEl.textContent = '请先粘贴原始素材'; msgEl.style.color = '#A32D2D'; return; }
+    btnGen.disabled = true; btnGen.textContent = '生成中…';
+    msgEl.textContent = ''; msgEl.style.color = '';
+    try {
+      const r = await fetch(`${API_BASE}/api/ai/fill-template`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          skeleton: currentTpl.skeleton,
+          slots: currentTpl.required_slots || [],
+          material,
+          angle: currentTpl.angle,
+          category: currentTpl.category,
+        }),
+      });
+      const json = await r.json();
+      if (!json.ok) {
+        msgEl.textContent = '✕ ' + (json.error || ('HTTP ' + r.status));
+        msgEl.style.color = '#A32D2D';
+        btnGen.disabled = false; btnGen.textContent = '✨ 生成';
+        return;
+      }
+      outEl.value = json.text || '';
+      outWrap.style.display = '';
+      msgEl.textContent = `✓ 生成成功 · 用 ${json.model || 'AI'}`;
+      msgEl.style.color = '#27500A';
+    } catch (e) {
+      msgEl.textContent = '✕ 网络错误: ' + e.message;
+      msgEl.style.color = '#A32D2D';
+    } finally {
+      btnGen.disabled = false; btnGen.textContent = '✨ 重新生成';
+    }
+  });
+
+  btnCopy.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(outEl.value);
+      msgEl.textContent = '✓ 已复制到剪贴板';
+      msgEl.style.color = '#27500A';
+    } catch (e) {
+      msgEl.textContent = '✕ 复制失败';
+      msgEl.style.color = '#A32D2D';
+    }
   });
 })();
 </script>

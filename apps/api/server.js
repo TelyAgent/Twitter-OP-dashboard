@@ -45,6 +45,100 @@ function classifyTweetKind(referenced) {
   return 'original';
 }
 
+// ====== AI 套模板填充 ======
+// 优先 Anthropic Claude, fallback DeepSeek
+app.post('/api/ai/fill-template', async (req, reply) => {
+  const { skeleton, slots, material, angle, category } = req.body || {};
+  if (!skeleton || !material) {
+    return reply.code(400).send({ ok: false, error: 'skeleton + material required' });
+  }
+
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  const deepseekKey  = process.env.DEEPSEEK_API_KEY;
+  if (!anthropicKey && !deepseekKey) {
+    return reply.code(503).send({
+      ok: false,
+      error: 'AI key not configured. Set ANTHROPIC_API_KEY or DEEPSEEK_API_KEY in /root/pallax-api/.env then restart pallax-api.service',
+    });
+  }
+
+  const slotsText = Array.isArray(slots) && slots.length > 0
+    ? '骨架槽位: ' + slots.map(s => '{' + s + '}').join(' · ')
+    : '骨架无显式槽位, 但里面的具体名词/数据可以替换';
+
+  const prompt = `你是 Polymarket / 预测市场 / 加密 Twitter 营销文案专家. 给你一个金模板骨架和一些原始素材, 请用素材里的具体信息填充骨架, 写一条可发布的推文.
+
+【模板骨架】 (含 {槽位}/具体名词, 这些是要被替换的占位)
+${skeleton}
+
+【${slotsText}】
+
+【角度】 ${angle || '未指定'}
+【分类】 ${category || '未指定'}
+
+【原始素材】 (用这些信息填充骨架)
+${material}
+
+【输出要求】
+1. 保持骨架原有的句式结构和叙事节奏
+2. 用素材中的具体数字/名词/事件替换骨架里的占位符或泛指名词
+3. 推文必须可独立成立, 不要加 "以下是" / "Output:" 之类的前缀
+4. 控制在 280 字符以内 (Twitter 限制)
+5. 不要加 emoji 满天飞, 一两个克制使用即可
+6. 直接给出最终推文, 一行起头, 不要解释
+
+【填充后的推文】:`;
+
+  try {
+    let text = '';
+    let model = '';
+    if (anthropicKey) {
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': anthropicKey,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-5-20250929',
+          max_tokens: 600,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      });
+      const json = await resp.json();
+      if (!resp.ok) {
+        return reply.code(502).send({ ok: false, error: json.error?.message || 'anthropic error', upstream: json });
+      }
+      text = (json.content || []).map(b => b.text || '').join('').trim();
+      model = json.model || 'claude';
+    } else {
+      const resp = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${deepseekKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'deepseek-chat',
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 600,
+        }),
+      });
+      const json = await resp.json();
+      if (!resp.ok) {
+        return reply.code(502).send({ ok: false, error: json.error?.message || 'deepseek error', upstream: json });
+      }
+      text = json.choices?.[0]?.message?.content?.trim() || '';
+      model = json.model || 'deepseek-chat';
+    }
+    return { ok: true, text, model };
+  } catch (err) {
+    req.log.error(err);
+    return reply.code(500).send({ ok: false, error: err.message || 'internal' });
+  }
+});
+
 // 拉某个 @handle 近 N 小时推文
 app.post('/api/twitter/handle/:handle/recent', async (req, reply) => {
   const raw = String(req.params.handle || '').replace(/^@/, '').trim();

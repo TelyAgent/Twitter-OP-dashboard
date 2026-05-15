@@ -176,8 +176,8 @@
 <thead>
 <tr>
 <th style="width:26%">账号 · 类型</th>
-<th>4 周热点贡献</th>
-<th>4 周走势</th>
+<th>7 天热点</th>
+<th>7 天走势</th>
 <th>爆款贡献</th>
 <th>状态</th>
 <th>添加人</th>
@@ -1141,24 +1141,35 @@ theblock.co
     const rateLeft = res.rate_limit?.remaining;
     const rateNote = rateLeft != null ? `  · 配额剩 ${rateLeft}` : '';
 
-    // 3. 回写源的 metrics_4w (基于刚拉到的 tweets, 不再查 hotspots — 避免 JSONB contains 查询问题)
+    // 3. 回写源的 metrics_4w (语义改为 7 天: 这个源在 7 天里关联到多少 hotspot)
+    //    (跟下方 🔥 feed 用同一份 hotspots 数据对齐)
     try {
-      // 用本次 sync 拉到的 tweets 直接算
-      const hits = tweets.length;
-      const fire = tweets.filter(t => (t.metrics?.views || 0) > 50000).length;
-      // spark: 4 周, 按 tweet.created_at 分桶
+      const since = new Date(Date.now() - 7 * 24 * 3600e3).toISOString();
+      // 拉近 7 天所有 hotspot, 客户端过滤含 sourceId 的
+      // (PostgREST 对 JSONB 数组 contains 字符串元素的语法易错, 客户端过滤稳)
+      const { data: hsRows, error: qErr } = await sb
+        .from('hotspots')
+        .select('id, hot_signal, sources, created_at')
+        .gte('created_at', since);
+      if (qErr) throw qErr;
+      const mine = (hsRows || []).filter(h =>
+        Array.isArray(h.sources) && h.sources.includes(sourceId)
+      );
+      const hits = mine.length;
+      const fire = mine.filter(h => h.hot_signal).length;
+      // 7 天 spark 按天分桶 (7 列)
       const now = Date.now();
-      const spark = [0, 0, 0, 0];
-      for (const t of tweets) {
-        const wks = Math.floor((now - new Date(t.created_at).getTime()) / (7 * 24 * 3600 * 1000));
-        if (wks >= 0 && wks < 4) spark[3 - wks]++;  // 越新越右
+      const spark = [0, 0, 0, 0, 0, 0, 0];
+      for (const h of mine) {
+        const days = Math.floor((now - new Date(h.created_at).getTime()) / (24 * 3600e3));
+        if (days >= 0 && days < 7) spark[6 - days]++;  // 越新越右
       }
       const maxV = Math.max(1, ...spark);
       const sparkPx = spark.map(c => Math.round(3 + (c / maxV) * 15));
-      console.log(`[sync] ${handle} metrics:`, { hits, fire, spark: sparkPx });
+      console.log(`[sync] ${handle} 7d metrics:`, { hits, fire, spark: sparkPx });
 
       const { error: updErr } = await sb.from('sources').update({
-        metrics_4w: { hits, fire, spark: sparkPx },
+        metrics_4w: { hits, fire, spark: sparkPx },  // 字段名保留 (避免 schema migration)
         last_active_at: new Date().toISOString(),
       }).eq('id', sourceId);
       if (updErr) {

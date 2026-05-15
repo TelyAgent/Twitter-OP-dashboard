@@ -262,6 +262,23 @@
 </div>
 </div>
 
+<!-- ====== 🔥 爆款推文池 · 按 7 角度分类 ====== -->
+<div class="card" id="fire-pool-card" style="margin-top:14px;padding:16px 18px">
+  <div class="card-head" style="margin-bottom:10px">
+    <div class="card-title">🔥 爆款推文池 · 按角度分类</div>
+    <span class="muted" id="fire-pool-count">加载中…</span>
+  </div>
+  <div id="fire-angle-tabs" style="display:inline-flex;gap:2px;margin-bottom:12px;flex-wrap:wrap;background:var(--color-background-secondary);padding:4px;border-radius:8px"></div>
+  <div id="fire-angle-list" style="max-height:520px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:6px"></div>
+</div>
+<style>
+  #fire-angle-list::-webkit-scrollbar{width:6px;}
+  #fire-angle-list::-webkit-scrollbar-track{background:transparent;}
+  #fire-angle-list::-webkit-scrollbar-thumb{background:var(--color-border-secondary);border-radius:3px;}
+  #fire-angle-list::-webkit-scrollbar-thumb:hover{background:var(--color-text-tertiary);}
+  .fire-card:hover{border-color:var(--color-border-secondary) !important;}
+</style>
+
 </main>
 </div>
 
@@ -777,6 +794,108 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
       close();
     }, 800);
   });
+})();
+
+// ====== 🔥 爆款推文池 · 按 7 角度分类 ======
+(function(){
+  const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  // 跟 08-sources / 02-radar 同一份角度分类启发式
+  function classifyAngle(t) {
+    if (!t) return 'Other';
+    const text = String(t.text || '');
+    if (!text) return 'Other';
+    if (/🧵|^\s*1\/|\(1\/\d+\)|\bthread\b/i.test(text)) return 'Thread';
+    if (/\b(full guide|step.?by.?step|tutorial|how to|here'?s how|hour guide|guide:|complete guide|walkthrough)\b/i.test(text)) return '教程';
+    if (/(this guy|made \$[\d,]+|turned \$[\d,.]+ ?into|flipped \$[\d,.]+|\$\d{2,}\s?k\/?(month|day)|profit of \$)/i.test(text)) return '案例';
+    if (/\b(destroyed|killed|finally|everyone (thinks|expects)|nobody (knows|talks|sees)|reality is|truth is|wrong about|but actually|the real |secret|exposed)\b/i.test(text)
+        || /\b[A-Z]{5,}\b/.test(text)) return '反直觉';
+    if (/\d{1,3}%|\b\d+x\s+(return|gain|profit)|\bwin rate|\broi\b|n\s*=\s*\d+|backtest/i.test(text)) return '数据驱动';
+    if (t.kind === 'quote' || t.kind === 'reply' || t.kind === 'retweet'
+        || (text.match(/@\w+/g) || []).length >= 2) return 'KOL 蹭点';
+    if (text.length > 200 && t.kind === 'original') return '深度';
+    return 'Other';
+  }
+
+  const ANGLES_FOR_TABS = ['全部', '反直觉', '数据驱动', '案例', 'KOL 蹭点', '深度', '教程', 'Thread', 'Other'];
+
+  function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  function fmt(n){if(n==null)return'—';n=Number(n);if(n>=1e6)return(n/1e6).toFixed(1).replace(/\.0$/,'')+'M';if(n>=1e3)return(n/1e3).toFixed(1).replace(/\.0$/,'')+'k';return String(n);}
+  function timeAgo(ts){if(!ts)return'';const d=Date.now()-new Date(ts).getTime();if(d<60_000)return'刚刚';if(d<3.6e6)return Math.floor(d/60_000)+' min';if(d<8.64e7)return Math.floor(d/3.6e6)+' h';return Math.floor(d/8.64e7)+' d';}
+
+  let allFire = [];
+  let currentAngle = '全部';
+  const countEl = document.getElementById('fire-pool-count');
+  const tabsEl  = document.getElementById('fire-angle-tabs');
+  const listEl  = document.getElementById('fire-angle-list');
+
+  function renderTabs() {
+    tabsEl.innerHTML = ANGLES_FOR_TABS.map(a => {
+      const cnt = a === '全部' ? allFire.length : allFire.filter(t => t._angle === a).length;
+      const isActive = a === currentAngle;
+      return `<button class="angle-tab" data-angle="${a}" style="font-size:12px;padding:5px 12px;border:0;border-radius:6px;cursor:pointer;background:${isActive ? '#fff' : 'transparent'};color:${isActive ? '#1a1a17' : 'var(--color-text-secondary)'};font-weight:${isActive ? '500' : '400'};box-shadow:${isActive ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'};display:inline-flex;align-items:center;gap:4px;font-family:inherit">${a}<span style="color:var(--color-text-tertiary);font-size:10px">${cnt}</span></button>`;
+    }).join('');
+    tabsEl.querySelectorAll('.angle-tab').forEach(b => {
+      b.onclick = () => { currentAngle = b.getAttribute('data-angle'); renderTabs(); renderList(); };
+    });
+  }
+
+  function renderList() {
+    const items = currentAngle === '全部' ? allFire : allFire.filter(t => t._angle === currentAngle);
+    countEl.textContent = `按角度筛选 · ${items.length} 条 · 全部 ${allFire.length}`;
+    if (items.length === 0) {
+      listEl.innerHTML = `<div style="padding:24px;text-align:center;font-size:12px;color:var(--color-text-tertiary);background:var(--color-background-secondary);border-radius:8px">无 ${currentAngle} 类爆款</div>`;
+      return;
+    }
+    listEl.innerHTML = items.map(t => {
+      const m = t.metrics || {};
+      const handle = t.author?.username ? '@' + t.author.username : '?';
+      const url = t.url || (t.id ? `https://x.com/i/status/${t.id}` : '#');
+      const angle = t._angle || 'Other';
+      const bg = angle === 'Other' ? '#ECEAE0' : '#FAEEDA';
+      const fg = angle === 'Other' ? '#888780' : '#854F0B';
+      const kindBadge = (t.kind && t.kind !== 'original')
+        ? `<span style="font-size:10px;background:#EEEDFE;color:#3C3489;padding:1px 6px;border-radius:3px;margin-left:4px">${t.kind}</span>` : '';
+      return `
+        <a class="fire-card" href="${url}" target="_blank" rel="noopener" style="display:block;text-decoration:none;color:inherit;padding:10px 12px;background:var(--color-background-secondary);border-radius:8px;border:0.5px solid transparent;transition:border-color 0.15s">
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:4px;flex-wrap:wrap">
+            <span style="font-weight:500;color:var(--color-text-primary)">${escapeHtml(handle)}</span>
+            <span style="color:var(--color-text-tertiary)">· ${timeAgo(t.created_at)}</span>${kindBadge}
+            <span style="font-size:10px;background:${bg};color:${fg};padding:1px 6px;border-radius:3px;font-weight:500;margin-left:4px">${angle}</span>
+          </div>
+          <div style="font-size:13px;line-height:1.55">${escapeHtml(t.text || '')}</div>
+          <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:6px;display:flex;gap:14px">
+            <span>↻ ${fmt(m.retweets)}</span>
+            <span>♡ ${fmt(m.likes)}</span>
+            <span>💬 ${fmt(m.replies)}</span>
+            <span>👁 ${fmt(m.views)}</span>
+          </div>
+        </a>`;
+    }).join('');
+  }
+
+  async function load() {
+    const { data, error } = await sb.from('hotspots')
+      .select('id, tweets, created_at')
+      .eq('hot_signal', true)
+      .order('created_at', { ascending: false })
+      .limit(300);
+    if (error) {
+      countEl.textContent = '加载失败';
+      listEl.innerHTML = `<div style="padding:16px;color:#A32D2D;font-size:12px">${escapeHtml(error.message)}</div>`;
+      return;
+    }
+    const tweets = (data || []).map(h => h.tweets?.[0]).filter(Boolean);
+    tweets.forEach(t => { t._angle = classifyAngle(t); });
+    tweets.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    allFire = tweets;
+    renderTabs();
+    renderList();
+  }
+
+  load();
 })();
 </script>
 

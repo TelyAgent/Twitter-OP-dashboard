@@ -388,7 +388,6 @@ theblock.co
       return `<span class="src-act" data-source-id="${s.id}" data-act="${act}" style="display:${base};background:${bg};color:${fg}">${label}</span>`;
     };
     const action = (
-      mkBtn('live',    'live',    s.status === 'live',    false) +
       mkBtn('retired', 'retired', s.status === 'retired', false) +
       mkBtn('del',     '✕',       false,                  true)
     );

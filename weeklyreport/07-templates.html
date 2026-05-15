@@ -125,45 +125,7 @@
 <div style="text-align:center;padding:4px 0;color:var(--color-text-secondary)">Thread</div>
 </div>
 
-<div style="display:grid;grid-template-columns:80px repeat(7, 1fr);gap:5px">
-
-<div style="display:flex;align-items:center;justify-content:flex-start;padding-left:6px"><span class="tag tag-A">A 赔率</span></div>
-<div class="matrix-cell solid"><div class="cell-num">5</div><div class="cell-sub">42k 均</div></div>
-<div class="matrix-cell fire selected"><span class="fire-badge">●</span><div class="cell-num">8</div><div class="cell-sub">68k 均</div></div>
-<div class="matrix-cell weak"><div class="cell-num">2</div><div class="cell-sub">12k</div></div>
-<div class="matrix-cell solid"><div class="cell-num">4</div><div class="cell-sub">38k</div></div>
-<div class="matrix-cell solid"><div class="cell-num">3</div><div class="cell-sub">31k</div></div>
-<div class="matrix-cell empty"><div class="cell-num">+</div></div>
-<div class="matrix-cell solid"><div class="cell-num">2</div><div class="cell-sub">28k</div></div>
-
-<div style="display:flex;align-items:center;justify-content:flex-start;padding-left:6px"><span class="tag tag-C">C 链上</span></div>
-<div class="matrix-cell fire"><span class="fire-badge">●</span><div class="cell-num">6</div><div class="cell-sub">82k 均</div></div>
-<div class="matrix-cell fire"><span class="fire-badge">●</span><div class="cell-num">5</div><div class="cell-sub">71k</div></div>
-<div class="matrix-cell weak"><div class="cell-num">1</div><div class="cell-sub">9k</div></div>
-<div class="matrix-cell fire"><span class="fire-badge">●</span><div class="cell-num">4</div><div class="cell-sub">58k</div></div>
-<div class="matrix-cell solid"><div class="cell-num">3</div><div class="cell-sub">44k</div></div>
-<div class="matrix-cell empty"><div class="cell-num">+</div></div>
-<div class="matrix-cell solid"><div class="cell-num">3</div><div class="cell-sub">36k</div></div>
-
-<div style="display:flex;align-items:center;justify-content:flex-start;padding-left:6px"><span class="tag tag-D">D 新合约</span></div>
-<div class="matrix-cell solid"><div class="cell-num">3</div><div class="cell-sub">26k</div></div>
-<div class="matrix-cell solid"><div class="cell-num">2</div><div class="cell-sub">21k</div></div>
-<div class="matrix-cell weak"><div class="cell-num">4</div><div class="cell-sub">8k 跌</div></div>
-<div class="matrix-cell empty"><div class="cell-num">+</div></div>
-<div class="matrix-cell solid"><div class="cell-num">2</div><div class="cell-sub">22k</div></div>
-<div class="matrix-cell weak"><div class="cell-num">2</div><div class="cell-sub">11k</div></div>
-<div class="matrix-cell empty"><div class="cell-num">+</div></div>
-
-<div style="display:flex;align-items:center;justify-content:flex-start;padding-left:6px"><span class="tag tag-E">E 现实</span></div>
-<div class="matrix-cell solid"><div class="cell-num">2</div><div class="cell-sub">29k</div></div>
-<div class="matrix-cell solid"><div class="cell-num">3</div><div class="cell-sub">33k</div></div>
-<div class="matrix-cell empty"><div class="cell-num">+</div></div>
-<div class="matrix-cell weak"><div class="cell-num">2</div><div class="cell-sub">15k</div></div>
-<div class="matrix-cell solid"><div class="cell-num">2</div><div class="cell-sub">24k</div></div>
-<div class="matrix-cell weak"><div class="cell-num">1</div><div class="cell-sub">2k 退役</div></div>
-<div class="matrix-cell empty"><div class="cell-num">+</div></div>
-
-</div>
+<div id="matrix-cells" style="display:grid;grid-template-columns:80px repeat(7, 1fr);gap:5px"></div>
 
 <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:10px;border-top:0.5px solid var(--color-border-tertiary);font-size: 12px;color:var(--color-text-secondary)">
 <div>共 <span id="tpl-total">68</span> 个模板 · <span id="tpl-fire">12</span> 个爆款级 · 4 个观察 · 7 个空格待建</div>
@@ -917,6 +879,68 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
 
   load();
 
+  // ====== 中部金模板矩阵 (loaded from DB) ======
+  const MATRIX_CATS = [
+    { code: 'A', label: 'A 赔率' },
+    { code: 'C', label: 'C 链上' },
+    { code: 'D', label: 'D 新合约' },
+    { code: 'E', label: 'E 现实' },
+  ];
+  const MATRIX_ANGLES = ['反直觉','数据驱动','案例','KOL 蹭点','深度','教程','Thread'];
+
+  async function loadMatrix() {
+    const grid = document.getElementById('matrix-cells');
+    if (!grid) return;
+    const { data, error } = await sb.from('templates')
+      .select('id, category, angle, status, uses, avg_views, fire_count')
+      .order('updated_at', { ascending: false });
+    if (error) {
+      console.warn('[matrix] load:', error);
+      return;
+    }
+    const tpls = data || [];
+    // 按 (category, angle) 聚合
+    const cells = {};
+    for (const t of tpls) {
+      const key = `${t.category}|${t.angle}`;
+      if (!cells[key]) cells[key] = { count: 0, sumViews: 0, statuses: [], fireCount: 0 };
+      const c = cells[key];
+      c.count++;
+      c.sumViews += (t.avg_views || 0);
+      c.statuses.push(t.status);
+      c.fireCount += (t.fire_count || 0);
+    }
+    // 渲染
+    let html = '';
+    for (const cat of MATRIX_CATS) {
+      html += `<div style="display:flex;align-items:center;justify-content:flex-start;padding-left:6px"><span class="tag tag-${cat.code}">${cat.label}</span></div>`;
+      for (const angle of MATRIX_ANGLES) {
+        const cell = cells[`${cat.code}|${angle}`];
+        if (!cell || cell.count === 0) {
+          html += `<div class="matrix-cell empty" title="${cat.code} · ${angle} 空格 待建"><div class="cell-num">+</div></div>`;
+          continue;
+        }
+        const avg = cell.sumViews / cell.count;
+        const cls = cell.statuses.includes('fire') ? 'fire'
+                  : cell.statuses.includes('solid') ? 'solid' : 'weak';
+        const fireBadge = cls === 'fire' ? '<span class="fire-badge">●</span>' : '';
+        const sub = avg >= 1000 ? `${Math.round(avg/1000)}k 均`
+                  : avg > 0    ? `${Math.round(avg)} 均`
+                  : '未用';
+        const tooltip = `${cell.count} 个模板 · 平均 ${Math.round(avg)} views · 状态分布: ${[...new Set(cell.statuses)].join('/')}`;
+        html += `<div class="matrix-cell ${cls}" title="${tooltip.replace(/"/g,'&quot;')}">${fireBadge}<div class="cell-num">${cell.count}</div><div class="cell-sub">${sub}</div></div>`;
+      }
+    }
+    grid.innerHTML = html;
+    // 总计
+    const totalEl = document.getElementById('tpl-total');
+    const fireEl  = document.getElementById('tpl-fire');
+    if (totalEl) totalEl.textContent = tpls.length;
+    if (fireEl)  fireEl.textContent  = tpls.filter(t => t.status === 'fire').length;
+  }
+  window.__reloadTplMatrix = loadMatrix;
+  loadMatrix();
+
   // ====== ✨ 提炼金模板 (启发式: 数字/URL/@/$ → 槽位) ======
   const CAT_KW = {
     A: ['odds','polymarket','kalshi','manifold','prediction market','bet','probability','resolves','contract','yes/no'],
@@ -1053,8 +1077,9 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
       exSave.textContent = '保存选中的';
       return;
     }
-    exMsg.textContent = `✓ 已写入 ${rows.length} 个模板到 templates 表`;
+    exMsg.textContent = `✓ 已写入 ${rows.length} 个模板, 矩阵刷新中…`;
     exMsg.style.color = '#27500A';
+    if (window.__reloadTplMatrix) await window.__reloadTplMatrix();
     setTimeout(() => { closeExtract(); }, 1100);
   });
 })();

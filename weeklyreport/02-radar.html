@@ -487,6 +487,23 @@
     return `<span style="margin-left:auto">${ago} · ${fmt(v || 0)} ${label}</span>`;
   }
 
+  // 启发式: 从 tweet 推断 7 angle (反直觉/数据驱动/案例/KOL 蹭点/深度/教程/Thread)
+  function classifyAngle(t) {
+    if (!t) return null;
+    const text = String(t.text || '');
+    if (!text) return null;
+    if (/🧵|^\s*1\/|\(1\/\d+\)|\bthread\b/i.test(text)) return 'Thread';
+    if (/\b(full guide|step.?by.?step|tutorial|how to|here'?s how|hour guide|guide:|complete guide|walkthrough)\b/i.test(text)) return '教程';
+    if (/(this guy|made \$[\d,]+|turned \$[\d,.]+ ?into|flipped \$[\d,.]+|\$\d{2,}\s?k\/?(month|day)|profit of \$)/i.test(text)) return '案例';
+    if (/\b(destroyed|killed|finally|everyone (thinks|expects)|nobody (knows|talks|sees)|reality is|truth is|wrong about|but actually|the real |secret|exposed)\b/i.test(text)
+        || /\b[A-Z]{5,}\b/.test(text)) return '反直觉';
+    if (/\d{1,3}%|\b\d+x\s+(return|gain|profit)|\bwin rate|\broi\b|n\s*=\s*\d+|backtest/i.test(text)) return '数据驱动';
+    if (t.kind === 'quote' || t.kind === 'reply' || t.kind === 'retweet'
+        || (text.match(/@\w+/g) || []).length >= 2) return 'KOL 蹭点';
+    if (text.length > 200 && t.kind === 'original') return '深度';
+    return null;
+  }
+
   // 把同步存的 tweet 形状映射到旧 mock 形状, 兼容 renderTweets
   function normalizeTweet(t) {
     if (!t) return null;
@@ -496,6 +513,7 @@
       text:   t.text   || '',
       url:    t.url    || (t.id ? `https://x.com/i/status/${t.id}` : null),
       tag:    t.tag    ?? (t.kind && t.kind !== 'original' ? t.kind : null),
+      angle:  classifyAngle(t),
       stats: t.stats ?? {
         rt:    t.metrics?.retweets ?? 0,
         like:  t.metrics?.likes    ?? 0,
@@ -681,15 +699,17 @@
     document.getElementById('rd-tweets').innerHTML = tweets.map(t => {
       const s = t.stats;
       const tag = t.tag ? `<span class="tag tag-C" style="margin-left:4px">${t.tag}</span>` : '';
+      const angleBadge = t.angle
+        ? `<span style="font-size:10px;background:#FAEEDA;color:#854F0B;padding:1px 6px;border-radius:3px;font-weight:500;margin-left:4px">${t.angle}</span>` : '';
       const escText = String(t.text || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
       const openLink = t.url ? `<a href="${t.url}" target="_blank" rel="noopener" style="display:block;text-decoration:none;color:inherit">` : '<div>';
       const closeLink = t.url ? '</a>' : '</div>';
       return `
         ${openLink}
-          <div style="display:flex;align-items:center;gap:6px;font-size: 12px;margin-bottom:4px">
+          <div style="display:flex;align-items:center;gap:6px;font-size: 12px;margin-bottom:4px;flex-wrap:wrap">
             <span style="font-weight:500;color:var(--color-text-primary)">${t.handle}</span>
             <span style="color:var(--color-text-tertiary)">· ${t.time}</span>
-            ${tag}
+            ${tag}${angleBadge}
           </div>
           <div style="font-size: 13px;line-height:1.55">${escText}</div>
           <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:6px;display:flex;gap:14px">

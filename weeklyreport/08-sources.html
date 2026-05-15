@@ -954,6 +954,42 @@ theblock.co
     return Math.floor(diff/8.64e7) + ' d';
   }
 
+  // 启发式: 从 tweet 文本 + kind 推断 7 angle 之一
+  function classifyAngle(t) {
+    if (!t) return null;
+    const text = String(t.text || '');
+    if (!text) return null;
+
+    // 1. Thread 标记最优先
+    if (/🧵|^\s*1\/|\(1\/\d+\)|\bthread\b/i.test(text)) return 'Thread';
+
+    // 2. 教程
+    if (/\b(full guide|step.?by.?step|tutorial|how to|here'?s how|hour guide|guide:|complete guide|walkthrough)\b/i.test(text)) return '教程';
+
+    // 3. 案例
+    if (/(this guy|made \$[\d,]+|turned \$[\d,.]+ ?into|flipped \$[\d,.]+|\$\d{2,}\s?k\/?(month|day)|profit of \$)/i.test(text)) return '案例';
+
+    // 4. 反直觉 (sensational language + ALL-CAPS 序列)
+    if (/\b(destroyed|killed|finally|everyone (thinks|expects)|nobody (knows|talks|sees)|reality is|truth is|wrong about|but actually|the real |secret|exposed)\b/i.test(text)
+        || /\b[A-Z]{5,}\b/.test(text)) {
+      return '反直觉';
+    }
+
+    // 5. 数据驱动 (数字/比例)
+    if (/\d{1,3}%|\b\d+x\s+(return|gain|profit)|\bwin rate|\broi\b|n\s*=\s*\d+|backtest/i.test(text)) return '数据驱动';
+
+    // 6. KOL 蹭点 (转发/引用/回复 或多 @)
+    if (t.kind === 'quote' || t.kind === 'reply' || t.kind === 'retweet'
+        || (text.match(/@\w+/g) || []).length >= 2) {
+      return 'KOL 蹭点';
+    }
+
+    // 7. 深度 (长 original)
+    if (text.length > 200 && t.kind === 'original') return '深度';
+
+    return null;
+  }
+
   // ─── 🔥 爆款 feed ────────────────────────────────────────────────────
   async function loadFireFeed() {
     const summaryEl = document.getElementById('fire-summary');
@@ -987,11 +1023,14 @@ theblock.co
       const url = t.url || `https://x.com/i/status/${t.id}`;
       const kindBadge = (t.kind && t.kind !== 'original')
         ? `<span style="font-size:10px;background:#EEEDFE;color:#3C3489;padding:1px 5px;border-radius:3px;margin-left:4px">${t.kind}</span>` : '';
+      const angle = classifyAngle(t);
+      const angleBadge = angle
+        ? `<span style="font-size:10px;background:#FAEEDA;color:#854F0B;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:500">${angle}</span>` : '';
       return `
         <a href="${url}" target="_blank" rel="noopener" style="display:block;text-decoration:none;color:inherit">
-          <div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:4px">
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:4px;flex-wrap:wrap">
             <span style="font-weight:500;color:var(--color-text-primary)">${escapeHtml(handle)}</span>
-            <span style="color:var(--color-text-tertiary)">· ${timeAgo(t.created_at)}</span>${kindBadge}
+            <span style="color:var(--color-text-tertiary)">· ${timeAgo(t.created_at)}</span>${kindBadge}${angleBadge}
           </div>
           <div style="font-size:13px;line-height:1.55">${escapeHtml(t.text || '')}</div>
           <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:6px;display:flex;gap:14px">

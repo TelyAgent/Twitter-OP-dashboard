@@ -28,7 +28,9 @@
 .kol-table tbody tr{border-bottom:0.5px solid var(--color-border-tertiary);}
 .kol-table tbody tr:hover{background:var(--color-background-secondary);}
 .kol-table tbody td{padding:9px 10px;}
-.kol-handle{font-weight:500;color:var(--color-text-primary);}
+.kol-handle{font-weight:500;color:var(--color-text-primary);cursor:text;border-radius:4px;padding:1px 4px;margin:-1px -4px;transition:background 0.12s;display:inline-block;}
+.kol-handle:hover{background:rgba(0,0,0,0.05);}
+.kol-handle input{font:inherit;font-weight:500;color:inherit;border:0.5px solid rgba(0,0,0,0.16);border-radius:4px;padding:1px 6px;outline:none;background:#fff;width:160px;}
 .kol-bio{font-size: 11px;color:var(--color-text-tertiary);margin-top:1px;}
 
 .spark{display:inline-flex;align-items:flex-end;gap:2px;height:18px;}
@@ -388,7 +390,6 @@ theblock.co
       return `<span class="src-act" data-source-id="${s.id}" data-act="${act}" style="display:${base};background:${bg};color:${fg}">${label}</span>`;
     };
     const action = (
-      mkBtn('edit',    '✎',       false,                  false) +
       mkBtn('retired', 'retire',  s.status === 'retired', false) +
       mkBtn('del',     '✕',       false,                  true)
     );
@@ -408,7 +409,7 @@ theblock.co
     return `
       <tr ${st.rowBg ? `style="${st.rowBg}"` : ''} data-id="${s.id}" data-pm-score="${pmScore ?? -1}">
         <td>
-          <div class="kol-handle">${s.handle}${pmBadge}</div>
+          <div><span class="kol-handle" title="点击修改 handle">${s.handle}</span>${pmBadge}</div>
           <div class="kol-bio">${s.name || ''}</div>
         </td>
         <td><span style="font-weight:500">${hits} 次</span>${hitsNote}</td>
@@ -1308,70 +1309,50 @@ theblock.co
   const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  // 锚定式 input popover (修改 handle)
-  function editHandleAt(anchorEl, currentHandle, onSave) {
-    let pop = document.getElementById('inline-edit-pop');
-    if (!pop) {
-      pop = document.createElement('div');
-      pop.id = 'inline-edit-pop';
-      pop.style.cssText = 'position:fixed;z-index:9999;display:none;background:#fff;border:0.5px solid rgba(0,0,0,0.16);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.14);padding:12px 14px;width:280px;font-size:12px;line-height:1.55';
-      document.body.appendChild(pop);
-    }
-    const initial = (currentHandle || '').replace(/^@/, '');
-    pop.innerHTML = `
-      <div style="font-weight:500;color:#1a1a17;margin-bottom:6px">修改 handle</div>
-      <div style="position:relative;margin-bottom:6px">
-        <span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#888780;font-size:12px">@</span>
-        <input data-role="input" value="${initial.replace(/"/g,'&quot;')}"
-          style="width:100%;padding:5px 8px 5px 22px;border:0.5px solid rgba(0,0,0,0.16);border-radius:6px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box" />
-      </div>
-      <div data-role="err" style="font-size:11px;color:#A32D2D;min-height:14px;margin-bottom:6px"></div>
-      <div style="display:flex;justify-content:flex-end;gap:6px">
-        <button data-role="cancel" style="font-size:11px;padding:4px 12px;border:0.5px solid rgba(0,0,0,0.16);background:#F5F4EE;color:#1a1a17;border-radius:6px;cursor:pointer">取消</button>
-        <button data-role="ok"     style="font-size:11px;padding:4px 12px;border:0;background:#185FA5;color:#fff;border-radius:6px;cursor:pointer">保存</button>
-      </div>`;
-    // 定位 (同样的边界检测)
-    const rect = anchorEl.getBoundingClientRect();
-    const W = 310, H = 140;
-    let top = rect.bottom + 6;
-    let left = rect.right - W;
-    if (left < 8) left = 8;
-    if (left + W > window.innerWidth - 8) left = window.innerWidth - W - 8;
-    if (top + H > window.innerHeight - 8) top = rect.top - H - 6;
-    pop.style.top = top + 'px';
-    pop.style.left = left + 'px';
-    pop.style.display = '';
+  // 点 .kol-handle 文本 → 就地变 input → blur/Enter 保存 → Esc 取消
+  document.getElementById('sources-tbody').addEventListener('click', (e) => {
+    const el = e.target.closest('.kol-handle');
+    if (!el) return;
+    if (el.querySelector('input')) return;  // 已经在编辑
+    const row = el.closest('tr');
+    const sid = row?.getAttribute('data-id');
+    if (!sid) return;
+    const original = el.textContent.trim();  // '@xxx'
+    const initial = original.replace(/^@/, '');
 
-    const input = pop.querySelector('[data-role="input"]');
-    const errEl = pop.querySelector('[data-role="err"]');
-    input.focus(); input.select();
+    el.innerHTML = `<span style="color:#888780">@</span><input value="${initial.replace(/"/g,'&quot;')}" />`;
+    const input = el.querySelector('input');
+    input.focus();
+    input.select();
 
-    const close = () => {
-      pop.style.display = 'none';
-      document.removeEventListener('click', outside, true);
-      document.removeEventListener('keydown', keys);
-    };
-    const submit = () => {
+    let done = false;
+    const restore = () => { if (!done) { done = true; el.textContent = original; } };
+    const save = async () => {
+      if (done) return;
+      done = true;
       const val = input.value.trim().replace(/^@/, '');
-      if (!val) { errEl.textContent = '不能为空'; return; }
-      if (!/^[A-Za-z0-9_]{1,15}$/.test(val)) { errEl.textContent = '只允许 A-Z a-z 0-9 _, 长度 1-15'; return; }
-      if (val.toLowerCase() === initial.toLowerCase()) { close(); return; }
-      close();
-      onSave('@' + val);
-    };
-    const outside = (e) => { if (!pop.contains(e.target) && e.target !== anchorEl) close(); };
-    const keys = (e) => {
-      if (e.key === 'Escape') close();
-      else if (e.key === 'Enter') submit();
+      if (!val || val.toLowerCase() === initial.toLowerCase()) { el.textContent = original; return; }
+      if (!/^[A-Za-z0-9_]{1,15}$/.test(val)) {
+        if (window.__toast) window.__toast('handle 格式无效 (允许 A-Z a-z 0-9 _, 长度 1-15)', 'error');
+        el.textContent = original; return;
+      }
+      el.textContent = '@' + val + ' …';  // 提示保存中
+      const { error } = await sb.from('sources').update({ handle: '@' + val }).eq('id', sid);
+      if (error) {
+        const msg = /duplicate|unique/i.test(error.message) ? `@${val} 已存在` : '更新失败: ' + error.message;
+        if (window.__toast) window.__toast(msg, 'error');
+        el.textContent = original; return;
+      }
+      if (window.__toast) window.__toast(`✓ ${original} → @${val}`, 'success', 2500);
+      if (window.__reloadSourcesTable) await window.__reloadSourcesTable();
     };
 
-    pop.querySelector('[data-role="cancel"]').onclick = close;
-    pop.querySelector('[data-role="ok"]').onclick = submit;
-    setTimeout(() => {
-      document.addEventListener('click', outside, true);
-      document.addEventListener('keydown', keys);
-    }, 0);
-  }
+    input.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+      else if (ev.key === 'Escape') { ev.preventDefault(); done = true; el.textContent = original; }
+    });
+    input.addEventListener('blur', save);
+  });
 
   // 锚定式确认 popover (替代 native confirm)
   function confirmAt(anchorEl, target, onConfirm) {
@@ -1426,25 +1407,6 @@ theblock.co
     const sid = btn.getAttribute('data-source-id');
     const act = btn.getAttribute('data-act');
     if (!sid || !act) return;
-
-    if (act === 'edit') {
-      const row = btn.closest('tr');
-      const currentHandle = row?.querySelector('.kol-handle')?.textContent?.trim() || '';
-      editHandleAt(btn, currentHandle, async (newHandle) => {
-        btn.style.opacity = '0.5';
-        const { error } = await sb.from('sources').update({ handle: newHandle }).eq('id', sid);
-        if (error) {
-          const msg = /duplicate|unique/i.test(error.message) ? `${newHandle} 已存在` : '更新失败: ' + error.message;
-          if (window.__toast) window.__toast(msg, 'error');
-          else alert(msg);
-          btn.style.opacity = '';
-          return;
-        }
-        if (window.__toast) window.__toast(`✓ ${currentHandle} → ${newHandle}`, 'success', 2500);
-        if (window.__reloadSourcesTable) await window.__reloadSourcesTable();
-      });
-      return;
-    }
 
     if (act === 'del') {
       const row = btn.closest('tr');

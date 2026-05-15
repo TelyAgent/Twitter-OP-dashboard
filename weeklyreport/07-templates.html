@@ -897,12 +897,14 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
       const fg = angle === 'Other' ? '#888780' : '#854F0B';
       const kindBadge = (t.kind && t.kind !== 'original')
         ? `<span style="font-size:10px;background:#EEEDFE;color:#3C3489;padding:1px 6px;border-radius:3px;margin-left:4px">${t.kind}</span>` : '';
+      const manualBadge = t._manual
+        ? `<span style="font-size:10px;background:#E6F1FB;color:#185FA5;padding:1px 6px;border-radius:3px;font-weight:500;margin-left:4px">manual</span>` : '';
       return `
         <a class="fire-card" href="${url}" target="_blank" rel="noopener" style="display:block;text-decoration:none;color:inherit;padding:10px 12px;background:var(--color-background-secondary);border-radius:8px;border:0.5px solid transparent;transition:border-color 0.15s">
           <div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:4px;flex-wrap:wrap">
             <span style="font-weight:500;color:var(--color-text-primary)">${escapeHtml(handle)}</span>
             <span style="color:var(--color-text-tertiary)">· ${timeAgo(t.created_at)}</span>${kindBadge}
-            <span style="font-size:10px;background:${bg};color:${fg};padding:1px 6px;border-radius:3px;font-weight:500;margin-left:4px">${angle}</span>
+            <span style="font-size:10px;background:${bg};color:${fg};padding:1px 6px;border-radius:3px;font-weight:500;margin-left:4px">${angle}</span>${manualBadge}
           </div>
           <div style="font-size:13px;line-height:1.55">${escapeHtml(t.text || '')}</div>
           <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:6px;display:flex;gap:14px">
@@ -926,7 +928,12 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
       listEl.innerHTML = `<div style="padding:16px;color:#A32D2D;font-size:12px">${escapeHtml(error.message)}</div>`;
       return;
     }
-    const tweets = (data || []).map(h => h.tweets?.[0]).filter(Boolean);
+    const tweets = (data || []).map(h => {
+      const t = h.tweets?.[0];
+      if (!t) return null;
+      t._manual = h.metrics?.manual === true;
+      return t;
+    }).filter(Boolean);
     tweets.forEach(t => { t._angle = classifyAngle(t); });
     tweets.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     allFire = tweets;

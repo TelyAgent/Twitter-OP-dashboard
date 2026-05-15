@@ -262,9 +262,48 @@
 <div id="fire-card" class="card" style="padding:14px 16px;margin-top:14px">
   <div class="card-head" style="margin-bottom:10px">
     <div class="card-title">🔥 爆款推文 · 来自监控源</div>
-    <span class="muted" id="fire-summary">加载中…</span>
+    <span class="muted" id="fire-summary" style="margin-right:auto;margin-left:10px">加载中…</span>
+    <button id="btn-paste-tweet" class="btn-ghost" style="background:#E6F1FB;color:#0C447C;border-color:#B7D7F1;font-size:12px;padding:6px 12px">↥ 粘贴推文</button>
   </div>
   <div id="fire-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px 18px"></div>
+</div>
+
+<!-- 粘贴推文 modal -->
+<div class="modal-backdrop" id="paste-tweet-modal">
+  <div class="modal" style="width:560px">
+    <div class="modal-head">
+      <div class="modal-title">↥ 手动添加爆款推文</div>
+      <button class="modal-close" id="paste-tweet-close">×</button>
+    </div>
+    <div class="modal-section">
+      <label class="modal-label">推文 URL 或 ID</label>
+      <input class="modal-input" id="paste-tweet-url" placeholder="https://x.com/user/status/1234567890..." />
+      <div class="modal-hint">粘贴 X 推文链接, 我抓取数据后存到爆款池, 自动按角度分类, 加 manual 标签</div>
+    </div>
+    <div class="modal-section" id="paste-tweet-preview" style="display:none">
+      <label class="modal-label">抓取结果</label>
+      <div style="background:var(--color-background-secondary);border-radius:6px;padding:10px;font-size:12px;line-height:1.55">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+          <span id="pt-author" style="font-weight:600"></span>
+          <span id="pt-time" style="color:var(--color-text-tertiary);font-size:11px"></span>
+          <span id="pt-angle" style="background:#FAEEDA;color:#854F0B;padding:1px 6px;border-radius:3px;font-weight:500;font-size:11px;margin-left:auto"></span>
+        </div>
+        <div id="pt-text" style="margin-bottom:8px"></div>
+        <div style="display:flex;gap:14px;font-size:11px;color:var(--color-text-tertiary)">
+          <span>↻ <span id="pt-rt"></span></span>
+          <span>♡ <span id="pt-likes"></span></span>
+          <span>💬 <span id="pt-replies"></span></span>
+          <span>👁 <span id="pt-views"></span></span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <span id="paste-tweet-msg" style="font-size:12px;margin-right:auto;color:var(--color-text-tertiary)"></span>
+      <button class="btn-ghost" id="paste-tweet-cancel">关闭</button>
+      <button class="btn-primary" id="paste-tweet-fetch" style="background:#185FA5">↗ 抓取</button>
+      <button class="btn-primary" id="paste-tweet-save" style="background:#3B6D11;display:none">保存到爆款池</button>
+    </div>
+  </div>
 </div>
 
 </main>
@@ -1048,7 +1087,12 @@ theblock.co
       return;
     }
 
-    const posts = (data || []).map(h => h.tweets?.[0]).filter(Boolean);
+    const posts = (data || []).map(h => {
+      const t = h.tweets?.[0];
+      if (!t) return null;
+      t._manual = h.metrics?.manual === true;
+      return t;
+    }).filter(Boolean);
     if (posts.length === 0) {
       summaryEl.textContent = '0 条';
       grid.innerHTML = `<div style="grid-column:1/-1;padding:24px;text-align:center;font-size:13px;color:var(--color-text-tertiary);background:var(--color-background-secondary);border-radius:var(--border-radius-md)">暂无爆款 · 点 KOL 的 ↻ 同步 拉取，views &gt; 50k 的会自动标记</div>`;
@@ -1068,11 +1112,13 @@ theblock.co
         const fg = angle === 'Other' ? '#888780' : '#854F0B';
         return `<span style="font-size:10px;background:${bg};color:${fg};padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:500">${angle}</span>`;
       })() : '';
+      const manualBadge = t._manual
+        ? `<span style="font-size:10px;background:#E6F1FB;color:#185FA5;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:500">manual</span>` : '';
       return `
         <a href="${url}" target="_blank" rel="noopener" style="display:block;text-decoration:none;color:inherit">
           <div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:4px;flex-wrap:wrap">
             <span style="font-weight:500;color:var(--color-text-primary)">${escapeHtml(handle)}</span>
-            <span style="color:var(--color-text-tertiary)">· ${timeAgo(t.created_at)}</span>${kindBadge}${angleBadge}
+            <span style="color:var(--color-text-tertiary)">· ${timeAgo(t.created_at)}</span>${kindBadge}${angleBadge}${manualBadge}
           </div>
           <div style="font-size:13px;line-height:1.55">${escapeHtml(t.text || '')}</div>
           <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:6px;display:flex;gap:14px">
@@ -1090,6 +1136,109 @@ theblock.co
 
   // 初次加载 + 登录后立刻拉一次
   loadFireFeed();
+
+  // ====== ↥ 粘贴推文 (手动添加到爆款池, tag=manual) ======
+  const ptModal   = document.getElementById('paste-tweet-modal');
+  const ptUrl     = document.getElementById('paste-tweet-url');
+  const ptFetch   = document.getElementById('paste-tweet-fetch');
+  const ptSave    = document.getElementById('paste-tweet-save');
+  const ptCancel  = document.getElementById('paste-tweet-cancel');
+  const ptClose   = document.getElementById('paste-tweet-close');
+  const ptPreview = document.getElementById('paste-tweet-preview');
+  const ptMsg     = document.getElementById('paste-tweet-msg');
+  let ptFetched = null;
+
+  function openPt() {
+    ptUrl.value = ''; ptMsg.textContent = ''; ptMsg.style.color = '';
+    ptPreview.style.display = 'none';
+    ptSave.style.display = 'none';
+    ptFetched = null;
+    ptModal.classList.add('open');
+    setTimeout(() => ptUrl.focus(), 50);
+  }
+  function closePt() { ptModal.classList.remove('open'); }
+  document.getElementById('btn-paste-tweet').addEventListener('click', openPt);
+  ptClose.addEventListener('click', closePt);
+  ptCancel.addEventListener('click', closePt);
+  ptModal.addEventListener('click', e => { if (e.target === ptModal) closePt(); });
+
+  ptFetch.addEventListener('click', async () => {
+    const url = ptUrl.value.trim();
+    if (!url) { ptMsg.textContent = '请粘贴推文 URL'; ptMsg.style.color = '#A32D2D'; return; }
+    ptFetch.disabled = true; ptFetch.textContent = '抓取中…';
+    ptMsg.textContent = ''; ptMsg.style.color = '';
+    try {
+      const r = await fetch(`${API_BASE}/api/twitter/tweet`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const res = await r.json();
+      if (!res.ok) {
+        ptMsg.textContent = '✕ ' + (res.error || ('HTTP ' + r.status));
+        ptMsg.style.color = '#A32D2D';
+        return;
+      }
+      ptFetched = res.tweet;
+      // 给 t 加 kind 字段 (singleTweet 不返回 referenced_tweets, 默认 original)
+      if (!ptFetched.kind) ptFetched.kind = 'original';
+      // preview
+      const angle = classifyAngle(ptFetched);
+      document.getElementById('pt-author').textContent = ptFetched.author?.username ? '@' + ptFetched.author.username : '?';
+      document.getElementById('pt-time').textContent   = ptFetched.created_at ? new Date(ptFetched.created_at).toLocaleString('zh-CN') : '';
+      document.getElementById('pt-angle').textContent  = angle || '反直觉';
+      document.getElementById('pt-text').textContent   = ptFetched.text || '';
+      document.getElementById('pt-rt').textContent      = ptFetched.metrics.retweets ?? 0;
+      document.getElementById('pt-likes').textContent   = ptFetched.metrics.likes ?? 0;
+      document.getElementById('pt-replies').textContent = ptFetched.metrics.replies ?? 0;
+      document.getElementById('pt-views').textContent   = ptFetched.metrics.views ?? 0;
+      ptFetched._angle = angle;
+      ptPreview.style.display = '';
+      ptSave.style.display = '';
+      ptMsg.textContent = '✓ 抓取成功, 点 "保存到爆款池"';
+      ptMsg.style.color = '#27500A';
+    } catch (e) {
+      ptMsg.textContent = '✕ 网络错误: ' + e.message;
+      ptMsg.style.color = '#A32D2D';
+    } finally {
+      ptFetch.disabled = false; ptFetch.textContent = '↗ 重新抓取';
+    }
+  });
+
+  ptSave.addEventListener('click', async () => {
+    if (!ptFetched) return;
+    ptSave.disabled = true; ptSave.textContent = '保存中…';
+    const t = ptFetched;
+    const m = t.metrics || {};
+    const eng = (m.likes || 0) + (m.retweets || 0) + (m.replies || 0);
+    // 简单分类: 看是否命中 CAT_KW (复用 sync IIFE 内的同名常量)
+    const text = (t.text || '').toLowerCase();
+    let cat = 'E';
+    for (const [c, kws] of Object.entries(CAT_KW)) {
+      if (kws.some(k => text.includes(k))) { cat = c; break; }
+    }
+    const row = {
+      id: `hs_manual_${t.id}`,
+      title: (t.text || '').slice(0, 120),
+      category: cat,
+      status: 'pool',
+      hot_signal: true,
+      sources: [],
+      tweets: [t],
+      metrics: { ...m, engagements: eng, manual: true },
+    };
+    const { error } = await sb.from('hotspots').upsert(row, { onConflict: 'id' });
+    if (error) {
+      ptMsg.textContent = '✕ 保存失败: ' + error.message;
+      ptMsg.style.color = '#A32D2D';
+      ptSave.disabled = false; ptSave.textContent = '保存到爆款池';
+      return;
+    }
+    ptMsg.textContent = '✓ 已保存, 刷新爆款池…';
+    ptMsg.style.color = '#27500A';
+    if (window.__reloadFireFeed) await window.__reloadFireFeed();
+    setTimeout(() => { ptSave.disabled = false; ptSave.textContent = '保存到爆款池'; closePt(); }, 800);
+  });
 
   // 简单 toast 替代 alert
   function toast(msg, type='info', dur=4000) {

@@ -164,6 +164,7 @@
 <div style="display:flex;align-items:center;gap:6px">
 <input style="border:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:6px 10px;font-size: 12px;width:160px" placeholder="搜索 @handle..."/>
 <button class="btn-ghost" id="btn-eval-pm" style="background:#FAEEDA;color:#854F0B;border-color:#EFD8A8">↗ 评估 PM 相关度</button>
+<button class="btn-ghost" id="btn-sync-all-pm" style="background:#E6F1FB;color:#0C447C;border-color:#B7D7F1">↻ 同步全部 PM 相关</button>
 <label style="font-size:11px;color:var(--color-text-secondary);display:inline-flex;align-items:center;gap:4px;margin-right:6px">
   <input type="checkbox" id="filter-pm-only" style="margin:0"> 仅 PM 相关 (★★+)
 </label>
@@ -1203,6 +1204,9 @@ theblock.co
     if (!handle || !sourceId) return;
     await syncHandle(handle, sourceId, btn);
   });
+
+  // 暴露给批量 sync 用 (传入一个 "假 btn" 对象即可)
+  window.__syncOneSource = syncHandle;
 })();
 
 // ====== ↗ 评估 PM 相关度 + 过滤芯片 ======
@@ -1340,6 +1344,77 @@ theblock.co
     if (error) { alert('更新失败: ' + error.message); btn.style.opacity = ''; return; }
     if (window.__reloadSourcesTable) await window.__reloadSourcesTable();
   });
+})();
+
+// ====== ↻ 批量同步 PM 相关源 (★★+) ======
+(function(){
+  const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  const PM_THRESHOLD = 0.4;  // ★★+ 才算 PM 相关
+
+  async function syncAllPM() {
+    const btn = document.getElementById('btn-sync-all-pm');
+    const orig = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '↻ 加载源…';
+
+    // 1. 拉所有 twitter + 非 retired 的源
+    const { data: srcs, error } = await sb.from('sources')
+      .select('id, handle, type, status, metrics_4w')
+      .eq('type', 'twitter')
+      .neq('status', 'retired');
+    if (error || !srcs) {
+      btn.textContent = '✕ 加载失败';
+      console.warn('[bulk-sync] load:', error);
+      setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 3000);
+      return;
+    }
+
+    // 2. 筛 PM 相关 (pm_score >= 0.4)
+    const targets = srcs.filter(s => (s.metrics_4w?.pm_score ?? 0) >= PM_THRESHOLD);
+    const noEval = srcs.filter(s => s.metrics_4w?.pm_score == null);
+
+    if (targets.length === 0) {
+      const hint = noEval.length > 0
+        ? `没有 PM 相关 (★★+) 的源.\n${noEval.length} 个源还没评估过. 请先点 "↗ 评估 PM 相关度".`
+        : `没有 PM 相关源. (现存 ${srcs.length} 个全部 PM 评分 < ${PM_THRESHOLD})`;
+      alert(hint);
+      btn.disabled = false; btn.textContent = orig;
+      return;
+    }
+
+    const ok = confirm(
+      `将同步 ${targets.length} 个 PM 相关源 (★★+) 的近 7 天推文:\n\n` +
+      targets.map(s => `  ${s.handle}  (PM ${Math.round(s.metrics_4w.pm_score*100)}%)`).join('\n') +
+      `\n\n预计耗时 ~${Math.round(targets.length*1.5)} 秒, X API 配额 ~${targets.length} 次.\n继续?`
+    );
+    if (!ok) { btn.disabled = false; btn.textContent = orig; return; }
+
+    // 3. 串行同步 (并行容易 429)
+    const fakeBtn = { textContent: '', disabled: false, style: {} };
+    let done = 0, success = 0, failed = 0;
+    for (const s of targets) {
+      done++;
+      btn.textContent = `↻ ${done}/${targets.length} · ${s.handle}`;
+      try {
+        const handle = s.handle.replace(/^@/, '');
+        await window.__syncOneSource(handle, s.id, fakeBtn);
+        success++;
+      } catch (e) {
+        console.warn('[bulk-sync] fail', s.handle, e);
+        failed++;
+      }
+    }
+
+    btn.textContent = `↻ 完成 ${success}/${targets.length}${failed ? ` · 失败 ${failed}` : ''}`;
+    if (window.__reloadSourcesTable) await window.__reloadSourcesTable();
+    if (window.__reloadFireFeed)     await window.__reloadFireFeed();
+    setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 6000);
+  }
+
+  document.getElementById('btn-sync-all-pm').addEventListener('click', syncAllPM);
 })();
 </script>
 

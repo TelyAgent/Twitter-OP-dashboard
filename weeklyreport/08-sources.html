@@ -268,6 +268,59 @@
 </main>
 </div>
 
+<!-- ====== 调整 / 详情 modal (edit single source) ====== -->
+<div class="modal-backdrop" id="edit-source-modal">
+  <div class="modal" style="width:520px">
+    <div class="modal-head">
+      <div class="modal-title">↗ 调整监控源</div>
+      <button class="modal-close" id="edit-source-close">✕</button>
+    </div>
+
+    <div class="modal-section">
+      <label class="modal-label">账号</label>
+      <div style="font-size:14px;font-weight:500" id="edit-handle">@xxx</div>
+      <div style="font-size:12px;color:var(--color-text-tertiary);margin-top:2px" id="edit-bio"></div>
+    </div>
+
+    <div class="modal-section">
+      <label class="modal-label">类型</label>
+      <select class="modal-select" id="edit-type">
+        <option value="twitter">twitter</option>
+        <option value="onchain">onchain</option>
+        <option value="market">market</option>
+        <option value="rss">rss</option>
+      </select>
+    </div>
+
+    <div class="modal-section">
+      <label class="modal-label">状态</label>
+      <select class="modal-select" id="edit-status">
+        <option value="observe">观察 (observe) — 4 周观察期</option>
+        <option value="live">主力 (live) — 长期监控</option>
+        <option value="retired">退役 (retired) — 不再监控</option>
+      </select>
+    </div>
+
+    <div class="modal-section">
+      <label class="modal-label">显示名 (覆盖 bio 显示)</label>
+      <input class="modal-input" id="edit-name" placeholder="留空则用 bio / handle" />
+    </div>
+
+    <div class="modal-section">
+      <label class="modal-label">指标快照 (只读)</label>
+      <div id="edit-metrics" style="font-size:12px;color:var(--color-text-secondary);background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:10px;line-height:1.7"></div>
+    </div>
+
+    <div id="edit-msg" style="font-size:12px;color:var(--color-text-tertiary);margin-top:4px"></div>
+
+    <div class="modal-foot">
+      <button class="btn-ghost danger" id="edit-delete" style="background:#FCEBEB;color:#A32D2D;border-color:#F2C0C0;margin-right:auto">✕ 删除</button>
+      <button class="btn-ghost" id="edit-cancel">取消</button>
+      <button class="btn-primary" id="edit-save" style="background:#185FA5">保存</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="bulk-modal">
 <div class="modal">
 <div class="modal-head">
@@ -377,7 +430,9 @@ theblock.co
       retired: { cls:'kill', label:'建议退役', rowBg:'background:#FCEBEB80' },
     };
     const st = STATUS_MAP[s.status] || STATUS_MAP.observe;
-    const action = s.status === 'retired' ? '<span class="act-link danger">✕ 移除</span>' : (s.status === 'observe' ? '<span class="act-link">↗ 调整</span>' : '<span class="act-link">↗ 详情</span>');
+    const actionLabel = s.status === 'retired' ? '✕ 移除' : (s.status === 'observe' ? '↗ 调整' : '↗ 详情');
+    const actionClass = s.status === 'retired' ? 'act-link edit-source-btn danger' : 'act-link edit-source-btn';
+    const action = `<span class="${actionClass}" data-source-id="${s.id}" style="cursor:pointer;user-select:none">${actionLabel}</span>`;
     // 同步按钮 — 仅对 twitter 类型显示 (其它类型暂不支持自动拉)
     const syncBtn = (s.type === 'twitter')
       ? `<button class="act-link sync-btn" data-handle="${s.handle.replace(/^@/, '')}" data-source-id="${s.id}" style="background:transparent;border:0;color:#185FA5;cursor:pointer;font-size:11px;padding:0;margin-right:8px">↻ 同步</button>`
@@ -1279,6 +1334,114 @@ theblock.co
   // 过滤芯片
   document.getElementById('filter-pm-only').addEventListener('change', () => {
     if (window.__reloadSourcesTable) window.__reloadSourcesTable();
+  });
+})();
+
+// ====== ↗ 调整 / ↗ 详情 / ✕ 移除 modal ======
+(function(){
+  const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  const modal      = document.getElementById('edit-source-modal');
+  const btnClose   = document.getElementById('edit-source-close');
+  const btnCancel  = document.getElementById('edit-cancel');
+  const btnSave    = document.getElementById('edit-save');
+  const btnDelete  = document.getElementById('edit-delete');
+  const elHandle   = document.getElementById('edit-handle');
+  const elBio      = document.getElementById('edit-bio');
+  const elType     = document.getElementById('edit-type');
+  const elStatus   = document.getElementById('edit-status');
+  const elName     = document.getElementById('edit-name');
+  const elMetrics  = document.getElementById('edit-metrics');
+  const elMsg      = document.getElementById('edit-msg');
+
+  let editing = null; // 当前编辑的 source 对象
+
+  function open(source) {
+    editing = source;
+    elHandle.textContent = source.handle;
+    elBio.textContent    = source.name || '(无 bio)';
+    elType.value         = source.type || 'twitter';
+    elStatus.value       = source.status || 'observe';
+    elName.value         = source.name || '';
+    elMsg.textContent    = '';
+    elMsg.style.color    = '';
+
+    const m = source.metrics_4w || {};
+    const pmScore = m.pm_score != null ? `${Math.round(m.pm_score*100)}% (${m.pm_matched ?? 0}/${m.pm_total ?? 0} 推命中)` : '未评估';
+    const addedAgo = source.added_at ? new Date(source.added_at).toLocaleString('zh-CN') : '—';
+    const lastActive = source.last_active_at ? new Date(source.last_active_at).toLocaleString('zh-CN') : '从未同步';
+    elMetrics.innerHTML = `
+      <div>4 周热点贡献: <b>${m.hits ?? 0}</b> 次 · 爆款 <b>${m.fire ?? 0}</b> 条</div>
+      <div>PM 相关度: <b>${pmScore}</b></div>
+      <div>添加时间: ${addedAgo}</div>
+      <div>最后同步: ${lastActive}</div>
+    `;
+
+    modal.classList.add('open');
+  }
+  function close() {
+    modal.classList.remove('open');
+    editing = null;
+  }
+
+  btnClose.addEventListener('click', close);
+  btnCancel.addEventListener('click', close);
+  modal.addEventListener('click', e => { if (e.target === modal) close(); });
+
+  // 事件委托: 点击表里的 .edit-source-btn
+  document.getElementById('sources-tbody').addEventListener('click', async (e) => {
+    const btn = e.target.closest('.edit-source-btn');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const sid = btn.getAttribute('data-source-id');
+    if (!sid) return;
+    // 从 DB 拿最新数据 (避免渲染时 stale)
+    const { data, error } = await sb.from('sources').select('*').eq('id', sid).single();
+    if (error || !data) {
+      alert('加载 source 失败: ' + (error?.message || 'not found'));
+      return;
+    }
+    open(data);
+  });
+
+  btnSave.addEventListener('click', async () => {
+    if (!editing) return;
+    btnSave.disabled = true; btnSave.textContent = '保存中…';
+    const patch = {
+      type:   elType.value,
+      status: elStatus.value,
+      name:   elName.value.trim() || null,
+    };
+    const { error } = await sb.from('sources').update(patch).eq('id', editing.id);
+    if (error) {
+      elMsg.textContent = '✕ 保存失败: ' + error.message;
+      elMsg.style.color = '#A32D2D';
+      btnSave.disabled = false; btnSave.textContent = '保存';
+      return;
+    }
+    elMsg.textContent = '✓ 已保存';
+    elMsg.style.color = '#27500A';
+    if (window.__reloadSourcesTable) await window.__reloadSourcesTable();
+    setTimeout(() => { btnSave.disabled = false; btnSave.textContent = '保存'; close(); }, 600);
+  });
+
+  btnDelete.addEventListener('click', async () => {
+    if (!editing) return;
+    if (!confirm(`确认删除 ${editing.handle}？\n(这是硬删除, 不可恢复; 想保留可以改 status 为 retired)`)) return;
+    btnDelete.disabled = true; btnDelete.textContent = '删除中…';
+    const { error } = await sb.from('sources').delete().eq('id', editing.id);
+    if (error) {
+      elMsg.textContent = '✕ 删除失败: ' + error.message;
+      elMsg.style.color = '#A32D2D';
+      btnDelete.disabled = false; btnDelete.textContent = '✕ 删除';
+      return;
+    }
+    if (window.__reloadSourcesTable) await window.__reloadSourcesTable();
+    btnDelete.disabled = false; btnDelete.textContent = '✕ 删除';
+    close();
   });
 })();
 </script>

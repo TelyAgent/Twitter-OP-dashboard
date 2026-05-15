@@ -163,7 +163,6 @@
 </div>
 <div style="display:flex;align-items:center;gap:6px">
 <input style="border:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:6px 10px;font-size: 12px;width:160px" placeholder="搜索 @handle..."/>
-<button class="btn-ghost" id="btn-eval-pm" style="background:#FAEEDA;color:#854F0B;border-color:#EFD8A8">↗ 评估 PM 相关度</button>
 <button class="btn-ghost" id="btn-sync-all-pm" style="background:#E6F1FB;color:#0C447C;border-color:#B7D7F1">↻ 同步全部 PM 相关</button>
 <label style="font-size:11px;color:var(--color-text-secondary);display:inline-flex;align-items:center;gap:4px;margin-right:6px">
   <input type="checkbox" id="filter-pm-only" style="margin:0"> 仅 PM 相关 (★★+)
@@ -765,8 +764,31 @@ theblock.co
       // 重新拉全表 (拿到完整 join 结果)
       const rows = await loadSourcesFromDB();
       if (rows) renderTable(rows);
-      progressEl.textContent = `✓ 已同步到 Supabase · ${ok} 条`;
-      progressEl.style.color = '#3B6D11';
+
+      // 后台跑 PM 相关度评估 (不阻塞 modal 关闭)
+      const twitterRows = (data || []).filter(s => s.type === 'twitter');
+      if (twitterRows.length > 0 && window.__evaluatePM) {
+        progressEl.textContent = `✓ 已同步 ${ok} 条 · 后台评估 PM 相关度…`;
+        progressEl.style.color = '#3B6D11';
+        // fire-and-forget — modal 关闭后继续跑
+        (async () => {
+          let pmDone = 0, pmFail = 0;
+          for (const s of twitterRows) {
+            const res = await window.__evaluatePM(s);
+            pmDone++;
+            if (!res.ok) pmFail++;
+            if (window.__toast) {
+              const stars = res.ok ? (res.score >= 0.6 ? '★★★' : res.score >= 0.4 ? '★★☆' : res.score >= 0.2 ? '★☆☆' : '☆☆☆') : '✕';
+              window.__toast(`PM 评估 ${pmDone}/${twitterRows.length}: ${s.handle} ${stars}${res.ok ? ' '+Math.round(res.score*100)+'%' : ''}`, res.ok ? 'info' : 'warn', 2000);
+            }
+          }
+          if (window.__reloadSourcesTable) await window.__reloadSourcesTable();
+          if (window.__toast) window.__toast(`✓ PM 评估完成 ${pmDone-pmFail}/${twitterRows.length}`, 'success', 3500);
+        })();
+      } else {
+        progressEl.textContent = `✓ 已同步到 Supabase · ${ok} 条`;
+        progressEl.style.color = '#3B6D11';
+      }
     } else {
       // ─── Mock 模式: DOM 插入 (兼容未登录或 DB 未就绪) ─────────
       const statusLabel = '观察', statusClass = 'warn', rowBg = 'background:#FAEEDA40';
@@ -1083,6 +1105,7 @@ theblock.co
     clearTimeout(el._t);
     el._t = setTimeout(() => { el.style.display = 'none'; }, dur);
   }
+  window.__toast = toast;
 
   async function syncHandle(handle, sourceId, btn) {
     // 1. 拉 X
@@ -1209,22 +1232,18 @@ theblock.co
   window.__syncOneSource = syncHandle;
 })();
 
-// ====== ↗ 评估 PM 相关度 + 过滤芯片 ======
+// ====== PM 相关度: 工具函数 (导入时自动调用) + 过滤芯片 ======
 (function(){
   const API_BASE = `http://${location.hostname}:8081`;
   const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-  const SYNC_HOURS = 168; // 7 天
+  const SYNC_HOURS = 168;
 
-  // Polymarket 相关关键词
   const POLY_KW = [
-    // 平台名
     'polymarket','kalshi','manifold','predictit','metaculus',
-    // 通用概念
     'prediction market','binary market','event contract','odds','probability',
     'yes/no','resolves','bet on','betting market',
-    // 衍生主题
     'fomc','rate cut','rate hike','election','whale','smart money',
     'fed','cpi','powell','trump',
   ];
@@ -1237,72 +1256,44 @@ theblock.co
       if (POLY_KW.some(kw => text.includes(kw))) matches++;
     }
     const ratio = matches / tweets.length;
-    const score = +Math.min(1, ratio / 0.2).toFixed(2); // 20%+ 命中即满分
+    const score = +Math.min(1, ratio / 0.2).toFixed(2);
     return { score, matches, total: tweets.length };
   }
 
-  async function evaluateAll() {
-    const btn = document.getElementById('btn-eval-pm');
-    btn.disabled = true;
-    const orig = btn.textContent;
-
-    // 拿当前全部 twitter sources
-    const { data: srcs, error } = await sb.from('sources')
-      .select('id, handle, type, metrics_4w').eq('type', 'twitter');
-    if (error || !srcs) {
-      btn.textContent = '✕ 加载失败';
-      console.warn('[pm-eval] load sources:', error);
-      setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 2000);
-      return;
-    }
-
-    const total = srcs.length;
-    let done = 0, ok = 0, fail = 0, qzero = 0;
-    const ranking = [];
-
-    for (const s of srcs) {
-      done++;
-      btn.textContent = `↗ 评估 ${done}/${total}`;
-      const handle = s.handle.replace(/^@/, '');
-      try {
-        const r = await fetch(`${API_BASE}/api/twitter/handle/${encodeURIComponent(handle)}/recent`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ hours: SYNC_HOURS }),
-        });
-        const res = await r.json();
-        if (!res.ok) { fail++; console.warn('[pm-eval] fail', handle, res.error); continue; }
-        const rel = pmRelevance(res.tweets);
-        if (rel.total === 0) qzero++;
-        ranking.push({ handle: s.handle, ...rel });
-
-        // 写回 sources.metrics_4w
-        const nextMetrics = { ...(s.metrics_4w || {}), pm_score: rel.score, pm_matched: rel.matches, pm_total: rel.total, pm_evaluated_at: new Date().toISOString() };
-        const { error: upErr } = await sb.from('sources').update({ metrics_4w: nextMetrics }).eq('id', s.id);
-        if (upErr) console.warn('[pm-eval] write', handle, upErr);
-        else ok++;
-      } catch (e) {
-        fail++;
-        console.warn('[pm-eval] err', handle, e.message);
+  // 评估单个 source 的 PM 相关度并回写 (供导入流程调用)
+  async function evaluateOneSource(source) {
+    const handle = source.handle.replace(/^@/, '');
+    try {
+      const r = await fetch(`${API_BASE}/api/twitter/handle/${encodeURIComponent(handle)}/recent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hours: SYNC_HOURS }),
+      });
+      const res = await r.json();
+      if (!res.ok) {
+        console.warn('[pm-eval] api fail', handle, res.error);
+        return { ok: false, error: res.error };
       }
+      const rel = pmRelevance(res.tweets);
+      const nextMetrics = {
+        ...(source.metrics_4w || {}),
+        pm_score: rel.score,
+        pm_matched: rel.matches,
+        pm_total: rel.total,
+        pm_evaluated_at: new Date().toISOString(),
+      };
+      const { error: upErr } = await sb.from('sources').update({ metrics_4w: nextMetrics }).eq('id', source.id);
+      if (upErr) {
+        console.warn('[pm-eval] write', handle, upErr);
+        return { ok: false, error: upErr.message };
+      }
+      return { ok: true, ...rel };
+    } catch (e) {
+      console.warn('[pm-eval] err', handle, e.message);
+      return { ok: false, error: e.message };
     }
-
-    btn.textContent = `↗ 评估完成 ${ok}/${total}`;
-    // 重新拉表 + 重渲
-    if (window.__reloadSourcesTable) await window.__reloadSourcesTable();
-    setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 2500);
-
-    // 打印 ranking 到 console
-    ranking.sort((a, b) => b.score - a.score);
-    console.log('=== PM 相关度排名 ===');
-    console.table(ranking.map(r => ({ handle: r.handle, 'PM%': Math.round(r.score*100), '命中': `${r.matches}/${r.total}` })));
-
-    // toast 概要 - 用 sync IIFE 同款 toast 函数, 这里复制一份本地版避免依赖
-    const top3 = ranking.slice(0, 3).map(r => `${r.handle}(${Math.round(r.score*100)}%)`).join(' · ');
-    console.log(`top 3: ${top3}${qzero ? ` · ${qzero} 个 KOL 近 7 天 0 推` : ''}`);
   }
-
-  document.getElementById('btn-eval-pm').addEventListener('click', evaluateAll);
+  window.__evaluatePM = evaluateOneSource;
 
   // 过滤芯片
   document.getElementById('filter-pm-only').addEventListener('change', () => {

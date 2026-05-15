@@ -137,6 +137,20 @@
 </div>
 </div>
 
+<!-- ✨ 最近提炼模板 (real DB-driven list) -->
+<div class="card" id="recent-tpl-card" style="margin-top:14px">
+  <div class="card-head">
+    <div class="card-title">✨ 最近提炼模板</div>
+    <span class="muted" id="recent-tpl-count">加载中…</span>
+  </div>
+  <div id="recent-tpl-list" style="display:flex;flex-direction:column;gap:8px;max-height:480px;overflow-y:auto;padding-right:6px"></div>
+</div>
+<style>
+  #recent-tpl-list::-webkit-scrollbar{width:6px;}
+  #recent-tpl-list::-webkit-scrollbar-track{background:transparent;}
+  #recent-tpl-list::-webkit-scrollbar-thumb{background:var(--color-border-secondary);border-radius:3px;}
+</style>
+
 <div class="card">
 <div class="card-head">
 <div class="card-title">
@@ -937,7 +951,53 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
     const fireEl  = document.getElementById('tpl-fire');
     if (totalEl) totalEl.textContent = tpls.length;
     if (fireEl)  fireEl.textContent  = tpls.filter(t => t.status === 'fire').length;
+
+    // 顺便渲染"最近提炼模板" list (DB-driven content view)
+    await renderRecentTemplates();
   }
+
+  async function renderRecentTemplates() {
+    const list = document.getElementById('recent-tpl-list');
+    const cnt  = document.getElementById('recent-tpl-count');
+    if (!list) return;
+    const { data, error } = await sb.from('templates')
+      .select('id, category, angle, status, skeleton, required_slots, source_tweet_url, uses, avg_views, fire_count, created_at')
+      .order('created_at', { ascending: false })
+      .limit(30);
+    if (error) {
+      cnt.textContent = '加载失败';
+      list.innerHTML = `<div style="padding:16px;color:#A32D2D;font-size:12px">${escapeHtml(error.message)}</div>`;
+      return;
+    }
+    const tpls = data || [];
+    cnt.textContent = `共 ${tpls.length} 个模板 · 按提炼时间倒序 · top 30`;
+    if (tpls.length === 0) {
+      list.innerHTML = `<div style="padding:24px;text-align:center;font-size:12px;color:var(--color-text-tertiary);background:var(--color-background-secondary);border-radius:8px">还没提炼过模板. 滚到下方 🔥 模块, 点 ✨ 提炼金模板</div>`;
+      return;
+    }
+    list.innerHTML = tpls.map(t => {
+      const ago = timeAgo(t.created_at);
+      const slots = Array.isArray(t.required_slots) ? t.required_slots : [];
+      const statusColors = { fire: ['#FAECE7', '#993C1D'], solid: ['#EAF3DE', '#27500A'], observe: ['#FAEEDA', '#854F0B'], retired: ['#ECEAE0', '#888780'] };
+      const [statBg, statFg] = statusColors[t.status] || statusColors.observe;
+      const linkBtn = t.source_tweet_url
+        ? `<a href="${escapeHtml(t.source_tweet_url)}" target="_blank" rel="noopener" style="font-size:11px;color:#185FA5;text-decoration:none">↗ 原推</a>`
+        : '';
+      return `
+        <div style="border:0.5px solid var(--color-border-tertiary);border-radius:8px;padding:10px 12px;background:var(--color-background-primary)">
+          <div style="display:flex;align-items:center;gap:6px;font-size:11px;margin-bottom:6px;flex-wrap:wrap">
+            <span class="tag tag-${t.category}">${t.category}</span>
+            <span style="background:#FAEEDA;color:#854F0B;padding:1px 6px;border-radius:3px;font-weight:500">${escapeHtml(t.angle)}</span>
+            <span style="background:${statBg};color:${statFg};padding:1px 6px;border-radius:3px;font-weight:500">${t.status}</span>
+            <span style="color:var(--color-text-tertiary);margin-left:4px">${ago} · 使用 ${t.uses ?? 0} · avg ${fmt(t.avg_views ?? 0)}</span>
+            <span style="margin-left:auto">${linkBtn}</span>
+          </div>
+          <div style="font-size:13px;color:var(--color-text-primary);line-height:1.55;background:var(--color-background-secondary);border-radius:6px;padding:8px;white-space:pre-wrap;word-break:break-word">${escapeHtml(t.skeleton || '')}</div>
+          ${slots.length > 0 ? `<div style="font-size:11px;color:var(--color-text-tertiary);margin-top:4px">槽位: ${slots.map(s => '{'+escapeHtml(s)+'}').join(' · ')}</div>` : ''}
+        </div>`;
+    }).join('');
+  }
+
   window.__reloadTplMatrix = loadMatrix;
   loadMatrix();
 

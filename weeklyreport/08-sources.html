@@ -806,7 +806,10 @@ theblock.co
   const SYNC_HOURS = 168;             // 7 天
   const CLUSTER_WINDOW_MS = 4 * 3600e3; // 4h 聚类窗口
   const MIN_CLUSTER_SCORE = 0.10;       // 低于此分丢弃 (无主题的孤立推默认会很低)
-  const HOT_THRESHOLD = 0.35;           // ≥ 0.35 标 HOT
+  const HOT_THRESHOLD = 0.35;           // ≥ 0.35 才能候选 HOT
+  // HOT 还要过绝对量门槛 - 防止 "243 views 17 互动" 这种小数据靠 viral 比例蒙混标 HOT
+  const HOT_MIN_VIEWS = 10000;          // 要么至少 10k 视图
+  const HOT_MIN_ENGAGEMENT = 200;       // 要么互动 ≥ 200 (高质小盘)
 
   // ── 主实体词典 + 分类词典 (从 content-factory radar-pull.js 抄)
   const CLUSTER_KEYS = [
@@ -917,11 +920,15 @@ theblock.co
     const bucket = Math.floor(earliest / CLUSTER_WINDOW_MS);
     const keySlug = cluster.key.replace(/[^a-z0-9]+/gi, '_').slice(0, 30);
 
+    // HOT 双门槛: score 过线 + (绝对 views 或 绝对 eng 至少一个达标)
+    const passAbs = (sc.total_views >= HOT_MIN_VIEWS) || (sc.total_engagement >= HOT_MIN_ENGAGEMENT);
+    const isHot = sc.score >= HOT_THRESHOLD && passAbs;
+
     return {
       id: `hs_c_${keySlug}_${bucket}`,
       title: (top.text || '').slice(0, 120),
       category: cat,
-      hot_signal: sc.score >= HOT_THRESHOLD,
+      hot_signal: isHot,
       tweets,
       metrics: sc,
     };

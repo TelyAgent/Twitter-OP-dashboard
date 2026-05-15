@@ -723,10 +723,25 @@
       }
       // 按计算分降序排
       rows.sort((a, b) => b._score - a._score);
-      // 算 hot_signal: top 15% 标 hot
+      // 算 hot_signal: 双门槛 — score 过线 + 绝对量达标 (防止小推靠比例蒙混)
       const cutoff = rows[Math.floor(rows.length * 0.15)]?._score ?? 0.5;
+      const scoreThresh = Math.max(cutoff, 0.35);
+      const HOT_MIN_VIEWS = 10000;
+      const HOT_MIN_ENG   = 200;
       for (const h of rows) {
-        h._isHot = h._score >= Math.max(cutoff, 0.35);  // 至少 0.35 才能 hot
+        // metrics 优先 (cluster sync 写过), 否则从 tweets[0] 推算
+        let totalViews = h.metrics?.total_views;
+        let totalEng   = h.metrics?.total_engagement;
+        if (totalViews == null || totalEng == null) {
+          totalViews = 0; totalEng = 0;
+          for (const t of (h.tweets || [])) {
+            const m = t.metrics || {};
+            totalViews += m.views || 0;
+            totalEng   += (m.likes || 0) + (m.retweets || 0) + (m.replies || 0);
+          }
+        }
+        const passAbs = totalViews >= HOT_MIN_VIEWS || totalEng >= HOT_MIN_ENG;
+        h._isHot = h._score >= scoreThresh && passAbs;
       }
       return rows;
     } catch (e) {

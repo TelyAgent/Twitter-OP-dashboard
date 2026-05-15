@@ -1301,11 +1301,56 @@ theblock.co
   });
 })();
 
-// ====== 内联 live / retired / ✕ 直接改 status / 删除 ======
+// ====== 内联 live / retired / ✕ 直接改 status / 删除 (✕ 锚定式 popover 确认) ======
 (function(){
   const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  // 锚定式确认 popover (替代 native confirm)
+  function confirmAt(anchorEl, target, onConfirm) {
+    let pop = document.getElementById('inline-confirm-pop');
+    if (!pop) {
+      pop = document.createElement('div');
+      pop.id = 'inline-confirm-pop';
+      pop.style.cssText = 'position:fixed;z-index:9999;display:none;background:#fff;border:0.5px solid rgba(0,0,0,0.16);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.14);padding:12px 14px;width:260px;font-size:12px;line-height:1.55';
+      document.body.appendChild(pop);
+    }
+    pop.innerHTML = `
+      <div style="font-weight:500;color:#1a1a17;margin-bottom:4px">确认删除 ${target} ?</div>
+      <div style="color:#888780;font-size:11px;margin-bottom:10px">硬删除不可恢复. 保留可以改为 <b>retired</b>.</div>
+      <div style="display:flex;justify-content:flex-end;gap:6px">
+        <button data-role="cancel" style="font-size:11px;padding:4px 12px;border:0.5px solid rgba(0,0,0,0.16);background:#F5F4EE;color:#1a1a17;border-radius:6px;cursor:pointer">取消</button>
+        <button data-role="ok"     style="font-size:11px;padding:4px 12px;border:0;background:#A32D2D;color:#fff;border-radius:6px;cursor:pointer">删除</button>
+      </div>`;
+
+    // 定位: 默认在按钮下方右对齐, 边界检测自动调整
+    const rect = anchorEl.getBoundingClientRect();
+    const W = 290, H = 100;
+    let top = rect.bottom + 6;
+    let left = rect.right - W;
+    if (left < 8) left = 8;
+    if (left + W > window.innerWidth - 8) left = window.innerWidth - W - 8;
+    if (top + H > window.innerHeight - 8) top = rect.top - H - 6;
+    pop.style.top  = top + 'px';
+    pop.style.left = left + 'px';
+    pop.style.display = '';
+
+    const close = () => {
+      pop.style.display = 'none';
+      document.removeEventListener('click', outside, true);
+      document.removeEventListener('keydown', esc);
+    };
+    const outside = (e) => { if (!pop.contains(e.target) && e.target !== anchorEl) close(); };
+    const esc = (e) => { if (e.key === 'Escape') close(); };
+
+    pop.querySelector('[data-role="cancel"]').onclick = close;
+    pop.querySelector('[data-role="ok"]').onclick = () => { close(); onConfirm(); };
+    setTimeout(() => {
+      document.addEventListener('click', outside, true);
+      document.addEventListener('keydown', esc);
+    }, 0);
+  }
 
   document.getElementById('sources-tbody').addEventListener('click', async (e) => {
     const btn = e.target.closest('.src-act');
@@ -1317,22 +1362,31 @@ theblock.co
     if (!sid || !act) return;
 
     if (act === 'del') {
-      // 找到 handle 用于 confirm
       const row = btn.closest('tr');
       const handle = row?.querySelector('.kol-handle')?.textContent?.trim() || sid;
-      if (!confirm(`确认删除 ${handle}？\n这是硬删除, 不可恢复. (保留可以改为 retired)`)) return;
-      btn.style.opacity = '0.5';
-      const { error } = await sb.from('sources').delete().eq('id', sid);
-      if (error) { alert('删除失败: ' + error.message); btn.style.opacity = ''; return; }
-      if (window.__reloadSourcesTable) await window.__reloadSourcesTable();
+      confirmAt(btn, handle, async () => {
+        btn.style.opacity = '0.5';
+        const { error } = await sb.from('sources').delete().eq('id', sid);
+        if (error) {
+          if (window.__toast) window.__toast('删除失败: ' + error.message, 'error');
+          else alert('删除失败: ' + error.message);
+          btn.style.opacity = '';
+          return;
+        }
+        if (window.__reloadSourcesTable) await window.__reloadSourcesTable();
+      });
       return;
     }
 
-    // act = 'live' | 'retired' → 直接 update status
-    const newStatus = act;  // 同名
+    // act = 'live' | 'retired' → 直接 update status (无 confirm)
     btn.style.opacity = '0.5';
-    const { error } = await sb.from('sources').update({ status: newStatus }).eq('id', sid);
-    if (error) { alert('更新失败: ' + error.message); btn.style.opacity = ''; return; }
+    const { error } = await sb.from('sources').update({ status: act }).eq('id', sid);
+    if (error) {
+      if (window.__toast) window.__toast('更新失败: ' + error.message, 'error');
+      else alert('更新失败: ' + error.message);
+      btn.style.opacity = '';
+      return;
+    }
     if (window.__reloadSourcesTable) await window.__reloadSourcesTable();
   });
 })();

@@ -388,7 +388,7 @@ theblock.co
       return `<span class="src-act" data-source-id="${s.id}" data-act="${act}" style="display:${base};background:${bg};color:${fg}">${label}</span>`;
     };
     const action = (
-      mkBtn('retired', 'retired', s.status === 'retired', false) +
+      mkBtn('retired', 'retire',  s.status === 'retired', false) +
       mkBtn('del',     '✕',       false,                  true)
     );
     // 同步按钮 — 仅对 twitter 类型显示 (其它类型暂不支持自动拉)

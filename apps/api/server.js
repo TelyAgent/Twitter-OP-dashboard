@@ -107,15 +107,43 @@ function classifyTweetKind(referenced) {
   return 'original';
 }
 
-// ====== AI 工具 ======
+// ====== AI 工具 (Priority: OpenAI > Anthropic > DeepSeek) ======
 async function callLLM(prompt, maxTokens = 800) {
+  const openaiKey    = process.env.OPENAI_API_KEY;
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   const deepseekKey  = process.env.DEEPSEEK_API_KEY;
-  if (!anthropicKey && !deepseekKey) {
-    const err = new Error('AI key not configured. Set ANTHROPIC_API_KEY or DEEPSEEK_API_KEY in /root/pallax-api/.env then restart pallax-api.service');
+  if (!openaiKey && !anthropicKey && !deepseekKey) {
+    const err = new Error('AI key not configured. Set OPENAI_API_KEY (or ANTHROPIC_API_KEY / DEEPSEEK_API_KEY) in /root/pallax-api/.env then restart pallax-api.service');
     err.code = 503;
     throw err;
   }
+
+  // ── OpenAI (or compatible gateway like NewAPI / oneapi) ──
+  if (openaiKey) {
+    const model   = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    const baseUrl = (process.env.OPENAI_BASE_URL || 'https://api.openai.com').replace(/\/+$/, '');
+    const resp = await fetch(`${baseUrl}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: maxTokens,
+      }),
+    });
+    const json = await resp.json();
+    if (!resp.ok) {
+      const err = new Error(json.error?.message || 'openai error');
+      err.code = 502; err.upstream = json;
+      throw err;
+    }
+    return {
+      text: json.choices?.[0]?.message?.content?.trim() || '',
+      model: json.model || model,
+    };
+  }
+
+  // ── Anthropic ──
   if (anthropicKey) {
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -133,8 +161,7 @@ async function callLLM(prompt, maxTokens = 800) {
     const json = await resp.json();
     if (!resp.ok) {
       const err = new Error(json.error?.message || 'anthropic error');
-      err.code = 502;
-      err.upstream = json;
+      err.code = 502; err.upstream = json;
       throw err;
     }
     return {
@@ -142,6 +169,8 @@ async function callLLM(prompt, maxTokens = 800) {
       model: json.model || 'claude',
     };
   }
+
+  // ── DeepSeek ──
   const resp = await fetch('https://api.deepseek.com/chat/completions', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${deepseekKey}`, 'Content-Type': 'application/json' },
@@ -154,8 +183,7 @@ async function callLLM(prompt, maxTokens = 800) {
   const json = await resp.json();
   if (!resp.ok) {
     const err = new Error(json.error?.message || 'deepseek error');
-    err.code = 502;
-    err.upstream = json;
+    err.code = 502; err.upstream = json;
     throw err;
   }
   return {

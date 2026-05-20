@@ -4,7 +4,9 @@ import { TwitterApi, ApiResponseError } from 'twitter-api-v2';
 
 const PORT = Number(process.env.PORT || 8081);
 const HOST = process.env.HOST || '0.0.0.0';
-const BEARER = process.env.TWITTER_BEARER_TOKEN || '';
+const BEARER     = process.env.TWITTER_BEARER_TOKEN || '';
+const TWAPI_KEY  = process.env.TWITTERAPI_IO_KEY || '';
+const TWAPI_BASE = 'https://api.twitterapi.io';
 
 const app = Fastify({ logger: { level: 'info' } });
 
@@ -12,11 +14,69 @@ await app.register(cors, {
   origin: true,
 });
 
+// ─── 双后端: 优先 TwitterAPI.io, 回落官方 X ────────────────────────────
+function hasTwapi() { return !!TWAPI_KEY && !TWAPI_KEY.startsWith('PLACEHOLDER'); }
+function hasX()     { return !!BEARER && !BEARER.startsWith('PLACEHOLDER'); }
+function provider() { return hasTwapi() ? 'twapi' : hasX() ? 'x' : null; }
+
+async function twapiGet(path, params) {
+  if (!hasTwapi()) {
+    const e = new Error('TWITTERAPI_IO_KEY not configured');
+    e.code = 503; throw e;
+  }
+  const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+  const r = await fetch(`${TWAPI_BASE}${path}${qs}`, {
+    headers: { 'X-API-Key': TWAPI_KEY, 'Accept': 'application/json' },
+  });
+  let j = {};
+  try { j = await r.json(); } catch {}
+  if (!r.ok) {
+    const e = new Error(j.msg || j.message || j.error || `twapi HTTP ${r.status}`);
+    e.code = r.status; e.upstream = j; throw e;
+  }
+  return j;
+}
+
+// 把 TwitterAPI.io 的 tweet 形状映射成我们前端期望的格式
+function normalizeTwapiTweet(t) {
+  if (!t || !t.id) return null;
+  let kind = 'original', refId = null;
+  const rt = t.retweeted_tweet || t.retweetedTweet;
+  const qt = t.quoted_tweet    || t.quotedTweet;
+  const inReply = t.in_reply_to_status_id || t.inReplyToId;
+  if (rt) { kind = 'retweet'; refId = rt.id || null; }
+  else if (qt) { kind = 'quote'; refId = qt.id || null; }
+  else if (inReply) { kind = 'reply'; refId = String(inReply); }
+  const uname = t.author?.userName || t.author?.username || '';
+  const name  = t.author?.name || '';
+  let createdISO = null;
+  if (t.createdAt || t.created_at) {
+    const dt = new Date(t.createdAt || t.created_at);
+    if (!isNaN(dt.getTime())) createdISO = dt.toISOString();
+  }
+  return {
+    id: String(t.id),
+    url: uname ? `https://x.com/${uname}/status/${t.id}` : `https://x.com/i/status/${t.id}`,
+    text: t.text || '',
+    lang: t.lang || null,
+    author: uname ? { username: uname, name } : null,
+    created_at: createdISO,
+    kind,
+    referenced_tweet_id: refId,
+    metrics: {
+      views:     t.viewCount     ?? t.view_count     ?? null,
+      likes:     t.likeCount     ?? t.like_count     ?? 0,
+      retweets:  t.retweetCount  ?? t.retweet_count  ?? 0,
+      replies:   t.replyCount    ?? t.reply_count    ?? 0,
+      quotes:    t.quoteCount    ?? t.quote_count    ?? 0,
+      bookmarks: t.bookmarkCount ?? t.bookmark_count ?? 0,
+    },
+  };
+}
+
 let xClient = null;
 function getClient() {
-  if (!BEARER || BEARER.startsWith('PLACEHOLDER')) {
-    throw new Error('TWITTER_BEARER_TOKEN not configured');
-  }
+  if (!hasX()) throw new Error('TWITTER_BEARER_TOKEN not configured');
   if (!xClient) xClient = new TwitterApi(BEARER).readOnly;
   return xClient;
 }
@@ -31,7 +91,9 @@ function extractTweetId(input) {
 
 app.get('/api/health', async () => ({
   ok: true,
-  hasToken: Boolean(BEARER) && !BEARER.startsWith('PLACEHOLDER'),
+  provider: provider() || 'none',
+  hasTwapi: hasTwapi(),
+  hasXBearer: hasX(),
   time: new Date().toISOString(),
 }));
 
@@ -210,20 +272,64 @@ app.post('/api/twitter/handle/:handle/recent', async (req, reply) => {
   if (!/^[A-Za-z0-9_]{1,15}$/.test(raw)) {
     return reply.code(400).send({ ok: false, error: 'invalid handle' });
   }
-  const hours = Math.min(Math.max(Number(req.body?.hours || 168), 1), 720); // 1h ~ 30d, default 168 = 7d
+  const hours = Math.min(Math.max(Number(req.body?.hours || 168), 1), 720);
   const startTime = new Date(Date.now() - hours * 3600 * 1000).toISOString();
+  const cutoffMs = Date.now() - hours * 3600e3;
 
+  // ── TwitterAPI.io 路 ──
+  if (hasTwapi()) {
+    try {
+      // 拉时间线 (cursor 分页), 直到出窗口或上限
+      const all = [];
+      let cursor = '';
+      let userInfo = null;
+      for (let page = 0; page < 5; page++) {
+        const j = await twapiGet('/twitter/user/last_tweets',
+          cursor ? { userName: raw, cursor } : { userName: raw });
+        // user info
+        if (!userInfo) userInfo = j.user || j.data?.user || null;
+        const arr = j.tweets || j.data?.tweets || j.data || [];
+        let crossedCutoff = false;
+        for (const t of arr) {
+          const ts = new Date(t.createdAt || t.created_at).getTime();
+          if (isNaN(ts)) continue;
+          if (ts < cutoffMs) { crossedCutoff = true; break; }
+          all.push(t);
+        }
+        if (crossedCutoff) break;
+        if (all.length >= 100) break;
+        cursor = j.next_cursor || j.cursor || '';
+        if (!cursor || !j.has_next_page) break;
+      }
+      const tweets = all.map(normalizeTwapiTweet).filter(Boolean);
+      const u = userInfo
+        ? { id: userInfo.id || '', username: userInfo.userName || userInfo.username || raw, name: userInfo.name || '' }
+        : { id: '', username: raw, name: '' };
+      return {
+        ok: true,
+        provider: 'twapi',
+        handle: '@' + (u.username || raw),
+        user: u,
+        window: { hours, start_time: startTime, end_time: new Date().toISOString() },
+        pulled: tweets.length,
+        tweets,
+        rate_limit: { remaining: null, reset: null, limit: null },
+      };
+    } catch (err) {
+      return reply.code(err.code === 429 ? 429 : err.code === 401 ? 401 : err.code === 404 ? 404 : 502).send({
+        ok: false, error: err.message, upstream: err.upstream,
+      });
+    }
+  }
+
+  // ── 官方 X API fallback ──
   let client;
   try { client = getClient(); }
   catch (e) { return reply.code(503).send({ ok: false, error: e.message }); }
-
   try {
-    // 1. handle → user_id
     const user = await client.v2.userByUsername(raw, { 'user.fields': ['username', 'name', 'public_metrics'] });
     if (!user?.data) return reply.code(404).send({ ok: false, error: 'X user not found' });
     const u = user.data;
-
-    // 2. 拉时间线 (max 100, start_time = 7 天前)
     const tl = await client.v2.userTimeline(u.id, {
       max_results: 100,
       start_time: startTime,
@@ -231,7 +337,6 @@ app.post('/api/twitter/handle/:handle/recent', async (req, reply) => {
       expansions:    ['referenced_tweets.id', 'author_id'],
       'user.fields': ['username', 'name'],
     });
-
     const tweets = (tl.data?.data || []).map(t => ({
       id: t.id,
       url: `https://x.com/${u.username}/status/${t.id}`,
@@ -250,28 +355,22 @@ app.post('/api/twitter/handle/:handle/recent', async (req, reply) => {
         bookmarks: t.public_metrics?.bookmark_count ?? 0,
       },
     }));
-
-    // rate limit 透传给前端
     const meta = tl._rateLimit || {};
     reply.header('x-x-rate-remaining', meta.remaining ?? '');
     reply.header('x-x-rate-reset', meta.reset ?? '');
-
     return {
-      ok: true,
+      ok: true, provider: 'x',
       handle: '@' + u.username,
       user: { id: u.id, username: u.username, name: u.name },
       window: { hours, start_time: startTime, end_time: new Date().toISOString() },
-      pulled: tweets.length,
-      tweets,
+      pulled: tweets.length, tweets,
       rate_limit: { remaining: meta.remaining, reset: meta.reset, limit: meta.limit },
     };
   } catch (err) {
     if (err instanceof ApiResponseError) {
       const code = err.code || 500;
       return reply.code(code === 429 ? 429 : code === 401 ? 401 : 502).send({
-        ok: false,
-        error: err.data?.detail || err.message || 'twitter api error',
-        twitterCode: code,
+        ok: false, error: err.data?.detail || err.message || 'twitter api error', twitterCode: code,
       });
     }
     req.log.error(err);
@@ -285,11 +384,42 @@ app.post('/api/twitter/list/:listId/members', async (req, reply) => {
   if (!/^\d{1,25}$/.test(listId)) {
     return reply.code(400).send({ ok: false, error: 'invalid list id' });
   }
+  const HARD_CAP = 2000;
+
+  // ── TwitterAPI.io 路 ──
+  if (hasTwapi()) {
+    try {
+      const members = [];
+      let cursor = '';
+      for (let page = 0; page < 20; page++) {
+        const j = await twapiGet('/twitter/list/members', cursor ? { listId, cursor } : { listId });
+        const arr = j.users || j.members || j.data?.users || [];
+        for (const u of arr) {
+          members.push({
+            id: String(u.id || ''),
+            username: u.userName || u.username || '',
+            name: u.name || '',
+            bio: u.description || u.bio || null,
+            followers: u.followers ?? u.followers_count ?? null,
+          });
+          if (members.length >= HARD_CAP) break;
+        }
+        if (members.length >= HARD_CAP) break;
+        cursor = j.next_cursor || j.cursor || '';
+        if (!cursor || !j.has_next_page) break;
+      }
+      return { ok: true, list_id: listId, count: members.length, members, provider: 'twapi' };
+    } catch (err) {
+      return reply.code(err.code === 429 ? 429 : err.code === 401 ? 401 : err.code === 404 ? 404 : 502).send({
+        ok: false, error: err.message, upstream: err.upstream,
+      });
+    }
+  }
+
+  // ── 官方 X API 路 (旧 fallback) ──
   let client;
   try { client = getClient(); }
   catch (e) { return reply.code(503).send({ ok: false, error: e.message }); }
-
-  const HARD_CAP = 2000;
   try {
     const paginator = await client.v2.listMembers(listId, {
       max_results: 100,
@@ -306,14 +436,12 @@ app.post('/api/twitter/list/:listId/members', async (req, reply) => {
       });
       if (members.length >= HARD_CAP) break;
     }
-    return { ok: true, list_id: listId, count: members.length, members };
+    return { ok: true, list_id: listId, count: members.length, members, provider: 'x' };
   } catch (err) {
     if (err instanceof ApiResponseError) {
       const code = err.code || 500;
       return reply.code(code === 429 ? 429 : code === 401 ? 401 : code === 404 ? 404 : 502).send({
-        ok: false,
-        error: err.data?.detail || err.message || 'twitter api error',
-        twitterCode: code,
+        ok: false, error: err.data?.detail || err.message || 'twitter api error', twitterCode: code,
       });
     }
     req.log.error(err);
@@ -322,19 +450,28 @@ app.post('/api/twitter/list/:listId/members', async (req, reply) => {
 });
 
 app.post('/api/twitter/tweet', async (req, reply) => {
-  const body = req.body || {};
-  const id = extractTweetId(body.url || body.id);
-  if (!id) {
-    return reply.code(400).send({ ok: false, error: 'invalid tweet URL or id' });
+  const id = extractTweetId(req.body?.url || req.body?.id);
+  if (!id) return reply.code(400).send({ ok: false, error: 'invalid tweet URL or id' });
+
+  // ── TwitterAPI.io 路 ──
+  if (hasTwapi()) {
+    try {
+      const j = await twapiGet('/twitter/tweets', { tweet_ids: id });
+      const arr = j.tweets || j.data || [];
+      const t = normalizeTwapiTweet(arr[0]);
+      if (!t) return reply.code(404).send({ ok: false, error: 'tweet not found' });
+      return { ok: true, tweet: t, provider: 'twapi' };
+    } catch (err) {
+      return reply.code(err.code === 429 ? 429 : err.code === 401 ? 401 : 502).send({
+        ok: false, error: err.message, upstream: err.upstream,
+      });
+    }
   }
 
+  // ── 官方 X API fallback ──
   let client;
-  try {
-    client = getClient();
-  } catch (e) {
-    return reply.code(503).send({ ok: false, error: e.message });
-  }
-
+  try { client = getClient(); }
+  catch (e) { return reply.code(503).send({ ok: false, error: e.message }); }
   try {
     const { data: t, includes } = await client.v2.singleTweet(id, {
       'tweet.fields': ['public_metrics', 'created_at', 'author_id', 'text'],
@@ -342,17 +479,18 @@ app.post('/api/twitter/tweet', async (req, reply) => {
       'user.fields': ['username', 'name'],
     });
     if (!t) return reply.code(404).send({ ok: false, error: 'tweet not found' });
-
     const author = includes?.users?.[0];
     const m = t.public_metrics || {};
     return {
       ok: true,
+      provider: 'x',
       tweet: {
         id: t.id,
         url: author ? `https://x.com/${author.username}/status/${t.id}` : `https://x.com/i/status/${t.id}`,
         text: t.text,
         author: author ? { username: author.username, name: author.name } : null,
         created_at: t.created_at,
+        kind: 'original',
         metrics: {
           views: m.impression_count ?? null,
           likes: m.like_count ?? 0,
@@ -367,9 +505,7 @@ app.post('/api/twitter/tweet', async (req, reply) => {
     if (err instanceof ApiResponseError) {
       const code = err.code || 500;
       return reply.code(code === 429 ? 429 : code === 401 ? 401 : 502).send({
-        ok: false,
-        error: err.data?.detail || err.message || 'twitter api error',
-        twitterCode: code,
+        ok: false, error: err.data?.detail || err.message || 'twitter api error', twitterCode: code,
       });
     }
     req.log.error(err);

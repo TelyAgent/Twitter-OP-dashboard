@@ -169,7 +169,6 @@
 <label style="font-size:11px;color:var(--color-text-secondary);display:inline-flex;align-items:center;gap:4px;margin-right:6px">
   <input type="checkbox" id="filter-pm-only" style="margin:0"> 仅 PM 相关 (★★+)
 </label>
-<button class="btn-ghost" id="btn-manual-add">+ 手动添加</button>
 <button class="btn-ghost" id="btn-bulk-import" style="background:#EEEDFE;color:#3C3489;border-color:#CECBF6">↥ 批量导入</button>
 </div>
 </div>
@@ -476,7 +475,7 @@ theblock.co
     const visible = applyFilters();
     const tbody = document.getElementById('sources-tbody');
     if (visible.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--color-text-tertiary);font-size: 12px">${rows.length === 0 ? '暂无监控源 · 用右上「+ 手动添加」或「↥ 批量导入」' : `当前过滤无匹配 (共 ${rows.length} 条)`}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--color-text-tertiary);font-size: 12px">${rows.length === 0 ? '暂无监控源 · 用右上「↥ 批量导入」' : `当前过滤无匹配 (共 ${rows.length} 条)`}</td></tr>`;
     } else {
       tbody.innerHTML = visible.map(renderSourceRow).join('');
     }
@@ -499,7 +498,7 @@ theblock.co
   }
 
   function setWriteButtonsEnabled(enabled, reason) {
-    ['btn-manual-add', 'btn-bulk-import'].forEach(id => {
+    ['btn-bulk-import'].forEach(id => {
       const b = document.getElementById(id);
       if (!b) return;
       b.disabled = !enabled;

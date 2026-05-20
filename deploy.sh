@@ -66,7 +66,7 @@ rsync -az -e "$SSH_CMD" \
   "$LOCAL_PREVIEW" "$REMOTE:$REMOTE_DIR/preview.html"
 
 echo "→ rsync $LOCAL_FACTORY_DIR/ (只传 diff)"
-rsync -az --delete --info=stats0,name1 -e "$SSH_CMD" \
+rsync -az --delete -e "$SSH_CMD" \
   --include='*.html' --include='*.css' --exclude='*' \
   "$LOCAL_FACTORY_DIR/" "$REMOTE:$REMOTE_DIR/$LOCAL_FACTORY_DIR/"
 

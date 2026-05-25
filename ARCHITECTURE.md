@@ -6,7 +6,7 @@
 
 ```
 本地机器
-├── node serve.js :8080              ← 静态服务 + 读 .env → 注入 /env.js
+├── node src/serve.js :8080          ← 静态服务 + 读 .env → 注入 /env.js
 ├── OpenCLI Chrome 插件 + Daemon :19825 ← Twitter 数据抓取（复用浏览器登录态）
 │
 远程依赖（仅 2 个）
@@ -18,7 +18,7 @@
 
 ```
 config.js                  ← window.PALLAX_CONFIG: SUPABASE_URL, SUPABASE_KEY
-serve.js                   ← Node 静态服务，读 .env，响应 /env.js
+src/serve.js               ← Node 静态服务，读 .env，响应 /env.js
 .env.example               ← DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL 模板
 .env                       ← 真实 key（gitignored）
 
@@ -225,7 +225,7 @@ localStorage 离线优先
 cp .env.example .env
 # 编辑 .env 填入 DeepSeek API key
 
-node serve.js
+node src/serve.js
 # → http://localhost:8080
 ```
 

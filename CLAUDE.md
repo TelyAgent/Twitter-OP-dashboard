@@ -54,7 +54,7 @@
 cp .env.example .env
 
 # 启动（serve 自动读取 .env）
-node serve.js
+node src/serve.js
 # → http://localhost:8080
 ```
 
@@ -218,7 +218,7 @@ drop view if exists v_source_contribution;
 
 ### Phase 6：Serve 脚本 + .env
 
-`serve.js`（极简静态服务，读取 `.env`）：
+`src/serve.js`（极简静态服务，读取 `.env`）：
 ```js
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';

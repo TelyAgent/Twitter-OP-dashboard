@@ -70,14 +70,17 @@ createServer(async (req, res) => {
         return;
       } else if (sub === '/api/twitter/user-timeline') {
         var h = url.searchParams.get('handle') || '';
-        var hrs = url.searchParams.get('hours') || '168';
-        args = ['twitter', 'user-timeline', '--handle', h, '--hours', hrs, '--format', 'json'];
+        args = ['twitter', 'tweets', h, '--limit', '100', '--format', 'json'];
       } else if (sub === '/api/twitter/tweet') {
-        args = ['twitter', 'tweet', '--url', url.searchParams.get('url') || '', '--format', 'json'];
+        var tweetUrl = url.searchParams.get('url') || '';
+        // Extract username from URL, get recent tweets, client will filter by id
+        var m = tweetUrl.match(/(?:x\.com|twitter\.com)\/([^/]+)/i);
+        var user = m ? m[1] : '';
+        args = ['twitter', 'tweets', user, '--limit', '100', '--format', 'json'];
       } else if (sub === '/api/twitter/list-members') {
-        args = ['twitter', 'list-members', '--list-id', url.searchParams.get('listId') || '', '--format', 'json'];
+        var lid = url.searchParams.get('listId') || '';
+        args = ['twitter', 'list-tweets', lid, '--limit', '200', '--format', 'json'];
       } else if (sub === '/exec') {
-        // Direct command execution (already shell-escaped by provider.js)
         var cmd = url.searchParams.get('cmd') || '';
         args = cmd.split(' ');
       } else {

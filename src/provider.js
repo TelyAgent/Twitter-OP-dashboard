@@ -48,32 +48,37 @@
   }
 
   // ─── Tweet normalization ───────────────────────────────────────
+  // Handles both OpenCLI flat format ({author:"x",likes:5,...}) and
+  // legacy nested format ({author:{username:"x"},metrics:{likes:5},...})
+
   function normalizeTweet(t) {
     if (!t) return null;
-    var author = t.author || {};
-    var metrics = t.metrics || {};
+    // OpenCLI: author is a string, metrics are flat on t
+    var isOpenCLI = typeof t.author === 'string';
     return {
       id: t.id || t.tweet_id || '',
-      url: t.url || (author.username || author.userName
-        ? 'https://x.com/' + (author.username || author.userName) + '/status/' + (t.id || '')
-        : ''),
+      url: t.url || (isOpenCLI
+        ? 'https://x.com/' + t.author + '/status/' + t.id
+        : (t.author && (t.author.username || t.author.userName)
+          ? 'https://x.com/' + (t.author.username || t.author.userName) + '/status/' + t.id
+          : '')),
       text: t.text || '',
-      author: {
-        username: author.username || author.userName || author.screen_name || '',
-        name: author.name || author.display_name || '',
-      },
+      author: isOpenCLI
+        ? { username: t.author || '', name: t.name || '' }
+        : { username: (t.author && (t.author.username || t.author.userName || t.author.screen_name)) || '',
+            name: (t.author && (t.author.name || t.author.display_name)) || '' },
       created_at: t.created_at || t.createdAt || t.created || '',
       kind: t.kind || (t.is_retweet || t.isRetweet ? 'retweet'
         : (t.is_quote || t.isQuote ? 'quote'
         : (t.is_reply || t.isReply ? 'reply' : 'original'))),
-      metrics: {
-        views:     metrics.views     ?? metrics.impression_count ?? metrics.viewCount ?? 0,
-        likes:     metrics.likes     ?? metrics.like_count      ?? metrics.likeCount  ?? 0,
-        retweets:  metrics.retweets  ?? metrics.retweet_count   ?? metrics.retweetCount ?? 0,
-        replies:   metrics.replies   ?? metrics.reply_count     ?? metrics.replyCount   ?? 0,
-        quotes:    metrics.quotes    ?? metrics.quote_count     ?? metrics.quoteCount   ?? 0,
-        bookmarks: metrics.bookmarks ?? metrics.bookmark_count  ?? metrics.bookmarkCount ?? 0,
-      },
+      metrics: isOpenCLI
+        ? { views: t.views || 0, likes: t.likes || 0, retweets: t.retweets || 0, replies: t.replies || 0, quotes: 0, bookmarks: t.bookmarks || 0 }
+        : { views: (t.metrics && t.metrics.views) || (t.metrics && t.metrics.impression_count) || (t.metrics && t.metrics.viewCount) || 0,
+            likes: (t.metrics && t.metrics.likes) || (t.metrics && t.metrics.like_count) || (t.metrics && t.metrics.likeCount) || 0,
+            retweets: (t.metrics && t.metrics.retweets) || (t.metrics && t.metrics.retweet_count) || (t.metrics && t.metrics.retweetCount) || 0,
+            replies: (t.metrics && t.metrics.replies) || (t.metrics && t.metrics.reply_count) || (t.metrics && t.metrics.replyCount) || 0,
+            quotes: (t.metrics && t.metrics.quotes) || (t.metrics && t.metrics.quote_count) || (t.metrics && t.metrics.quoteCount) || 0,
+            bookmarks: (t.metrics && t.metrics.bookmarks) || (t.metrics && t.metrics.bookmark_count) || (t.metrics && t.metrics.bookmarkCount) || 0 },
     };
   }
 

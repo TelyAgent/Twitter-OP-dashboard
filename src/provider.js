@@ -29,16 +29,20 @@
   }
 
   // ─── HTTP client ───────────────────────────────────────────────
-  async function opencli(path, params) {
-    var url = new URL(path, OPENCLI_BASE);
+  function buildUrl(path, params) {
+    var qs = [];
     if (params) {
       var keys = Object.keys(params);
       for (var i = 0; i < keys.length; i++) {
         var k = keys[i], v = params[k];
-        if (v != null) url.searchParams.set(k, String(v));
+        if (v != null) qs.push(encodeURIComponent(k) + '=' + encodeURIComponent(v));
       }
     }
-    var res = await fetch(url.toString());
+    return OPENCLI_BASE + path + (qs.length ? '?' + qs.join('&') : '');
+  }
+
+  async function opencli(path, params) {
+    var res = await fetch(buildUrl(path, params));
     if (!res.ok) {
       var err = '';
       try { err = await res.text(); } catch (_) {}

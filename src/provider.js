@@ -75,6 +75,8 @@
       kind: t.kind || (t.is_retweet || t.isRetweet ? 'retweet'
         : (t.is_quote || t.isQuote ? 'quote'
         : (t.is_reply || t.isReply ? 'reply' : 'original'))),
+      has_media: t.has_media || (t.media_urls && t.media_urls.length > 0) || false,
+      media_urls: t.media_urls || [],
       metrics: isOpenCLI
         ? { views: t.views || 0, likes: t.likes || 0, retweets: t.retweets || 0, replies: t.replies || 0, quotes: 0, bookmarks: t.bookmarks || 0 }
         : { views: (t.metrics && t.metrics.views) || (t.metrics && t.metrics.impression_count) || (t.metrics && t.metrics.viewCount) || 0,

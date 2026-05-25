@@ -98,13 +98,15 @@
     await ensureAvailable();
     try {
       var data = await opencli('/api/twitter/user-timeline', { handle: raw, hours: hours });
-      return (data.tweets || []).map(normalizeTweet).filter(Boolean);
+      var tweets = Array.isArray(data) ? data : (data.tweets || data.result || []);
+      return tweets.map(normalizeTweet).filter(Boolean);
     } catch (e) {
       console.warn('[provider] primary fetchTweetsByHandle failed, trying fallback:', e.message);
-      var data = await opencli('/exec', {
+      var data2 = await opencli('/exec', {
         cmd: 'twitter user-timeline --handle ' + shellArg(raw) + ' --hours ' + shellArg(hours) + ' --format json',
       });
-      return (data.result || data.tweets || []).map(normalizeTweet).filter(Boolean);
+      var tweets2 = Array.isArray(data2) ? data2 : (data2.result || data2.tweets || []);
+      return tweets2.map(normalizeTweet).filter(Boolean);
     }
   }
 
@@ -114,13 +116,15 @@
     await ensureAvailable();
     try {
       var data = await opencli('/api/twitter/tweet', { url: input });
-      return normalizeTweet(data.tweet || data);
+      var t = Array.isArray(data) ? data[0] : (data.tweet || data);
+      return normalizeTweet(t);
     } catch (e) {
       console.warn('[provider] primary fetchSingleTweet failed, trying fallback:', e.message);
-      var data = await opencli('/exec', {
+      var data2 = await opencli('/exec', {
         cmd: 'twitter tweet --url ' + shellArg(input) + ' --format json',
       });
-      return normalizeTweet(data.result || data.tweet || data);
+      var t2 = Array.isArray(data2) ? data2[0] : (data2.result || data2.tweet || data2);
+      return normalizeTweet(t2);
     }
   }
 

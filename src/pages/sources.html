@@ -379,16 +379,7 @@ theblock.co
   let currentSession = null; // session
   let currentProfile = null; // user_profiles 一行
 
-  // 表内 mock 数据 (兜底 · 没登录 / DB 空时使用)
-  const MOCK_SOURCES = [
-    { id:'mock1', type:'twitter', handle:'@JimGCryptos',      name:'A 赔率 · 链上分析师', status:'live',    uploader:{initials:'LR', display_name:'Lareina', avatar_color:''},   metrics_4w:{hits:14, spark:[10,13,15,18], fire:3, note:'avg'}, added_ago:'3 月前' },
-    { id:'mock2', type:'twitter', handle:'@OnchainBob',       name:'C 链上 · 钱包追踪',  status:'live',    uploader:{initials:'KA', display_name:'Kay',    avatar_color:'r1'},  metrics_4w:{hits:11, spark:[9,11,14,14], fire:2}, added_ago:'2 月前' },
-    { id:'mock3', type:'twitter', handle:'@HayesEconomics',   name:'A 赔率 · 宏观',      status:'live',    uploader:{initials:'JY', display_name:'Jay',    avatar_color:'r2'},  metrics_4w:{hits:9,  spark:[11,10,11,12], fire:1}, added_ago:'5 周前' },
-    { id:'mock4', type:'twitter', handle:'@PolymarketPro',    name:'D 新合约 · 官方账号', status:'live',    uploader:{initials:'LR', display_name:'Lareina', avatar_color:''},   metrics_4w:{hits:7,  spark:[7,9,11,13],   fire:1}, added_ago:'6 周前' },
-    { id:'mock5', type:'twitter', handle:'@SmartKalshi',      name:'A 赔率 · Kalshi 玩家', status:'observe', uploader:{initials:'VL', display_name:'Valeria', avatar_color:'r3'}, metrics_4w:{hits:3,  spark:[13,9,7,5],    fire:0}, added_ago:'3 周前' },
-    { id:'mock6', type:'twitter', handle:'@CryptoTrendz2023', name:'综合 · 通用账号',    status:'retired', uploader:{initials:'LR', display_name:'Lareina', avatar_color:''},   metrics_4w:{hits:0,  spark:[3,2,2,2],     fire:0, note:'5 周无新推'}, added_ago:'7 月前' },
-    { id:'mock7', type:'twitter', handle:'@PunditGuru99',     name:'E 现实 · 误报率高',  status:'retired', uploader:{initials:'KA', display_name:'Kay',    avatar_color:'r1'},  metrics_4w:{hits:2,  spark:[5,3,2,2],     fire:0, false_rate:0.78}, added_ago:'4 月前' },
-  ];
+  // No mock — always read from DB (anon RLS)
 
   function ago(ts){
     if (!ts) return '刚刚';
@@ -515,20 +506,15 @@ theblock.co
 
   async function bootstrap(){
     setWriteButtonsEnabled(false, '加载中…');
-
-    // Always try DB (anon RLS allows public access — no login needed)
     const rows = await loadSourcesFromDB();
-    if (rows !== null) {
-      dbReady = true;
-      renderTable(rows);
-      const muted = document.querySelector('.page-header .right .muted');
-      if (muted) muted.textContent = '☁ 已同步 · ' + rows.length + ' 条';
+    dbReady = rows !== null;
+    renderTable(rows || []);
+    var muted = document.querySelector('.page-header .right .muted');
+    if (dbReady) {
+      if (muted) muted.textContent = '☁ 已同步 · ' + (rows || []).length + ' 条';
       setWriteButtonsEnabled(true);
     } else {
-      renderTable(MOCK_SOURCES);
-      setWriteButtonsEnabled(false, 'DB 读取失败，无法写入（请检查 Supabase 连接）');
-      const muted = document.querySelector('.page-header .right .muted');
-      if (muted) muted.innerHTML = '⚠ DB 读取失败 · 当前数据为 mock · 写入已禁用';
+      if (muted) muted.innerHTML = '⚠ DB 连接失败 · 请检查 Supabase';
     }
   }
 

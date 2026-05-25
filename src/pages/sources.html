@@ -563,14 +563,16 @@ theblock.co
     }
     const av = document.querySelector('.page-header .avatar');
     const init = av ? av.textContent.trim() : 'LR';
-    const MAP = {
+    // Local user ID for anon inserts (Supabase anon RLS)
+    var localId = 'local_' + (init || 'anon');
+    var MAP = {
       LR: { name: 'Lareina', role: 'Owner', color: '' },
       KA: { name: 'Kay',     role: 'Researcher', color: 'r1' },
       JY: { name: 'Jay',     role: 'Researcher', color: 'r2' },
       VL: { name: 'Valeria', role: 'Researcher', color: 'r3' },
     };
-    const meta = MAP[init] || { name: init, role: '', color: '' };
-    return { id: null, init, ...meta };
+    var meta = MAP[init] || { name: init || 'anon', role: '', color: '' };
+    return { id: localId, init: init || '?', name: meta.name, role: meta.role, color: meta.color };
   }
   const uAv = document.getElementById('bulk-uploader-av');
   const uName = document.getElementById('bulk-uploader-name');
@@ -749,7 +751,7 @@ theblock.co
     let ok = 0;
 
     const u = getCurrentUser();
-    if (dbReady && u.id) {
+    if (dbReady) {
       // ─── DB 模式: 真插入 sources 表 ──────────────────────────
       const payload = fresh.map(r => ({
         id: 'src_' + (crypto.randomUUID ? crypto.randomUUID().slice(0,8) : Math.random().toString(36).slice(2,10)),
@@ -757,10 +759,10 @@ theblock.co
         handle: r.handle,
         name: r.bio || null,
         status: 'observe',
-        uploader_id: u.id,
         metrics_4w: { hits:0, spark:[3,3,3,3], fire:0 },
+        // uploader_id omitted (anon RLS, no auth system)
       }));
-      progressEl.textContent = `写入 DB ${fresh.length} 条…`;
+      progressEl.textContent = '写入 DB ' + fresh.length + ' 条…';
       const { data, error } = await sb.from('sources').insert(payload).select('*, uploader:user_profiles!sources_uploader_id_fkey(initials,display_name,avatar_color)');
       if (error) {
         progressEl.textContent = '✕ DB 写入失败: ' + error.message.slice(0, 60);

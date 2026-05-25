@@ -1,9 +1,9 @@
 // src/provider.js — data sourcing abstraction (replaces Twitter API proxy).
 // Load via <script src="src/provider.js">, exposes window.Provider.
-// Uses OpenCLI Chrome Extension daemon at localhost:19825.
+// Uses OpenCLI Chrome Extension via serve.js proxy (/api/opencli → localhost:19825).
 
 (function () {
-  const OPENCLI_BASE = 'http://localhost:19825';
+  const OPENCLI_BASE = '/api/opencli';   // proxied by serve.js (avoids CORS)
 
   // ─── Input validation ──────────────────────────────────────────
   var HANDLE_RE = /^[A-Za-z0-9_]{1,15}$/;
@@ -80,7 +80,7 @@
   // ─── Data fetching with availability gate ──────────────────────
   async function ensureAvailable() {
     var ok = await isAvailable();
-    if (!ok) throw new Error('OpenCLI daemon not running at ' + OPENCLI_BASE);
+    if (!ok) throw new Error('OpenCLI daemon not running — install the Chrome extension');
   }
 
   async function fetchTweetsByHandle(handle, hours) {

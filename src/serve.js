@@ -58,6 +58,20 @@ createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const path = url.pathname;
 
+  // /api/opencli/* — proxy to OpenCLI daemon (avoids CORS)
+  if (path.startsWith('/api/opencli/')) {
+    try {
+      const target = 'http://localhost:19825' + path.replace('/api/opencli', '') + (url.search || '');
+      const proxy = await fetch(target);
+      res.writeHead(proxy.status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(await proxy.text());
+    } catch {
+      res.writeHead(502);
+      res.end(JSON.stringify({ error: 'OpenCLI daemon not reachable at localhost:19825' }));
+    }
+    return;
+  }
+
   // /config.js — inject all runtime config into browser
   if (path === '/config.js') {
     res.writeHead(200, { 'Content-Type': 'application/javascript' });

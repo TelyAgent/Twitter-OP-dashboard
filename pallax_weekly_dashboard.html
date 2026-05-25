@@ -689,10 +689,10 @@ details.wr-collapsible[open] summary { color: var(--ink-2); margin-bottom: 8px; 
 </div>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
 <script>
 (function() {
-  const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
+  const { SUPABASE_URL, SUPABASE_KEY } = window.PALLAX_CONFIG;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   let currentUser = null;
 

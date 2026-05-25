@@ -6,6 +6,7 @@
 <title>监控源 list · Pallax 内容工厂</title>
 <link rel="stylesheet" href="styles.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../config.js"></script>
 <style>
 
 .config-nav-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--border-radius-md);font-size:12px;color:var(--color-text-secondary);cursor:pointer;margin-bottom:2px;}
@@ -370,8 +371,7 @@ theblock.co
 <script>
 (function(){
   // ─── Supabase 客户端 (跟 weekly_dashboard 共用同一项目) ───────────────
-  const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
+  const { SUPABASE_URL, SUPABASE_KEY } = window.PALLAX_CONFIG;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   let dbReady = false;       // 是否真连上 DB 并有会话
   let currentSession = null; // session
@@ -734,7 +734,7 @@ theblock.co
     msgXList.textContent = '调 X API…';
     msgXList.style.color = 'var(--color-text-tertiary)';
     try {
-      const API_BASE = `http://${location.hostname}:8081`;
+      const { API_BASE } = window.PALLAX_CONFIG;
       const r = await fetch(`${API_BASE}/api/twitter/list/${encodeURIComponent(m[1])}/members`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -875,9 +875,8 @@ theblock.co
 
 // ====== ↻ 同步: 拉 @handle 近 7 天 → 聚类 → cluster hotspot (RPC) + 🔥 爆款 feed ======
 (function(){
-  const API_BASE = `http://${location.hostname}:8081`;
-  const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
+  const { API_BASE } = window.PALLAX_CONFIG;
+  const { SUPABASE_URL, SUPABASE_KEY } = window.PALLAX_CONFIG;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   const SYNC_HOURS = 168;             // 7 天
   const CLUSTER_WINDOW_MS = 4 * 3600e3; // 4h 聚类窗口
@@ -1384,9 +1383,8 @@ theblock.co
 
 // ====== PM 相关度: 工具函数 (导入时自动调用) + 过滤芯片 ======
 (function(){
-  const API_BASE = `http://${location.hostname}:8081`;
-  const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
+  const { API_BASE } = window.PALLAX_CONFIG;
+  const { SUPABASE_URL, SUPABASE_KEY } = window.PALLAX_CONFIG;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   const SYNC_HOURS = 168;
 
@@ -1453,8 +1451,7 @@ theblock.co
 
 // ====== 内联 live / retired / ✕ 直接改 status / 删除 (✕ 锚定式 popover 确认) ======
 (function(){
-  const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
+  const { SUPABASE_URL, SUPABASE_KEY } = window.PALLAX_CONFIG;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   // 点 .kol-handle 文本 → 就地变 input → blur/Enter 保存 → Esc 取消
@@ -1588,8 +1585,7 @@ theblock.co
 
 // ====== ↻ 批量同步 PM 相关源 (★★+) ======
 (function(){
-  const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
+  const { SUPABASE_URL, SUPABASE_KEY } = window.PALLAX_CONFIG;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   const PM_THRESHOLD = 0.4;  // ★★+ 才算 PM 相关

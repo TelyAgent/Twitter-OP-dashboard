@@ -1,0 +1,10 @@
+{
+  "name": "pallax-op-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Static frontend + Twitter proxy Functions deployed to Vercel.",
+  "dependencies": {
+    "twitter-api-v2": "^1.18.0"
+  }
+}

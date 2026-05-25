@@ -6,6 +6,7 @@
 <title>热点雷达 · Pallax 内容工厂</title>
 <link rel="stylesheet" href="styles.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../config.js"></script>
 <style>
 
 #rd-pool::-webkit-scrollbar{width:6px;}
@@ -333,8 +334,7 @@
 
 <script>
 (function(){
-  const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
+  const { SUPABASE_URL, SUPABASE_KEY } = window.PALLAX_CONFIG;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   const CAT_LABEL = { A:'A 赔率', C:'C 链上', D:'D 新合约', E:'E 现实' };

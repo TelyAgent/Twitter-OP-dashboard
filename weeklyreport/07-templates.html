@@ -6,6 +6,7 @@
 <title>金模板库 · Pallax 内容工厂</title>
 <link rel="stylesheet" href="styles.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../config.js"></script>
 <style>
 
 .config-nav-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--border-radius-md);font-size:12px;color:var(--color-text-secondary);cursor:pointer;margin-bottom:2px;}
@@ -682,9 +683,8 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
 
 // ====== 记录使用 (real backend: pallax-api + Supabase template_uses) ======
 (function(){
-  const API_BASE = `http://${location.hostname}:8081`;
-  const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
+  const { API_BASE } = window.PALLAX_CONFIG;
+  const { SUPABASE_URL, SUPABASE_KEY } = window.PALLAX_CONFIG;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   const el = (id) => document.getElementById(id);
@@ -837,8 +837,7 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
 
 // ====== 🔥 爆款推文池 · 按 7 角度分类 ======
 (function(){
-  const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
+  const { SUPABASE_URL, SUPABASE_KEY } = window.PALLAX_CONFIG;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   // 跟 08-sources / 02-radar 同一份角度分类启发式

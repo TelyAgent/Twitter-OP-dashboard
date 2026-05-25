@@ -94,10 +94,10 @@ createServer(async (req, res) => {
         res.writeHead(400); res.end(JSON.stringify({ error: 'unknown endpoint: ' + sub })); return;
       }
 
-      const cmd = 'opencli ' + args.join(' ');
-      log(req.method, path, '…', cmd);
+      const cliCmd = 'opencli ' + args.join(' ');
+      log(req.method, path, '…', cliCmd);
       const { execSync } = await import('node:child_process');
-      const result = execSync(cmd, {
+      const result = execSync(cliCmd, {
         timeout: 30000, maxBuffer: 10 * 1024 * 1024, encoding: 'utf-8',
       });
       var count = 1;

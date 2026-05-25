@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Local-first ops dashboard. Static HTML + Supabase + DeepSeek AI + OpenCLI.",
   "scripts": {
-    "start": "node src/serve.js",
+    "start": "pkill -f 'node.*serve' 2>/dev/null; sleep 1; node src/serve.js",
     "db": "node scripts/db.js"
   }
 }

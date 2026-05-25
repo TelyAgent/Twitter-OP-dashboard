@@ -15,11 +15,11 @@
 ## 文件层级
 
 ```
-config.js / styles.css / .env.example ← 配置 + 共享样式（根目录）
+.env.example                          ← 环境变量模板（根目录）
 ARCHITECTURE.md / CLAUDE.md           ← 文档（根目录）
 
 src/
-├── serve.js                          ← Node 静态服务，零依赖
+├── serve.js                          ← Node 静态服务，读 .env → /config.js
 ├── provider.js                       ← window.Provider: 数据抓取（OpenCLI）
 ├── content-ops.js                    ← window.ContentOps: 启发式分析（纯函数）
 ├── ai/
@@ -41,19 +41,19 @@ src/
 ## 页面依赖
 
 ```
-dashboard.html:  supabase-js, chart.js, config.js
-preview.html:    supabase-js, chart.js, config.js
-radar.html:      supabase-js, config.js, /env.js, content-ops.js, ai/client.js, ai/pipeline.js
-templates.html:  supabase-js, config.js, /env.js, content-ops.js, ai/client.js, ai/pipeline.js, provider.js
-sources.html:    supabase-js, config.js, content-ops.js, provider.js
+dashboard.html:  supabase-js, chart.js, /config.js
+preview.html:    supabase-js, chart.js, /config.js
+radar.html:      supabase-js, /config.js, content-ops.js, ai/client.js, ai/pipeline.js
+templates.html:  supabase-js, /config.js, content-ops.js, ai/client.js, ai/pipeline.js, provider.js
+sources.html:    supabase-js, /config.js, content-ops.js, provider.js
 ```
 
-加载顺序：`config.js → /env.js → content-ops.js → ai/client.js → ai/pipeline.js → provider.js`
+加载顺序：`/config.js → content-ops.js → ai/client.js → ai/pipeline.js → provider.js`
 
 ## 模块
 
 ### serve.js
-Node 内置 HTTP 模块，读 `.env` → `/env.js`（注入 `window.DEEPSEEK_CONFIG`），`/` → `src/pages/dashboard.html`。
+Node 内置 HTTP 模块，读 `.env` → `/config.js`（注入 `window.PALLAX_CONFIG` + `window.DEEPSEEK_CONFIG`），`/` → `src/pages/dashboard.html`。
 
 ### provider.js → `window.Provider`
 

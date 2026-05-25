@@ -20,6 +20,8 @@ const MIME = {
 };
 
 // Read .env into memory
+let SUPABASE_URL = '';
+let SUPABASE_KEY = '';
 let DEEPSEEK_API_KEY = '';
 let DEEPSEEK_BASE_URL = 'https://api.deepseek.com';
 
@@ -30,17 +32,23 @@ try {
     for (const line of raw.split('\n')) {
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith('#')) continue;
-      const idx = trimmed.indexOf('=');
-      if (idx === -1) continue;
-      const key = trimmed.slice(0, idx).trim();
-      const val = trimmed.slice(idx + 1).trim();
-      if (key === 'DEEPSEEK_API_KEY') DEEPSEEK_API_KEY = val;
-      if (key === 'DEEPSEEK_BASE_URL') DEEPSEEK_BASE_URL = val;
+      const eq = trimmed.indexOf('=');
+      if (eq === -1) continue;
+      const key = trimmed.slice(0, eq).trim();
+      const val = trimmed.slice(eq + 1).trim();
+      if (key === 'SUPABASE_URL') SUPABASE_URL = val;
+      else if (key === 'SUPABASE_KEY') SUPABASE_KEY = val;
+      else if (key === 'DEEPSEEK_API_KEY') DEEPSEEK_API_KEY = val;
+      else if (key === 'DEEPSEEK_BASE_URL') DEEPSEEK_BASE_URL = val;
     }
   }
 } catch {}
 
-const ENV_JS = `window.DEEPSEEK_CONFIG = {
+const CONFIG_JS = `window.PALLAX_CONFIG = {
+  SUPABASE_URL: ${JSON.stringify(SUPABASE_URL)},
+  SUPABASE_KEY: ${JSON.stringify(SUPABASE_KEY)},
+};
+window.DEEPSEEK_CONFIG = {
   API_KEY: ${JSON.stringify(DEEPSEEK_API_KEY)},
   BASE_URL: ${JSON.stringify(DEEPSEEK_BASE_URL)},
 };
@@ -50,14 +58,14 @@ createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const path = url.pathname;
 
-  // /env.js — inject DeepSeek config into browser
-  if (path === '/env.js') {
+  // /config.js — inject all runtime config into browser
+  if (path === '/config.js') {
     res.writeHead(200, { 'Content-Type': 'application/javascript' });
-    res.end(ENV_JS);
+    res.end(CONFIG_JS);
     return;
   }
 
-  // Static file serving — pages live in src/pages/, everything else at root
+  // Static file serving — pages live in src/pages/, everything else under src/
   let file;
   if (path === '/') {
     file = 'src/pages/dashboard.html';
@@ -66,7 +74,6 @@ createServer(async (req, res) => {
   } else {
     file = path;
   }
-  // Safety: prevent directory traversal
   if (file.includes('..')) { res.writeHead(403); res.end(); return; }
 
   try {
@@ -79,5 +86,6 @@ createServer(async (req, res) => {
   }
 }).listen(PORT, () => {
   console.log(`→ http://localhost:${PORT}`);
-  console.log(`  DEEPSEEK: ${DEEPSEEK_API_KEY ? 'configured' : 'NOT SET — export DEEPSEEK_API_KEY=sk-xxx in .env'}`);
+  if (!SUPABASE_URL) console.log('  WARN: SUPABASE_URL not set in .env');
+  if (!DEEPSEEK_API_KEY) console.log('  WARN: DEEPSEEK_API_KEY not set in .env');
 });

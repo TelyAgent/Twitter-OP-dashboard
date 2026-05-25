@@ -513,43 +513,21 @@ theblock.co
   }
 
   async function bootstrap(){
-    // 默认：禁用写按钮直到确认 DB 可写
     setWriteButtonsEnabled(false, '加载中…');
 
-    // 1. 复用 weekly_dashboard 的 session (同 supabase URL → localStorage 共享)
-    const { data: { session } } = await sb.auth.getSession();
-    currentSession = session;
-
-    if (session) {
-      // 2. 拉用户档案
-      const { data: profile } = await sb.from('user_profiles').select('*').eq('id', session.user.id).single();
-      currentProfile = profile;
-      if (profile) {
-        document.querySelector('.page-header .avatar').textContent = profile.initials;
-        if (window.__refreshUploaderDisplay) window.__refreshUploaderDisplay();
-      }
-
-      // 3. 拉 sources
-      const rows = await loadSourcesFromDB();
-      if (rows !== null) {
-        dbReady = true;
-        renderTable(rows);
-        const muted = document.querySelector('.page-header .right .muted');
-        if (muted) muted.textContent = `☁ 已同步 · ${rows.length} 条 · ${profile?.display_name || session.user.email}`;
-        setWriteButtonsEnabled(true);
-      } else {
-        // DB 报错 (表不存在 / RLS 没过等) → 降级 mock + 禁用写
-        renderTable(MOCK_SOURCES);
-        setWriteButtonsEnabled(false, 'DB 读取失败，无法写入（请联系管理员）');
-        const muted = document.querySelector('.page-header .right .muted');
-        if (muted) muted.innerHTML = '⚠ DB 读取失败 · 当前数据为 mock · 写入已禁用';
-      }
-    } else {
-      // 未登录 → 渲染 mock + 顶部提示 + 禁用写
+    // Always try DB (anon RLS allows public access — no login needed)
+    const rows = await loadSourcesFromDB();
+    if (rows !== null) {
+      dbReady = true;
+      renderTable(rows);
       const muted = document.querySelector('.page-header .right .muted');
-      if (muted) muted.innerHTML = '⚠ 未登录 · <a href="dashboard.html" style="color:#185FA5;text-decoration:underline">去登录</a> · 当前数据为 mock · 写入已禁用';
+      if (muted) muted.textContent = '☁ 已同步 · ' + rows.length + ' 条';
+      setWriteButtonsEnabled(true);
+    } else {
       renderTable(MOCK_SOURCES);
-      setWriteButtonsEnabled(false, '请先登录后才能导入到数据库');
+      setWriteButtonsEnabled(false, 'DB 读取失败，无法写入（请检查 Supabase 连接）');
+      const muted = document.querySelector('.page-header .right .muted');
+      if (muted) muted.innerHTML = '⚠ DB 读取失败 · 当前数据为 mock · 写入已禁用';
     }
   }
 

@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="styles.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
+<script src="/env.js"></script>
 <script src="src/ai/client.js"></script>
 <script src="src/ai/pipeline.js"></script>
 <style>
@@ -643,8 +644,8 @@
             </div>
             ${eng > 0 ? `<div style="margin-top:6px;font-size:11px;color:var(--color-text-tertiary)">总互动 = like + RT + reply = <span class="hl-num">${fmt(eng)}</span></div>` : ''}
           </div>
-          <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:6px;line-height:1.5">
-            ⓘ 这条 hotspot 没有 AI 萃取的 summary/facts/分歧/时间线。要看深度分析需接入 LLM 自动生成 intel JSONB.
+          <div id="rd-intel-loading" style="font-size:11px;color:var(--nsm-amber-text);margin-top:6px;line-height:1.5">
+            ✨ AI 正在生成深度分析…
           </div>`;
       } else {
         html += `
@@ -680,6 +681,29 @@
       </div>`;
 
     document.getElementById('rd-detail').innerHTML = html;
+
+    // If no intel but has tweets, fire async AI intel generation
+    if (!hasIntel && hs.tweets && hs.tweets.length > 0 && window.AIPipeline) {
+      var tweetsForIntel = hs.tweets.slice(0, 5);
+      window.AIPipeline.generateIntel(hs.title, tweetsForIntel).then(function (intel) {
+        if (intel && (intel.summary || (intel.facts && intel.facts.length))) {
+          hs.intel = intel;
+          // Persist intel to DB asynchronously (fire-and-forget)
+          if (dbReady && hs.id) {
+            sb.from('hotspots').update({ intel: intel }).eq('id', hs.id).then(
+              function () { console.log('[radar] intel saved for', hs.id); },
+              function (e) { console.warn('[radar] intel save failed:', e); }
+            );
+          }
+          // Re-render detail with fresh intel
+          if (hs.id === selectedId) renderDetail();
+        }
+      }).catch(function (e) {
+        console.warn('[radar] AI intel generation failed:', e.message);
+        var el = document.getElementById('rd-intel-loading');
+        if (el) el.textContent = 'ⓘ AI 分析暂不可用 · 请先配置 DEEPSEEK_API_KEY';
+      });
+    }
   }
 
   function renderTweets(){
@@ -776,34 +800,24 @@
   }
 
   async function bootstrap(){
-    const { data: { session } } = await sb.auth.getSession();
-    if (session) {
-      // 当前用户头像
-      const { data: profile } = await sb.from('user_profiles').select('initials,display_name').eq('id', session.user.id).single();
-      if (profile) document.querySelector('.page-header .avatar').textContent = profile.initials;
-
-      const rows = await loadHotspotsFromDB();
-      if (rows !== null && rows.length > 0) {
-        dbReady = true;
-        hotspots = rows;
-        selectedId = pickInitialSelected(rows);
-        renderAll();
-        document.getElementById('rd-banner').innerHTML = `<span class="dot" style="background:#3B6D11"></span>☁ 已同步 · ${rows.length} 热点 · ${profile?.display_name || session.user.email}`;
-      } else if (rows !== null && rows.length === 0) {
-        dbReady = true;
-        hotspots = [];
-        renderAll();
-        document.getElementById('rd-banner').innerHTML = `<span class="dot"></span>DB 空表 · 跑 seed_hotspots.sql 添加数据`;
-      } else {
-        hotspots = MOCK_HOTSPOTS;
-        selectedId = pickInitialSelected(hotspots);
-        renderAll();
-      }
+    // Always try DB (anon RLS allows public access — no login needed)
+    const rows = await loadHotspotsFromDB();
+    if (rows !== null && rows.length > 0) {
+      dbReady = true;
+      hotspots = rows;
+      selectedId = pickInitialSelected(rows);
+      renderAll();
+      document.getElementById('rd-banner').innerHTML = '<span class="dot" style="background:#3B6D11"></span>☁ 已同步 · ' + rows.length + ' 热点';
+    } else if (rows !== null && rows.length === 0) {
+      dbReady = true;
+      hotspots = [];
+      renderAll();
+      document.getElementById('rd-banner').innerHTML = '<span class="dot"></span>DB 空表 · 跑 seed_hotspots.sql 添加数据';
     } else {
       hotspots = MOCK_HOTSPOTS;
       selectedId = pickInitialSelected(hotspots);
       renderAll();
-      document.getElementById('rd-banner').innerHTML = `<span class="dot"></span>⚠ 未登录 · <a href="dashboard.html" style="color:#185FA5">去登录</a> · 当前数据为 mock`;
+      document.getElementById('rd-banner').innerHTML = '<span class="dot"></span>⚠ DB 不可用 · 当前数据为 mock';
     }
   }
 

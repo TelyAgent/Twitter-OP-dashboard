@@ -41,8 +41,8 @@ try {
 } catch {}
 
 const ENV_JS = `window.DEEPSEEK_CONFIG = {
-  API_KEY: "${DEEPSEEK_API_KEY}",
-  BASE_URL: "${DEEPSEEK_BASE_URL}",
+  API_KEY: ${JSON.stringify(DEEPSEEK_API_KEY)},
+  BASE_URL: ${JSON.stringify(DEEPSEEK_BASE_URL)},
 };
 `;
 

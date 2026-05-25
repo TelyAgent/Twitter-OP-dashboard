@@ -221,7 +221,7 @@
 <div style="display:flex;gap:6px">
 <button class="btn-ghost">↗ 查看版本历史</button>
 <button class="btn-ghost">↗ 复制为新模板</button>
-<a href="03-briefing.html" class="btn-primary" style="text-decoration:none">✨ 用此模板生成 angle</a>
+<span class="btn-primary" style="text-decoration:none;cursor:default;opacity:0.5" title="coming soon">✨ 用此模板生成 angle</span>
 </div>
 </div>
 
@@ -721,7 +721,7 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
     } else {
       btnOpen.title = '请先到 dashboard 登录后才能记录使用';
       btnOpen.style.cursor = 'not-allowed';
-      statusEl.innerHTML = '⚠ 未登录 · <a href="../" style="color:#185FA5;text-decoration:underline">去登录</a> · 写入已禁用';
+      statusEl.innerHTML = '⚠ 未登录 · <a href="dashboard.html" style="color:#185FA5;text-decoration:underline">去登录</a> · 写入已禁用';
     }
   })();
 

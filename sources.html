@@ -547,7 +547,7 @@ theblock.co
     } else {
       // 未登录 → 渲染 mock + 顶部提示 + 禁用写
       const muted = document.querySelector('.page-header .right .muted');
-      if (muted) muted.innerHTML = '⚠ 未登录 · <a href="../" style="color:#185FA5;text-decoration:underline">去登录</a> · 当前数据为 mock · 写入已禁用';
+      if (muted) muted.innerHTML = '⚠ 未登录 · <a href="dashboard.html" style="color:#185FA5;text-decoration:underline">去登录</a> · 当前数据为 mock · 写入已禁用';
       renderTable(MOCK_SOURCES);
       setWriteButtonsEnabled(false, '请先登录后才能导入到数据库');
     }

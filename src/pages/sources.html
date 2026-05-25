@@ -1090,18 +1090,20 @@ theblock.co
     btn.textContent = `↻ 入库 0/${kept.length}`;
     let inserted = 0, errors = 0;
     for (const h of kept) {
-      const { error } = await sb.rpc('upsert_cluster_hotspot', {
-        p_id:          h.id,
-        p_title:       h.title,
-        p_category:    h.category,
-        p_hot_signal:  h.hot_signal,
-        p_source_id:   sourceId,
-        p_tweets:      h.tweets,
-        p_metrics:     h.metrics,
-      });
-      if (error) { errors++; console.warn('[sync] rpc fail', h.id, error.message); }
+      const { error } = await sb.from('hotspots').upsert({
+        id:          h.id,
+        title:       h.title,
+        category:    h.category,
+        hot_signal:  h.hot_signal,
+        status:      h.hot_signal ? 'hot' : 'pool',
+        sources:     [sourceId],
+        tweets:      h.tweets,
+        metrics:     h.metrics,
+        created_at:  new Date().toISOString(),
+      }, { onConflict: 'id' });
+      if (error) { errors++; console.warn('[sync] upsert fail', h.id, error.message); }
       else inserted++;
-      btn.textContent = `↻ 入库 ${inserted+errors}/${kept.length}`;
+      btn.textContent = '↻ 入库 ' + (inserted+errors) + '/' + kept.length;
     }
 
     btn.textContent = '↻ 同步';

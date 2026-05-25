@@ -3,7 +3,8 @@
 // Depends on window.AIClient (loaded from src/ai/client.js).
 
 (function () {
-  const { chat, embed, cosineSimilarity } = window.AIClient || {};
+  // Lazy lookup at call time — avoids stale capture if client.js loads late
+  function client() { return window.AIClient || {}; }
 
   // ─── Prompt builders ──────────────────────────────────────
 
@@ -78,7 +79,7 @@
   async function scoreCluster(tweets) {
     var p = scoringPrompt(tweets);
     try {
-      return await chat([
+      return await client().chat([
         { role: 'system', content: p.system },
         { role: 'user', content: p.user },
       ]);
@@ -91,7 +92,7 @@
   async function classifyBatch(tweets) {
     var p = batchClassifyPrompt(tweets);
     try {
-      var result = await chat([
+      var result = await client().chat([
         { role: 'system', content: p.system },
         { role: 'user', content: p.user },
       ]);
@@ -105,7 +106,7 @@
   async function generateIntel(clusterTitle, tweets) {
     var p = intelPrompt(clusterTitle, tweets);
     try {
-      return await chat([
+      return await client().chat([
         { role: 'system', content: p.system },
         { role: 'user', content: p.user },
       ]);
@@ -118,7 +119,7 @@
   async function extractTemplates(tweets) {
     var p = extractTemplatePrompt(tweets);
     try {
-      var result = await chat([
+      var result = await client().chat([
         { role: 'system', content: p.system },
         { role: 'user', content: p.user },
       ]);
@@ -132,7 +133,7 @@
   async function fillTemplate(skeleton, slots, material, angle, category) {
     var p = fillTemplatePrompt(skeleton, slots, material, angle, category);
     try {
-      var result = await chat([
+      var result = await client().chat([
         { role: 'system', content: p.system },
         { role: 'user', content: p.user },
       ]);
@@ -155,7 +156,7 @@
       used[i] = true;
       for (var j = i + 1; j < embeddings.length; j++) {
         if (used[j]) continue;
-        if (cosineSimilarity(embeddings[i].embedding, embeddings[j].embedding) >= threshold) {
+        if (client().cosineSimilarity(embeddings[i].embedding, embeddings[j].embedding) >= threshold) {
           group.push(j);
           used[j] = true;
         }
@@ -171,7 +172,7 @@
     var texts = tweets.map(function (t) { return t.text || ''; });
     var embeddingResults;
     try {
-      embeddingResults = await embed(texts);
+      embeddingResults = await client().embed(texts);
     } catch (e) {
       console.warn('[pipeline] embedding failed, treating each tweet as own cluster');
       var results = [];
@@ -195,8 +196,8 @@
       var scoreResult, classifyResult;
       try {
         var pResults = await Promise.all([
-          chat([{ role: 'system', content: scoreP.system }, { role: 'user', content: scoreP.user }]),
-          chat([{ role: 'system', content: classifyP.system }, { role: 'user', content: classifyP.user }]),
+          client().chat([{ role: 'system', content: scoreP.system }, { role: 'user', content: scoreP.user }]),
+          client().chat([{ role: 'system', content: classifyP.system }, { role: 'user', content: classifyP.user }]),
         ]);
         scoreResult = pResults[0];
         classifyResult = pResults[1];

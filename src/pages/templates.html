@@ -890,7 +890,7 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
 
   async function load() {
     const { data, error } = await sb.from('hotspots')
-      .select('id, tweets, created_at')
+      .select('id, tweets, metrics, created_at')
       .eq('hot_signal', true)
       .order('created_at', { ascending: false })
       .limit(300);
@@ -1278,10 +1278,8 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
   });
 
   // ====== ✕ 删除模板 (anchored confirm popover) ======
-  const sbDel = window.supabase.createClient(
-    'https://snflonpxmzkeytzytqpg.supabase.co',
-    'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD'
-  );
+  const { SUPABASE_URL: SU_DEL, SUPABASE_KEY: SK_DEL } = window.PALLAX_CONFIG || {};
+  const sbDel = window.supabase.createClient(SU_DEL, SK_DEL);
 
   function confirmDelAt(anchorEl, tplId) {
     let pop = document.getElementById('tpl-del-pop');

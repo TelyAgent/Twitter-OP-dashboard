@@ -97,6 +97,7 @@ create table if not exists template_uses (
   hotspot_id  text        references hotspots(id) on delete set null,
   tweet_url   text,
   views       int         default 0,
+  snapshot    jsonb       default '{}'::jsonb,
   used_at     timestamptz default now()
 );
 create index if not exists idx_template_uses_tpl on template_uses(template_id);

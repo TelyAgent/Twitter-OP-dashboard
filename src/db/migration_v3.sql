@@ -29,3 +29,14 @@ create policy "anon all sources"   on sources       for all to anon using (true)
 create policy "anon all hotspots"  on hotspots      for all to anon using (true) with check (true);
 create policy "anon all templates" on templates     for all to anon using (true) with check (true);
 create policy "anon all tpl uses"  on template_uses for all to anon using (true) with check (true);
+
+-- v1 dashboard tables: switch to anon (were authenticated-only)
+drop policy if exists "auth all teams"    on teams;
+drop policy if exists "auth all schemas"  on team_schemas;
+drop policy if exists "auth all api"      on team_api_configs;
+drop policy if exists "auth all weekly"   on weekly_data;
+
+create policy "anon all teams"    on teams            for all to anon using (true) with check (true);
+create policy "anon all schemas"  on team_schemas     for all to anon using (true) with check (true);
+create policy "anon all api"      on team_api_configs for all to anon using (true) with check (true);
+create policy "anon all weekly"   on weekly_data      for all to anon using (true) with check (true);

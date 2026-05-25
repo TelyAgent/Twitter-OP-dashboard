@@ -93,7 +93,7 @@
     } catch (e) {
       console.warn('[provider] primary fetchTweetsByHandle failed, trying fallback:', e.message);
       var data = await opencli('/exec', {
-        cmd: 'twitter user-timeline --handle ' + shellArg(raw) + ' --hours ' + hours + ' --format json',
+        cmd: 'twitter user-timeline --handle ' + shellArg(raw) + ' --hours ' + shellArg(hours) + ' --format json',
       });
       return (data.result || data.tweets || []).map(normalizeTweet).filter(Boolean);
     }

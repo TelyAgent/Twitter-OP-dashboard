@@ -66,6 +66,11 @@ createServer(async (req, res) => {
   }
 
   // Static file serving — pages live in src/pages/, everything else under src/
+  // Check raw URL for traversal (URL.pathname normalizes ../ away, so check req.url)
+  if (req.url.includes('..')) { res.writeHead(403); res.end(); return; }
+  // Block serving sensitive files
+  if (path === '/.env' || path.startsWith('/.git')) { res.writeHead(403); res.end(); return; }
+
   let file;
   if (path === '/') {
     file = 'src/pages/dashboard.html';

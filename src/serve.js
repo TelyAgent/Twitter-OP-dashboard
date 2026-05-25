@@ -58,16 +58,42 @@ createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const path = url.pathname;
 
-  // /api/opencli/* — proxy to OpenCLI daemon (avoids CORS)
+  // /api/opencli/* — execute OpenCLI commands via CLI (handles auth automatically)
   if (path.startsWith('/api/opencli/')) {
+    const sub = path.replace('/api/opencli', '');
     try {
-      const target = 'http://localhost:19825' + path.replace('/api/opencli', '') + (url.search || '');
-      const proxy = await fetch(target);
-      res.writeHead(proxy.status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-      res.end(await proxy.text());
-    } catch {
+      let args = [];
+      // Map HTTP paths to opencli CLI commands
+      if (sub === '/health') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true }));
+        return;
+      } else if (sub === '/api/twitter/user-timeline') {
+        var h = url.searchParams.get('handle') || '';
+        var hrs = url.searchParams.get('hours') || '168';
+        args = ['twitter', 'user-timeline', '--handle', h, '--hours', hrs, '--format', 'json'];
+      } else if (sub === '/api/twitter/tweet') {
+        args = ['twitter', 'tweet', '--url', url.searchParams.get('url') || '', '--format', 'json'];
+      } else if (sub === '/api/twitter/list-members') {
+        args = ['twitter', 'list-members', '--list-id', url.searchParams.get('listId') || '', '--format', 'json'];
+      } else if (sub === '/exec') {
+        // Direct command execution (already shell-escaped by provider.js)
+        var cmd = url.searchParams.get('cmd') || '';
+        args = cmd.split(' ');
+      } else {
+        res.writeHead(400); res.end(JSON.stringify({ error: 'unknown endpoint: ' + sub })); return;
+      }
+
+      const { execSync } = await import('node:child_process');
+      const result = execSync('opencli ' + args.join(' '), {
+        timeout: 30000, maxBuffer: 10 * 1024 * 1024, encoding: 'utf-8',
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(result);
+    } catch (e) {
+      const msg = e.stderr || e.stdout || e.message || 'unknown error';
       res.writeHead(502);
-      res.end(JSON.stringify({ error: 'OpenCLI daemon not reachable at localhost:19825' }));
+      res.end(JSON.stringify({ ok: false, error: String(msg).slice(0, 500) }));
     }
     return;
   }

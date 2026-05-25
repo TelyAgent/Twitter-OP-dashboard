@@ -57,13 +57,20 @@ createServer(async (req, res) => {
     return;
   }
 
-  // Static file serving
-  let file = path === '/' ? '/dashboard.html' : path;
+  // Static file serving — pages live in src/pages/, everything else at root
+  let file;
+  if (path === '/') {
+    file = 'src/pages/dashboard.html';
+  } else if (path.endsWith('.html')) {
+    file = 'src/pages' + path;
+  } else {
+    file = path;
+  }
   // Safety: prevent directory traversal
   if (file.includes('..')) { res.writeHead(403); res.end(); return; }
 
   try {
-    const body = await readFile(ROOT + file);
+    const body = await readFile(ROOT + '/' + file);
     res.writeHead(200, { 'Content-Type': MIME[extname(file)] || 'application/octet-stream' });
     res.end(body);
   } catch {

@@ -6,7 +6,7 @@
 
 ```
 本地机器
-├── node src/serve.js :8080          ← 静态服务 + 读 .env → 注入 /env.js
+├── node src/serve.js :8080          ← 静态服务，页面读自 src/pages/
 ├── OpenCLI Chrome 插件 + Daemon :19825 ← Twitter 数据抓取（复用浏览器登录态）
 │
 远程依赖（仅 2 个）
@@ -18,26 +18,29 @@
 
 ```
 config.js                  ← window.PALLAX_CONFIG: SUPABASE_URL, SUPABASE_KEY
-src/serve.js               ← Node 静态服务，读 .env，响应 /env.js
+styles.css                 ← 共享样式
 .env.example               ← DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL 模板
 .env                       ← 真实 key（gitignored）
 
 src/
+├── serve.js               ← Node 静态服务，读 .env，响应 /env.js
 ├── provider.js            ← window.Provider: 数据抓取
 ├── content-ops.js         ← window.ContentOps: 内容分析（启发式，纯函数）
 ├── ai/
 │   ├── client.js          ← window.AIClient: DeepSeek API 客户端
 │   ├── pipeline.js        ← window.AIPipeline: AI 分析管线（LLM 驱动）
 │   └── prompts.js         ← Prompt 模板（ES module，供构建工具导入）
-
-dashboard.html             ← 数据复盘面板（supabase-js + chart.js）
-preview.html               ← 预览变体
-radar.html                 ← 热点雷达
-templates.html             ← 模板库
-sources.html               ← 监控源管理
-
-supabase_setup_v2.sql      ← 完整建表语句（v3 schema）
-migration_v3.sql           ← v2→v3 迁移脚本（删除 trigger/视图，RLS 改 anon）
+├── pages/
+│   ├── dashboard.html     ← 数据复盘面板
+│   ├── preview.html       ← 预览变体
+│   ├── radar.html         ← 热点雷达
+│   ├── templates.html     ← 模板库
+│   └── sources.html       ← 监控源管理
+└── db/
+    ├── supabase_setup_v2.sql  ← 完整建表（v3 schema）
+    ├── migration_v3.sql       ← v2→v3 迁移
+    ├── seed_hotspots.sql      ← 热点种子数据
+    └── seed_user_profiles.sql ← 用户种子数据
 ```
 
 ## 页面依赖关系

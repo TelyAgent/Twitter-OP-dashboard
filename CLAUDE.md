@@ -6,11 +6,11 @@
 
 本仓库是一个本地优先的多页面产品：静态 HTML 页面由极简 Node.js 服务托管，Supabase 为唯一远程依赖，DeepSeek API 为云端 AI 后端。
 
-- `dashboard.html` — 主周报复盘面板。
-- `preview.html` — 预览变体。
-- `radar.html` — 热点雷达。
-- `templates.html` — 模板库。
-- `sources.html` — 监控源管理。
+- `src/pages/dashboard.html` — 主周报复盘面板。
+- `src/pages/preview.html` — 预览变体。
+- `src/pages/radar.html` — 热点雷达。
+- `src/pages/templates.html` — 模板库。
+- `src/pages/sources.html` — 监控源管理。
 - `config.js` — `SUPABASE_URL`、`SUPABASE_KEY` 的唯一来源。
 
 ### 数据流
@@ -108,7 +108,7 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com
 
 OpenCLI Chrome 插件复用浏览器已登录的 X/Twitter 会话抓取推文数据。无需 API Key，无需 serverless 代理。OpenCLI Daemon 运行在 `localhost:19825`。
 
-sources.html 和 radar.html 的数据源流程：
+`sources.html` 和 `radar.html` 的数据源流程：
 1. 页面调用 OpenCLI Daemon 拉取某账号的推文
 2. 页面将推文批量发送到 DeepSeek API 做分析（评分、分类）
 3. 结果写入 Supabase `hotspots` 表做持久化
@@ -230,7 +230,7 @@ const MIME = { '.html':'text/html;charset=utf-8','.js':'application/javascript',
 
 createServer(async (req, res) => {
   const path = req.url.split('?')[0];
-  const file = path === '/' ? '/dashboard.html' : path;
+  const file = path === '/' ? 'src/pages/dashboard.html' : path;
   try {
     const body = await readFile(ROOT + file);
     res.writeHead(200, { 'Content-Type': MIME[extname(file)] || 'application/octet-stream' });
@@ -249,10 +249,10 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com
 
 ## 功能边界
 
-- `dashboard.html`：周报复盘、产品组指标、schema、复盘
-- `sources.html`：监控源管理、批量导入、源同步、PM 相关度评分
-- `radar.html`：热点审查、AI 情报、评分、雷达优先级排序
-- `templates.html`：模板库、角度分类、AI 模板提炼/填充、使用追踪
+- `src/pages/dashboard.html`：周报复盘、产品组指标、schema、复盘
+- `src/pages/sources.html`：监控源管理、批量导入、源同步、PM 相关度评分
+- `src/pages/radar.html`：热点审查、AI 情报、评分、雷达优先级排序
+- `src/pages/templates.html`：模板库、角度分类、AI 模板提炼/填充、使用追踪
 
 ## 工作约定
 

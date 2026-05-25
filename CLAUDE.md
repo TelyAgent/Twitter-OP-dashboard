@@ -1,272 +1,264 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+本文件为 Claude Code (claude.ai/code) 在此仓库中工作时提供指引。
 
-## Project Shape
+## 项目形态（目标架构）
 
-This repo is a small multi-surface product made of static HTML pages plus a thin set of Twitter-proxy serverless functions:
+本仓库是一个本地优先的多页面产品：静态 HTML 页面由极简 Node.js 服务托管，Supabase 为唯一远程依赖，DeepSeek API 为云端 AI 后端。
 
-- `pallax_weekly_dashboard.html` is the main weekly operations dashboard.
-- `pallax_weekly_dashboard_preview.html` is a preview variant of the main dashboard.
-- `weeklyreport/02-radar.html` is the hotspot radar view.
-- `weeklyreport/07-templates.html` is the template library / template usage flow.
-- `weeklyreport/08-sources.html` is the source management and source-sync flow.
-- `api/**` are the Vercel serverless functions that proxy X/Twitter reads.
-- `apps/api/server.js` is the legacy Fastify version of the same proxy, still deployable to the VPS via `deploy-api.sh`. It is no longer the recommended target — keep it in sync with `api/**` only as long as the VPS deployment is alive.
+- `dashboard.html` — 主周报复盘面板。
+- `preview.html` — 预览变体。
+- `radar.html` — 热点雷达。
+- `templates.html` — 模板库。
+- `sources.html` — 监控源管理。
+- `config.js` — `SUPABASE_URL`、`SUPABASE_KEY` 的唯一来源。
 
-There is no root app framework, bundler, or router. Navigation is done with plain links between HTML files, and most frontend logic is inline in each page. `config.js` at the repo root is the single source of truth for `SUPABASE_URL`, `SUPABASE_KEY`, and `API_BASE`; every HTML page loads it via a `<script src="…/config.js">` tag right after the supabase-js CDN, and inline scripts read from `window.PALLAX_CONFIG`.
+### 数据流
 
-## Common Commands
+```
+静态页面 ──supabase-js──→ Supabase（远程，仅持久化）
+静态页面 ──fetch────────→ DeepSeek API（云端 LLM，AI 分析）
+静态页面 ──fetch────────→ OpenCLI Daemon（:19825，数据抓取）
+```
 
-### Local frontend work
+### 外部依赖（仅 2 个）
 
-There is no checked-in frontend build step. Pages are standalone HTML files.
-
-- Serve the repo root locally with a simple static server:
-  - `python3 -m http.server 8080`
-- Then open:
-  - `http://localhost:8080/pallax_weekly_dashboard.html`
-  - `http://localhost:8080/pallax_weekly_dashboard_preview.html`
-  - `http://localhost:8080/weeklyreport/02-radar.html`
-  - `http://localhost:8080/weeklyreport/07-templates.html`
-  - `http://localhost:8080/weeklyreport/08-sources.html`
-
-A plain static server is enough for Supabase-only flows. Anything that hits `/api/twitter/*` (07-templates "记录使用", 08-sources "↻ 同步" and list import) needs `vercel dev` instead, which serves the static files **and** the Functions on the same origin.
-
-### Local API work (Vercel Functions)
-
-From the repo root:
-
-- `npm install` — installs `twitter-api-v2` for the functions
-- `npx vercel dev` — serves the static pages + `/api/*` on `http://localhost:3000` (or the next free port). First run prompts you to link a Vercel project.
-- Local env: put `TWITTER_BEARER_TOKEN=…` into `.env.local` (gitignored via `.env.*`); `vercel dev` injects it into Function processes.
-
-Sanity check:
-
-- `curl http://localhost:3000/api/health`
-
-### Local API work (legacy Fastify, only for VPS parity)
-
-Run from `apps/api`:
-
-- `npm install`, then `npm run dev` (watch) or `npm start` (once).
-- Reads `TWITTER_BEARER_TOKEN`, `PORT` (default 8081), `HOST` (default 0.0.0.0) from `.env`.
-- `curl http://localhost:8081/api/health`.
-
-### Tests / linting
-
-- There are currently no checked-in lint scripts.
-- There are currently no checked-in automated test scripts.
-- There is no repo-defined single-test command.
-
-### Deployment
-
-The repo supports two deploy targets in parallel.
-
-#### Vercel (current target)
-
-The whole repo is a Vercel project: static HTML at the root and serverless functions under `api/`.
-
-- `vercel.json` — `cleanUrls: true`, plus rewrites that map `/` → `pallax_weekly_dashboard.html` and `/preview` → the preview HTML.
-- Root `package.json` declares `twitter-api-v2` so Vercel installs it for the Functions runtime.
-- `npx vercel --prod` deploys; the project URL is auto-generated under `*.vercel.app`. Custom domain is not configured.
-- Required Vercel project env var: `TWITTER_BEARER_TOKEN`. The Functions return HTTP 503 with `TWITTER_BEARER_TOKEN not configured` if it is missing or still set to a `PLACEHOLDER_…` value.
-- Function routes (Node.js, ESM, default-exported handler):
-  - `GET /api/health`
-  - `POST /api/twitter/tweet` — body `{ url | id }`
-  - `POST /api/twitter/handle/[handle]/recent` — body `{ hours? }` (1–720, default 168)
-  - `POST /api/twitter/list/[listId]/members`
-- Shared helpers live at `api/_lib/twitter.js`. Path tip: imports use `../_lib/twitter.js` from `api/twitter/tweet.js`, and `../../../_lib/twitter.js` from the `[handle]` / `[listId]` nested routes.
-
-Because Vercel serves over HTTPS at the same origin as the Functions, the frontend's `API_BASE` is `''` (relative) on Vercel — `config.js` picks that automatically. There is no Mixed-Content issue.
-
-#### Legacy VPS (still works, kept in sync until retirement)
-
-Both legacy deploy scripts target the same Tokyo VPS, hardcoded inside the scripts:
-
-| Item | Value |
+| 依赖 | 用途 |
 |---|---|
-| Host | `43.163.198.237` (no DNS / custom domain) |
-| SSH user | `root` |
-| SSH key | `~/.ssh/tokyo_server` |
-| Static remote dir | `/root/pallax-dashboard/` |
-| API remote dir | `/root/pallax-api/` |
-| API systemd unit | `pallax-api.service` |
-| API log file | `/var/log/pallax-api.log` |
+| Supabase | 远程 PostgreSQL，仅持久化 — 无 trigger/视图 做分析逻辑 |
+| DeepSeek API | 云端 LLM 推理 — 评分、分类、情报、模板提炼/填充 |
 
-`./deploy.sh` pushes the static surface (`pallax_weekly_dashboard.html` → remote `index.html`, `…_preview.html` → `preview.html`, `weeklyreport/*.html|css`, **and `config.js`** since the pages now `<script src>` it). It uses `rsync` (diff-only), backs up the previous `index.html` to `index.html.bak-<TS>`, and md5-verifies after upload. **NOTE**: as of the Vercel migration, `deploy.sh` does not yet rsync `config.js` — when running the VPS deploy, either edit the script to include `config.js` in the `rsync` set or upload it manually, otherwise the pages will load with `window.PALLAX_CONFIG` undefined.
+### 本地依赖
 
-`./deploy-api.sh` uploads `apps/api/server.js` and `apps/api/package.json` to the VPS, runs `npm install --omit=dev`, and restarts `pallax-api.service`. First run also writes a placeholder `.env` (`TWITTER_BEARER_TOKEN=PLACEHOLDER_…`) — the real bearer token must be filled in by SSH and the unit restarted.
-
-Live VPS URLs (plain HTTP):
-
-- `http://43.163.198.237:8080/` — main dashboard (served as `index.html`)
-- `http://43.163.198.237:8080/preview.html`
-- `http://43.163.198.237:8080/weeklyreport/02-radar.html`
-- `http://43.163.198.237:8080/weeklyreport/07-templates.html`
-- `http://43.163.198.237:8080/weeklyreport/08-sources.html`
-- `http://43.163.198.237:8081/api/health` — Fastify API
-
-The `:8080` static server itself is **not** managed by `deploy.sh`; the script only writes files into `/root/pallax-dashboard/`. Whatever serves that directory on `:8080` (nginx / `python -m http.server` / similar) is provisioned outside this repo. Port `:8081` is the Fastify API managed by `pallax-api.service`.
-
-`config.js` detects the VPS by `location.port === '8080'` or `location.hostname === '43.163.198.237'` and sets `API_BASE` to `http://<host>:8081`, so the legacy frontend keeps reaching the legacy Fastify API without per-page changes.
-
-
-## Architecture
-
-### Frontend structure
-
-The frontend is not componentized. Each page is a mostly self-contained HTML document with:
-
-- large inline CSS blocks
-- large inline script blocks
-- direct DOM querying and event listeners
-- page-local mutable state
-- occasional globals on `window` for cross-block coordination
-
-`weeklyreport/styles.css` exists, but substantial page styling still lives inside each HTML file.
-
-When editing UI behavior, read the whole page first. Logic is often spread across multiple IIFEs in the same file rather than separated into modules.
-
-### State and persistence model
-
-The main dashboard uses an offline-first pattern:
-
-- local mutable JS objects hold the active state
-- state is persisted to `localStorage`
-- Supabase is used to sync that state to the cloud
-
-The core dashboard entities are:
-
-- `teams`
-- `team_schemas`
-- `team_api_configs`
-- `weekly_data`
-
-The dashboard stores week/team data in `localStorage` first, then mirrors it to Supabase.
-
-The weeklyreport pages are more DB-first, but still rely on browser session/local storage behavior for auth reuse.
-
-### Auth and shared session model
-
-All product surfaces use the same Supabase project and publishable key in-page.
-
-Important consequence:
-
-- `weeklyreport/08-sources.html`, `weeklyreport/07-templates.html`, and `weeklyreport/02-radar.html` reuse the session established by the main dashboard because they share the same Supabase project in the same browser.
-
-If a content-factory page appears to be "logged out," check whether the dashboard session exists first.
-
-### Backend and data flow
-
-The X/Twitter proxy lives in two parallel implementations that share the same wire contract:
-
-- **`api/**` (Vercel Functions, current target)** — one function file per route, ESM, default-exported handler, with shared helpers in `api/_lib/twitter.js`.
-- **`apps/api/server.js` (Fastify, legacy VPS)** — the original implementation, kept deployable while the VPS is alive.
-
-Both expose:
-
-- `GET /api/health`
-- `POST /api/twitter/tweet`
-- `POST /api/twitter/handle/<handle>/recent`
-- `POST /api/twitter/list/<listId>/members`
-
-The usual flow is:
-
-1. browser page calls the proxy at whatever `window.PALLAX_CONFIG.API_BASE` resolves to (empty string on Vercel, `http://<host>:8081` on the legacy VPS — see `config.js`)
-2. proxy fetches X/Twitter data via bearer token
-3. browser page writes derived records into Supabase
-
-If you change a route's request/response shape, change it in **both** implementations until the VPS is decommissioned.
-
-## Data Model
-
-The authoritative schema reference is `supabase_setup_v2.sql`.
-
-### Supabase instance
-
-The whole product (all 5 frontend pages) talks to a single hosted Supabase project. There is no self-hosted database and no migration tool — schema changes are made by hand in the Supabase SQL editor and mirrored back into `supabase_setup_v2.sql`.
-
-| Item | Value |
+| 组件 | 作用 |
 |---|---|
-| URL | `https://snflonpxmzkeytzytqpg.supabase.co` |
-| Project ref | `snflonpxmzkeytzytqpg` |
-| Publishable (anon) key | `sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD` |
+| Node.js 静态服务 | 在 `localhost:8080` 提供 HTML 页面 |
+| OpenCLI Chrome 插件 + Daemon | 浏览器 ↔ X/Twitter 数据抓取的桥梁，复用浏览器登录态，零 API Key |
 
-URL + key + `API_BASE` live in **one place**: `config.js` at the repo root, exposing `window.PALLAX_CONFIG`. Each HTML page loads it via `<script src="config.js">` (or `../config.js` from `weeklyreport/`) right after the supabase-js CDN, and inline scripts read `const { SUPABASE_URL, SUPABASE_KEY } = window.PALLAX_CONFIG;` (and `API_BASE` for the Twitter-touching pages).
+### 已移除的组件
 
-To switch Supabase projects:
+- `api/`（Vercel Functions）— 由 OpenCLI + DeepSeek API 替代
+- `apps/api/`（旧版 Fastify）— 退役
+- `vercel.json`、`deploy.sh`、`deploy-api.sh` — 不再需要
+- `twitter-api-v2` npm 依赖 — 移除
 
-1. Edit `SUPABASE_URL` / `SUPABASE_KEY` in `config.js`.
-2. In the new Supabase project's SQL editor, run `supabase_setup_v2.sql` (and optionally `seed_user_profiles.sql` / `seed_hotspots.sql`).
-3. In the new project's Authentication → URL Configuration, whitelist whatever origin will host the static pages (your `*.vercel.app`, `http://localhost:3000`, `http://localhost:8080`, and `http://43.163.198.237:8080` if the VPS is still alive).
-4. Redeploy. Existing browser sessions tied to the old project ref live in `localStorage` under `sb-<old-project-ref>-auth-token`; clear it after switching, since the SDK keys session storage by project ref.
+## 常用命令
 
-### Schema
+### 本地开发
 
-`supabase_setup_v2.sql` combines two connected domains:
+```bash
+# 一次性：安装 OpenCLI Chrome 插件
+# https://chromewebstore.google.com/detail/opencli/ildkmabpimmkaediidaifkhjpohdnifk
 
-1. weekly ops dashboard tables
-   - `teams`
-   - `team_schemas`
-   - `team_api_configs`
-   - `weekly_data`
-2. content factory tables
-   - `user_profiles`
-   - `sources`
-   - `hotspots`
-   - `templates`
-   - `template_uses`
+# 复制并填入你的 key
+cp .env.example .env
 
-Also important in that file:
+# 启动（serve 自动读取 .env）
+node serve.js
+# → http://localhost:8080
+```
 
-- RLS policies assume authenticated users have full access to the business tables.
-- `set_updated_at()` and trigger wiring maintain `updated_at` fields.
-- `bump_template_stats()` updates `templates.uses`, `avg_views`, `fire_count`, and status from `template_uses` inserts.
-- cross-domain views provide derived reporting:
-  - `v_weekly_hotspot_stats`
-  - `v_template_perf`
-  - `v_source_contribution`
+`.env`：
+```
+DEEPSEEK_API_KEY=sk-xxx
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+```
 
-Seed/reference SQL files:
+`.env.example`（可检入，不含真实 key）：
+```
+DEEPSEEK_API_KEY=sk-your-key-here
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+```
 
-- `seed_hotspots.sql`
-- `seed_user_profiles.sql`
+简单的静态服务即可。OpenCLI Daemon 随 Chrome 插件自动启动。DeepSeek API 由浏览器 JS 直接调用。
 
-Use these when you need example record shapes or want to understand intended semantics.
+### 测试 / linting
 
-## Feature Boundaries
+- 无检入的 lint 或测试脚本。
+- 无仓库定义的单一测试命令。
 
-The main business areas map cleanly by page:
+## 架构
 
-- `pallax_weekly_dashboard.html`: weekly review, team metrics, schemas, retros, auth entrypoint
-- `weeklyreport/08-sources.html`: monitored account/source management, list import, source syncing, PM relevance scoring
-- `weeklyreport/02-radar.html`: hotspot review, scoring, evidence display, radar-style prioritization
-- `weeklyreport/07-templates.html`: template library, angle classification, template usage tracking against tweet performance
+### 前端结构
 
-A lot of behavior is coupled through the database rather than through shared frontend code.
+前端未组件化。每个页面是几乎独立的 HTML 文档，包含：
+- 大段内联 CSS
+- 大段内联 JS
+- 直接 DOM 查询和事件监听
+- 页面本地可变状态
 
-## Working Conventions For This Repo
+`styles.css` 存在于根目录，但大量页面样式仍在各 HTML 文件内。
 
-- Prefer small, surgical edits inside the existing HTML pages rather than introducing new abstractions.
-- Preserve the current page-local style: direct DOM updates, inline scripts, and incremental changes.
-- Check `supabase_setup_v2.sql` before changing any field names or assumptions used in the weeklyreport pages.
-- If you touch X/Twitter-related flows, inspect both the page logic and `apps/api/server.js`; the browser/API boundary is part of the feature.
-- If you touch auth-dependent content-factory behavior, verify whether the page is reusing the dashboard session rather than implementing its own login flow.
+编辑 UI 行为时，先通读整个页面。逻辑通常分散在同一文件中的多个 IIFE 中。
 
-## Hosting Migration Notes
+### 状态与持久化模型
 
-Two migrations have been discussed but not executed. Capturing the constraints here so future edits don't accidentally break them.
+主面板使用离线优先模式：
+- 本地可变 JS 对象持有活跃状态
+- 状态持久化到 `localStorage`
+- Supabase 将状态同步到云端（纯读写，无分析逻辑）
 
-### Switching Supabase projects
+核心面板实体：`teams`、`team_schemas`、`team_api_configs`、`weekly_data`。
 
-See "Supabase instance" above for the full list of inlined `SUPABASE_URL` / `SUPABASE_KEY` pairs that must change together. The schema bootstrap (`supabase_setup_v2.sql`) and seeds (`seed_user_profiles.sql`, `seed_hotspots.sql`) need to be applied to the new project before the frontend will function. Existing browser sessions tied to the old project ref live in `localStorage` under `sb-snflonpxmzkeytzytqpg-auth-token` — clear it after switching, since the SDK keys session storage by project ref.
+### 认证
 
-### Switching the static frontend to Vercel
+无需认证。项目完全在本地运行，Supabase 表 RLS 策略改为允许 `anon` 公开访问。
 
-Two things are tightly coupled to the current "static + API on the same box" assumption and will need attention:
+### 数据抓取（OpenCLI 替代 Twitter API）
 
-1. **`API_BASE` is computed as `http://${location.hostname}:8081`** in 3 places — `weeklyreport/07-templates.html` (1) and `weeklyreport/08-sources.html` (2). On Vercel `location.hostname` becomes the Vercel domain, which has no `:8081`. These need to be replaced with an absolute URL pointing at wherever the API lives.
-2. **Mixed Content**: Vercel serves HTTPS; the API on `43.163.198.237:8081` is plain HTTP. Browsers will block HTTPS-page → HTTP-API requests. Either front the API with HTTPS (reverse proxy + Let's Encrypt on a subdomain) or move the API itself off the VPS (Vercel Functions / equivalent).
+OpenCLI Chrome 插件复用浏览器已登录的 X/Twitter 会话抓取推文数据。无需 API Key，无需 serverless 代理。OpenCLI Daemon 运行在 `localhost:19825`。
 
-If the API is rewritten as Vercel Functions, the Fastify routes in `apps/api/server.js` (`/api/twitter/tweet`, `/api/twitter/handle/:handle/recent`, `/api/twitter/list/:listId/members`) map 1:1 to function files; the `app.listen` call disappears and `TWITTER_BEARER_TOKEN` moves to Vercel env vars. `deploy-api.sh` and the `pallax-api.service` systemd unit become obsolete in that case.
+sources.html 和 radar.html 的数据源流程：
+1. 页面调用 OpenCLI Daemon 拉取某账号的推文
+2. 页面将推文批量发送到 DeepSeek API 做分析（评分、分类）
+3. 结果写入 Supabase `hotspots` 表做持久化
+
+### AI 分析（DeepSeek API，自建管线）
+
+所有分析逻辑位于浏览器端 JS，直接调用 DeepSeek API。Supabase trigger/视图中无分析逻辑。
+
+AI 端点（DeepSeek `deepseek-chat` 模型，`response_format: json_object`）：
+
+| 分析项 | 触发时机 | 输入 | 输出 |
+|---|---|---|---|
+| 热点评分 | 推文抓取后 | 推文批次 | 每个 cluster 的 `{fit, viral, fresh, score, isHot}` |
+| 角度分类 | 推文抓取后 | 推文文本 + 元数据 | 7 类角度标签 |
+| 语义聚类 | 推文抓取后 | 推文文本列表 | 基于 embedding 相似度的聚类分组 |
+| 情报生成 | 仅 HOT 候选 | cluster 内 top 推文 | `{summary, facts[], opportunity, dissent, timeline[]}` |
+| 模板提炼 | 用户点击"提炼" | 爆款推文批次 | 每个模板的 `{skeleton, slots[]}` |
+| 模板填充 | 用户点击"使用此模板" | 骨架 + 素材 | 填充后的推文文本 |
+
+Prompt 模板存放在 `src/ai/prompts.js`。所有 prompt 使用 few-shot 格式，带 JSON Schema 输出约束。
+
+### 数据库（Supabase — 仅持久化）
+
+`squpabase_setup_v2.sql` 是权威的 schema 参考。
+
+表：
+- 面板域：`teams`、`team_schemas`、`team_api_configs`、`weekly_data`
+- 内容工厂域：`user_profiles`、`sources`、`hotspots`、`templates`、`template_uses`
+
+相对于当前 schema 的变更：
+- **删除** `bump_template_stats()` trigger — 统计由 AI 管线计算，直接写入
+- **删除** 视图 `v_weekly_hotspot_stats`、`v_template_perf`、`v_source_contribution` — 由 AI 生成的汇总替代
+- **保留** `set_updated_at()` trigger — 纯工具函数
+- **修改** RLS 策略 — 从 `authenticated` 改为 `anon`（无需登录，本地运行）
+
+## 数据模型
+
+### Supabase 实例（当前）
+
+| 项 | 值 |
+|---|---|
+| URL | `https://dkwqvenghjjjzceucjov.supabase.co` |
+| Project ref | `dkwqvenghjjjzceucjov` |
+| Publishable key | `sb_publishable_HJSlxk0cXk1w7e0v9WRbqg_DFAhVZDc` |
+
+`config.js` 是唯一来源。所有页面通过 `<script src="config.js">` 加载（文件已在根目录）。
+
+## 重构计划
+
+### Phase 1：AI Prompts & Pipeline（新建文件）
+
+创建 `src/ai/prompts.js` — DeepSeek API 调用的全部 prompt 模板：
+
+```
+src/ai/
+├── prompts.js      # 全部 prompt 模板（评分、分类、聚类、情报、提炼、填充）
+├── client.js       # DeepSeek API 客户端封装（chat + embedding）
+└── pipeline.js     # 编排：批量评分 → 分类 → 聚类 → 情报
+```
+
+### Phase 2：前端数据层适配
+
+在每个页面中将 Twitter API 调用替换：
+
+| 页面 | 旧（Twitter API） | 新 |
+|---|---|---|
+| sources "↻ 同步" | `fetch(API_BASE + /api/twitter/handle/.../recent)` | `fetch(localhost:19825/...)` 通过 OpenCLI |
+| sources "↥ 粘贴推文" | `fetch(API_BASE + /api/twitter/tweet)` | OpenCLI 单条推文抓取 |
+| sources "导入成员" | `fetch(API_BASE + /api/twitter/list/.../members)` | OpenCLI list 成员 |
+| templates "记录使用" | `fetch(API_BASE + /api/twitter/tweet)` | OpenCLI 单条推文抓取 |
+| templates AI 提炼 | `fetch(API_BASE + /api/ai/extract-template)` | 直接调 DeepSeek API |
+| templates AI 填充 | `fetch(API_BASE + /api/ai/fill-template)` | 直接调 DeepSeek API |
+| radar 热点情报 | （仅 mock） | 直接调 DeepSeek API |
+
+### Phase 3：AI 分析集成
+
+将客户端启发式算法替换为 DeepSeek API 调用：
+
+| 当前（启发式） | 替换为（LLM） |
+|---|---|
+| `computeScore()` — 正则关键词匹配 | DeepSeek 评分 prompt → 结构化 JSON |
+| `classifyAngle()` — 正则模式 | DeepSeek 分类 prompt |
+| `clusterTweets()` — 关键词 + 4h 时间窗口 | DeepSeek embedding + 余弦相似度聚类 |
+| `extractSkeleton()` — 正则替换 | DeepSeek 模板提炼 prompt |
+| AI 模板填充（stub，未实现） | DeepSeek 填充 prompt |
+
+### Phase 4：Supabase 清理
+
+在 Supabase SQL Editor 中执行：
+```sql
+drop trigger if exists trg_template_uses_bump on template_uses;
+drop function if exists bump_template_stats();
+drop view if exists v_weekly_hotspot_stats;
+drop view if exists v_template_perf;
+drop view if exists v_source_contribution;
+```
+
+### Phase 5：移除死代码
+
+删除：
+- `api/` 目录（4 个 Vercel Functions + 共享库）
+- `apps/api/` 目录（旧版 Fastify）
+- `vercel.json`
+- `deploy.sh`、`deploy-api.sh`
+- `package.json` 中的 `twitter-api-v2` 依赖
+- `config.js` 中的 `API_BASE` 逻辑（仅保留 `SUPABASE_URL` + `SUPABASE_KEY`）
+
+### Phase 6：Serve 脚本 + .env
+
+`serve.js`（极简静态服务，读取 `.env`）：
+```js
+import { createServer } from 'node:http';
+import { readFile } from 'node:fs/promises';
+import { extname } from 'node:path';
+
+const PORT = 8080;
+const ROOT = process.cwd();
+const MIME = { '.html':'text/html;charset=utf-8','.js':'application/javascript','.css':'text/css','.json':'application/json' };
+
+createServer(async (req, res) => {
+  const path = req.url.split('?')[0];
+  const file = path === '/' ? '/dashboard.html' : path;
+  try {
+    const body = await readFile(ROOT + file);
+    res.writeHead(200, { 'Content-Type': MIME[extname(file)] || 'application/octet-stream' });
+    res.end(body);
+  } catch { res.writeHead(404); res.end(); }
+}).listen(PORT, () => console.log(`→ http://localhost:${PORT}`));
+```
+
+`.env.example`：
+```
+DEEPSEEK_API_KEY=sk-your-key-here
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+```
+
+`.env` 已加入 `.gitignore`。页面中的 AI 客户端通过 `serve.js` 启动时读取 `.env` 并注入的 `/env.js` 端点获取 `DEEPSEEK_BASE_URL` + key。
+
+## 功能边界
+
+- `dashboard.html`：周报复盘、产品组指标、schema、复盘
+- `sources.html`：监控源管理、批量导入、源同步、PM 相关度评分
+- `radar.html`：热点审查、AI 情报、评分、雷达优先级排序
+- `templates.html`：模板库、角度分类、AI 模板提炼/填充、使用追踪
+
+## 工作约定
+
+- 优先在现有 HTML 页面内做小范围、精准的编辑。
+- 保持当前页面本地风格：直接 DOM 更新、内联脚本。
+- 修改字段名前先检查 `supabase_setup_v2.sql`。
+- 所有 AI 分析调用经过 `src/ai/client.js` → DeepSeek API。
+- Prompt 变更仅在 `src/ai/prompts.js` 中进行。
+- Supabase 仅用于持久化 — trigger、function、视图中无分析逻辑。

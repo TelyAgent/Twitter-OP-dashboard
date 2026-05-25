@@ -4,5 +4,9 @@
   "private": true,
   "type": "module",
   "description": "Local-first ops dashboard. Static HTML + Supabase + DeepSeek AI + OpenCLI.",
+  "scripts": {
+    "start": "node src/serve.js",
+    "db": "node scripts/db.js"
+  },
   "dependencies": {}
 }

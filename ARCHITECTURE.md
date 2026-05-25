@@ -5,45 +5,40 @@
 ## 系统拓扑
 
 ```
-本地机器
-├── node src/serve.js :8080          ← 静态服务，页面读自 src/pages/
-├── OpenCLI Chrome 插件 + Daemon :19825 ← Twitter 数据抓取（复用浏览器登录态）
-│
-远程依赖（仅 2 个）
-├── Supabase 远程 PostgreSQL         ← 纯持久化，anon RLS，无 trigger/view 分析逻辑
-└── DeepSeek API (api.deepseek.com)  ← 云端 LLM 推理
+本地 node src/serve.js :8080          ← 静态服务，页面读自 src/pages/
+     OpenCLI Daemon :19825            ← Twitter 数据抓取（复用浏览器登录态）
+
+远程 Supabase  PostgreSQL             ← 纯持久化，anon RLS，无分析逻辑
+     DeepSeek API (api.deepseek.com)  ← 云端 LLM 推理
 ```
 
 ## 文件层级
 
 ```
-config.js                  ← window.PALLAX_CONFIG: SUPABASE_URL, SUPABASE_KEY
-styles.css                 ← 共享样式
-.env.example               ← DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL 模板
-.env                       ← 真实 key（gitignored）
+config.js / styles.css / .env.example ← 配置 + 共享样式（根目录）
+ARCHITECTURE.md / CLAUDE.md           ← 文档（根目录）
 
 src/
-├── serve.js               ← Node 静态服务，读 .env，响应 /env.js
-├── provider.js            ← window.Provider: 数据抓取
-├── content-ops.js         ← window.ContentOps: 内容分析（启发式，纯函数）
+├── serve.js                          ← Node 静态服务，零依赖
+├── provider.js                       ← window.Provider: 数据抓取（OpenCLI）
+├── content-ops.js                    ← window.ContentOps: 启发式分析（纯函数）
 ├── ai/
-│   ├── client.js          ← window.AIClient: DeepSeek API 客户端
-│   ├── pipeline.js        ← window.AIPipeline: AI 分析管线（LLM 驱动）
-│   └── prompts.js         ← Prompt 模板（ES module，供构建工具导入）
-├── pages/
-│   ├── dashboard.html     ← 数据复盘面板
-│   ├── preview.html       ← 预览变体
-│   ├── radar.html         ← 热点雷达
-│   ├── templates.html     ← 模板库
-│   └── sources.html       ← 监控源管理
-└── db/
-    ├── supabase_setup_v2.sql  ← 完整建表（v3 schema）
-    ├── migration_v3.sql       ← v2→v3 迁移
-    ├── seed_hotspots.sql      ← 热点种子数据
-    └── seed_user_profiles.sql ← 用户种子数据
+│   ├── client.js                     ← window.AIClient: DeepSeek chat + embedding
+│   ├── pipeline.js                   ← window.AIPipeline: LLM 评分/分类/情报/模板
+│   └── prompts.js                    ← Prompt 模板（ES module）
+├── pages/                            ← 5 个 HTML 页面
+│   ├── dashboard.html                ← 周报复盘（supabase-js + chart.js）
+│   ├── preview.html                  ← 预览变体
+│   ├── radar.html                    ← 热点雷达
+│   ├── templates.html                ← 模板库
+│   └── sources.html                  ← 监控源管理
+└── db/                               ← 数据库脚本
+    ├── supabase_setup_v2.sql         ← 完整建表（v3）
+    ├── migration_v3.sql              ← v2→v3 迁移
+    └── seed_*.sql                    ← 种子数据
 ```
 
-## 页面依赖关系
+## 页面依赖
 
 ```
 dashboard.html:  supabase-js, chart.js, config.js
@@ -53,183 +48,83 @@ templates.html:  supabase-js, config.js, /env.js, content-ops.js, ai/client.js, 
 sources.html:    supabase-js, config.js, content-ops.js, provider.js
 ```
 
-加载顺序保证依赖链：
+加载顺序：`config.js → /env.js → content-ops.js → ai/client.js → ai/pipeline.js → provider.js`
 
-```
-config.js  →  /env.js  →  content-ops.js  →  ai/client.js  →  ai/pipeline.js  →  provider.js
-```
-
-## 模块职责
+## 模块
 
 ### serve.js
-
-- Node.js 内置 HTTP 模块，零依赖
-- 启动时读 `.env`，解析 `DEEPSEEK_API_KEY` + `DEEPSEEK_BASE_URL`
-- `/env.js`：将配置注入浏览器 `window.DEEPSEEK_CONFIG`
-- `/`：映射到 `dashboard.html`
-- 防止目录遍历
-
-### config.js
-
-- `window.PALLAX_CONFIG = { SUPABASE_URL, SUPABASE_KEY }`
-- 所有页面通过 `<script src="config.js">` 加载
+Node 内置 HTTP 模块，读 `.env` → `/env.js`（注入 `window.DEEPSEEK_CONFIG`），`/` → `src/pages/dashboard.html`。
 
 ### provider.js → `window.Provider`
 
-| 函数 | 入参 | 出参 | 说明 |
-|------|------|------|------|
-| `fetchTweetsByHandle` | handle, hours | `Tweet[]` | 拉取某账号近 N 小时推文 |
-| `fetchSingleTweet` | url 或 id | `Tweet` | 拉取单条推文 |
-| `fetchListMembers` | listId | `User[]` | 拉取 X List 成员 |
-| `isAvailable` | — | boolean | OpenCLI daemon 是否在线 |
+| 函数 | 说明 |
+|------|------|
+| `fetchTweetsByHandle(handle, hours)` → `Tweet[]` | 拉取账号推文 |
+| `fetchSingleTweet(url/id)` → `Tweet` | 拉取单条推文 |
+| `fetchListMembers(listId)` → `User[]` | 拉取 List 成员 |
+| `isAvailable()` → boolean | OpenCLI daemon 是否在线 |
 
-内部流程：
-1. `validateHandle()` / `validateListId()` — 正则格式校验
-2. `ensureAvailable()` — 调用 `isAvailable()`，不可用时抛出明确错误
-3. `opencli(path, params)` — HTTP GET 到 OpenCLI daemon
-4. 主路径失败 → `/exec` 回退（命令参数经 `shellArg()` 转义）
-5. `normalizeTweet()` — snake_case/camelCase 双兼容
+内部：validateHandle → ensureAvailable → opencli（主路径）→ /exec（回退，shellArg 转义）→ normalizeTweet（snake_case/camelCase 双兼容）
 
 ### ai/client.js → `window.AIClient`
 
-| 函数 | 入参 | 出参 | 说明 |
-|------|------|------|------|
-| `chat` | messages, opts | parsed JSON | DeepSeek chat API，`response_format: json_object` |
-| `embed` | texts[] | `{embedding}[]` | DeepSeek embedding API |
-| `cosineSimilarity` | a[], b[] | number | 余弦相似度（NaN 保护 + 零向量保护） |
+| 函数 | 说明 |
+|------|------|
+| `chat(messages, opts)` → JSON | DeepSeek chat（`response_format: json_object`） |
+| `embed(texts[])` → `{embedding}[]` | DeepSeek embedding |
+| `cosineSimilarity(a, b)` → number | 余弦相似度（NaN + 零向量保护） |
 
 ### ai/pipeline.js → `window.AIPipeline`
 
-| 函数 | 入参 | 出参 | 说明 |
-|------|------|------|------|
-| `scoreCluster` | tweets | `{score,fit,viral,fresh,isHot}` | LLM 三维评分 |
-| `classifyBatch` | tweets | `[{index,angle}]` | LLM 7 类角度分类 |
-| `generateIntel` | title, tweets | `{summary,facts,opportunity,dissent,timeline}` | LLM 深度情报 |
-| `extractTemplates` | tweets | `[{skeleton,slots}]` | LLM 模板提炼 |
-| `fillTemplate` | skeleton,slots,material,angle,cat | text | LLM 模板填充 |
-| `runPipeline` | tweets | scored+classified clusters | 完整管线：embedding→聚类→评分+分类 |
+| 函数 | 说明 |
+|------|------|
+| `scoreCluster(tweets)` → `{score,fit,viral,fresh,isHot}` | LLM 三维评分 |
+| `classifyBatch(tweets)` → `[{index,angle}]` | LLM 7 类角度分类 |
+| `generateIntel(title, tweets)` → `{summary,facts,opportunity,dissent,timeline}` | LLM 深度情报 |
+| `extractTemplates(tweets)` → `[{skeleton,slots}]` | LLM 模板提炼 |
+| `fillTemplate(skeleton,slots,material,angle,cat)` → text | LLM 模板填充 |
+| `runPipeline(tweets)` → scored+classified clusters | 完整管线 |
 
 ### content-ops.js → `window.ContentOps`
 
-所有函数纯计算，无 DOM 操作，无 I/O。
+纯函数，启发式回退。`classifyCategory` / `classifyAngle` / `clusterTweets` / `scoreCluster` / `buildHotspotFromCluster` / `extractSkeleton` / `slotsOf` / `pmRelevance`
 
-| 函数 | 入参 | 出参 | 策略 |
-|------|------|------|------|
-| `classifyCategory` | text | A/C/D/E | 关键词词典匹配 |
-| `classifyAngle` | tweet | 7 类之一 | 正则优先级匹配 |
-| `clusterTweets` | tweets, windowMs | `[{key,tweets}]` | 实体关键词 + 时间窗 |
-| `scoreCluster` | tweets | `{fit,viral,fresh,score,...}` | fit×0.3 + viral×0.4 + fresh×0.3 |
-| `buildHotspotFromCluster` | cluster, opts | hotspot 行 | 聚类→评分→分类→HOT 判定 |
-| `extractSkeleton` | text | skeleton | 正则替换（数字→{数据}，URL→{链接} 等） |
-| `slotsOf` | skeleton | slot[] | 从骨架中提取 `{...}` 占位符 |
-| `pmRelevance` | tweets | `{score,matches,total}` | PM 关键词命中率 |
-
-## AI 分析双轨策略
-
-每个分析任务都有 LLM 主路径 + 启发式回退：
+## AI 双轨
 
 | 任务 | 主路径（LLM） | 回退（启发式） |
 |------|--------------|---------------|
-| 热点评分 | `AIPipeline.scoreCluster` → DeepSeek | `ContentOps.scoreCluster` → 关键词密度 |
-| 角度分类 | `AIPipeline.classifyBatch` → DeepSeek | `ContentOps.classifyAngle` → 正则 |
-| 语义聚类 | `AIPipeline.runPipeline` → embedding + 余弦相似度 | `ContentOps.clusterTweets` → 关键词 + 4h 时间窗 |
-| 情报生成 | `AIPipeline.generateIntel` → DeepSeek | 原始推文直接展示 |
-| 模板提炼 | `AIPipeline.extractTemplates` → DeepSeek | `ContentOps.extractSkeleton` → 正则替换 |
-| 模板填充 | `AIPipeline.fillTemplate` → DeepSeek | —（仅 LLM） |
+| 热点评分 | `AIPipeline.scoreCluster` | `ContentOps.scoreCluster`（关键词密度） |
+| 角度分类 | `AIPipeline.classifyBatch` | `ContentOps.classifyAngle`（正则） |
+| 语义聚类 | `AIPipeline.runPipeline`（embedding） | `ContentOps.clusterTweets`（关键词+4h 窗） |
+| 情报生成 | `AIPipeline.generateIntel` | 原始推文直接展示 |
+| 模板提炼 | `AIPipeline.extractTemplates` | `ContentOps.extractSkeleton`（正则替换） |
+| 模板填充 | `AIPipeline.fillTemplate` | —（仅 LLM） |
 
 ## 数据库
 
-### 表
+9 张表：`teams` / `team_schemas` / `team_api_configs` / `weekly_data` / `user_profiles` / `sources` / `hotspots` / `templates` / `template_uses`
 
-| 表 | 用途 | 主要页面 |
-|---|------|---------|
-| `teams` | 产品组（id, label, sort_order） | dashboard |
-| `team_schemas` | 每组指标 schema（team_id, schema JSONB） | dashboard |
-| `team_api_configs` | API 拉取配置（team_id, config JSONB） | dashboard |
-| `weekly_data` | 周报复盘数据（team_id, week, data JSONB） | dashboard |
-| `user_profiles` | 用户档案（id, initials, display_name, role, avatar_color） | 全部 |
-| `sources` | 监控源（id, type, handle, status, metrics_4w JSONB） | sources |
-| `hotspots` | 热点（id, title, category, hot_signal, tweets JSONB, intel JSONB, metrics JSONB） | sources, radar |
-| `templates` | 金模板（id, category, angle, skeleton, required_slots JSONB） | templates |
-| `template_uses` | 模板使用记录（template_id, tweet_url, views, snapshot JSONB） | templates |
+全部 `anon` RLS，无需认证。
 
-### RLS
+v3 vs v2：删除 `bump_template_stats()` trigger + 3 个分析视图，RLS `authenticated` → `anon`，保留 `set_updated_at()`。
 
-全部 `anon` 可读写，无需认证。
+## 核心数据流
 
-### v3 变更（相对于 v2）
+**数据抓取**：Provider.fetchTweetsByHandle → ContentOps.clusterTweets → ContentOps.scoreCluster → buildHotspotFromCluster → sb.from('hotspots').upsert
 
-- 删除 `bump_template_stats()` trigger — 统计由 AI 管线/客户端计算
-- 删除 3 个视图：`v_weekly_hotspot_stats`, `v_template_perf`, `v_source_contribution`
-- RLS 从 `authenticated` 改为 `anon`
-- 保留 `set_updated_at()` trigger（纯工具）
+**AI 情报**：AIPipeline.generateIntel(title, tweets) → AIClient.chat → sb.from('hotspots').update({intel})
 
-## 数据流详解
+**模板提炼**：ContentOps.extractSkeleton（立刻展示）→ AIPipeline.extractTemplates（异步替换）→ sb.from('templates').insert
 
-### 数据抓取（sources.html → Supabase）
+**模板填充**：AIPipeline.fillTemplate(skeleton, slots, material, angle, cat) → AIClient.chat
 
-```
-用户点击 "↻ 同步"
-  → Provider.fetchTweetsByHandle(handle, 168h)
-    → validateHandle() → ensureAvailable()
-    → opencli → normalizeTweet → Tweet[]
-  → ContentOps.clusterTweets(tweets, 4h)
-  → ContentOps.buildHotspotFromCluster(cluster)
-    → ContentOps.classifyCategory(text)
-    → ContentOps.scoreCluster(tweets)
-    → HOT 判定: score≥0.35 且 (views≥10k 或 eng≥200)
-  → sb.from('hotspots').upsert(...)
-  → 回写 sources.metrics_4w
-```
+**周报复盘**：localStorage 离线优先 → Supabase 异步同步
 
-### AI 情报（radar.html）
-
-```
-用户选中无 intel 的热点
-  → AIPipeline.generateIntel(title, tweets)
-  → AIClient.chat([{system: intelPrompt, user: tweets}])
-  → {summary, facts, opportunity, dissent, timeline}
-  → sb.from('hotspots').update({intel}) → 持久化
-  → 重新渲染详情
-```
-
-### 模板提炼（templates.html）
-
-```
-用户选择爆款推文 → 点击 "提炼金模板"
-  → 启发式占位: ContentOps.extractSkeleton(text) → 立刻展示
-  → 异步 AI 提炼: AIPipeline.extractTemplates(tweets)
-    → AIClient.chat → [{skeleton, slots}]
-  → 用户编辑/勾选 → sb.from('templates').insert(rows)
-```
-
-### 模板填充（templates.html）
-
-```
-用户点击 "使用此模板"
-  → 填写素材文本
-  → AIPipeline.fillTemplate(skeleton, slots, material, angle, category)
-  → AIClient.chat → 填充后的推文文本
-```
-
-### 周报复盘（dashboard.html）
-
-```
-localStorage 离线优先
-  → teams / schema / state 保存在 localStorage
-  → 自动保存（800ms debounce）
-  → Supabase 异步同步（cloudUpsertTeams / cloudUpsertWeekly 等）
-  → 总览页：遍历所有 teams → 读取各自的 localStorage 存档 → 聚合
-```
-
-## 启动方式
+## 启动
 
 ```bash
-cp .env.example .env
-# 编辑 .env 填入 DeepSeek API key
-
-node src/serve.js
-# → http://localhost:8080
+cp .env.example .env   # 填入 DEEPSEEK_API_KEY
+node src/serve.js      # → http://localhost:8080
 ```
 
-启动前确保 Chrome 已安装 OpenCLI 插件（daemon 自动启动在 `:19825`）。
+确保 Chrome 已装 OpenCLI 插件。

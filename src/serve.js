@@ -54,6 +54,11 @@ window.DEEPSEEK_CONFIG = {
 };
 `;
 
+function log(method, path, status, detail) {
+  var now = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+  console.log('[' + now + '] ' + method + ' ' + path + ' → ' + status + (detail ? ' | ' + detail : ''));
+}
+
 createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const path = url.pathname;
@@ -65,18 +70,19 @@ createServer(async (req, res) => {
       let args = [];
       // Map HTTP paths to opencli CLI commands
       if (sub === '/health') {
+        log(req.method, path, 200);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true }));
         return;
       } else if (sub === '/api/twitter/user-timeline') {
         var h = url.searchParams.get('handle') || '';
-        args = ['twitter', 'tweets', h, '--limit', '100', '--format', 'json'];
+        args = ['twitter', 'tweets', h, '--limit', '10', '--format', 'json'];
       } else if (sub === '/api/twitter/tweet') {
         var tweetUrl = url.searchParams.get('url') || '';
         // Extract username from URL, get recent tweets, client will filter by id
         var m = tweetUrl.match(/(?:x\.com|twitter\.com)\/([^/]+)/i);
         var user = m ? m[1] : '';
-        args = ['twitter', 'tweets', user, '--limit', '100', '--format', 'json'];
+        args = ['twitter', 'tweets', user, '--limit', '10', '--format', 'json'];
       } else if (sub === '/api/twitter/list-members') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, count: 0, members: [], note: 'list members not available via OpenCLI — paste handles manually' }));
@@ -88,14 +94,20 @@ createServer(async (req, res) => {
         res.writeHead(400); res.end(JSON.stringify({ error: 'unknown endpoint: ' + sub })); return;
       }
 
+      const cmd = 'opencli ' + args.join(' ');
+      log(req.method, path, '…', cmd);
       const { execSync } = await import('node:child_process');
-      const result = execSync('opencli ' + args.join(' '), {
+      const result = execSync(cmd, {
         timeout: 30000, maxBuffer: 10 * 1024 * 1024, encoding: 'utf-8',
       });
+      var count = 1;
+      try { var parsed = JSON.parse(result); count = Array.isArray(parsed) ? parsed.length : 1; } catch (_) {}
+      log(req.method, path, 200, count + ' items');
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(result);
     } catch (e) {
       const msg = e.stderr || e.stdout || e.message || 'unknown error';
+      log(req.method, path, 502, String(msg).slice(0, 80));
       res.writeHead(502);
       res.end(JSON.stringify({ ok: false, error: String(msg).slice(0, 500) }));
     }
@@ -104,6 +116,10 @@ createServer(async (req, res) => {
 
   // /config.js — inject all runtime config into browser
   if (path === '/config.js') {
+    log(req.method, path, 200);
+    res.writeHead(200, { 'Content-Type': 'application/javascript' });
+    res.end(CONFIG_JS);
+    return;
     res.writeHead(200, { 'Content-Type': 'application/javascript' });
     res.end(CONFIG_JS);
     return;
@@ -111,9 +127,9 @@ createServer(async (req, res) => {
 
   // Static file serving — pages live in src/pages/, everything else under src/
   // Check raw URL for traversal (URL.pathname normalizes ../ away, so check req.url)
-  if (req.url.includes('..')) { res.writeHead(403); res.end(); return; }
+  if (req.url.includes('..')) { log(req.method, path, 403, 'blocked'); res.writeHead(403); res.end(); return; }
   // Block serving sensitive files
-  if (path === '/.env' || path.startsWith('/.git')) { res.writeHead(403); res.end(); return; }
+  if (path === '/.env' || path.startsWith('/.git')) { log(req.method, path, 403, 'blocked'); res.writeHead(403); res.end(); return; }
 
   let file;
   if (path === '/') {
@@ -127,14 +143,22 @@ createServer(async (req, res) => {
 
   try {
     const body = await readFile(ROOT + '/' + file);
+    var kind = path.endsWith('.html') ? 'page' : 'static';
+    log(req.method, path, 200, kind);
     res.writeHead(200, { 'Content-Type': MIME[extname(file)] || 'application/octet-stream' });
     res.end(body);
   } catch {
+    log(req.method, path, 404);
     res.writeHead(404);
     res.end('404');
   }
 }).listen(PORT, () => {
-  console.log(`→ http://localhost:${PORT}`);
-  if (!SUPABASE_URL) console.log('  WARN: SUPABASE_URL not set in .env');
-  if (!DEEPSEEK_API_KEY) console.log('  WARN: DEEPSEEK_API_KEY not set in .env');
+  console.log('──────────────────────────────────────────');
+  console.log('  OP Dashboard');
+  console.log('  → http://localhost:' + PORT);
+  console.log('');
+  console.log('  Supabase : ' + (SUPABASE_URL ? SUPABASE_URL.replace(/https?:\/\//,'') : 'NOT SET'));
+  console.log('  DeepSeek : ' + (DEEPSEEK_API_KEY ? 'configured' : 'NOT SET'));
+  console.log('  OpenCLI  : http://localhost:19825 (CLI bridge)');
+  console.log('──────────────────────────────────────────');
 });

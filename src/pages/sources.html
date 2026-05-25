@@ -915,6 +915,10 @@ theblock.co
       var mediaHtml = '';
       if (t.media_urls && t.media_urls.length > 0) {
         mediaHtml = t.media_urls.slice(0, 2).map(function (mu) {
+          var isVideo = /\.(mp4|mov|webm|m3u8)(\?|$)/i.test(mu) || /video|twimg\.com\/.*\/vid\//i.test(mu);
+          if (isVideo) {
+            return '<video src="' + mu + '" controls style="width:100%;border-radius:8px;margin-top:8px;max-height:260px" preload="metadata"></video>';
+          }
           return '<img src="' + mu + '" style="width:100%;border-radius:8px;margin-top:8px;max-height:260px;object-fit:cover" loading="lazy" />';
         }).join('');
       }

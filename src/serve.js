@@ -78,8 +78,9 @@ createServer(async (req, res) => {
         var user = m ? m[1] : '';
         args = ['twitter', 'tweets', user, '--limit', '100', '--format', 'json'];
       } else if (sub === '/api/twitter/list-members') {
-        var lid = url.searchParams.get('listId') || '';
-        args = ['twitter', 'list-tweets', lid, '--limit', '200', '--format', 'json'];
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, count: 0, members: [], note: 'list members not available via OpenCLI — paste handles manually' }));
+        return;
       } else if (sub === '/exec') {
         var cmd = url.searchParams.get('cmd') || '';
         args = cmd.split(' ');

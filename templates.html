@@ -7,6 +7,9 @@
 <link rel="stylesheet" href="styles.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
+<script src="src/ai/client.js"></script>
+<script src="src/ai/pipeline.js"></script>
+<script src="src/provider.js"></script>
 <style>
 
 .config-nav-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--border-radius-md);font-size:12px;color:var(--color-text-secondary);cursor:pointer;margin-bottom:2px;}
@@ -683,7 +686,6 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
 
 // ====== 记录使用 (real backend: pallax-api + Supabase template_uses) ======
 (function(){
-  const { API_BASE } = window.PALLAX_CONFIG;
   const { SUPABASE_URL, SUPABASE_KEY } = window.PALLAX_CONFIG;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -765,28 +767,22 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
     fetchMsg.style.color = ''; fetchMsg.textContent = '抓取中…';
     btnFetch.disabled = true; btnSave.disabled = true;
     try {
-      const res = await fetch(`${API_BASE}/api/twitter/tweet`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-      });
-      const json = await res.json();
-      if (!json.ok) {
-        fetchMsg.textContent = '失败: ' + (json.error || res.status);
+      lastFetched = await window.Provider.fetchSingleTweet(url);
+      if (!lastFetched) {
+        fetchMsg.textContent = '失败: 未获取到推文';
         fetchMsg.style.color = '#A32D2D';
         return;
       }
-      lastFetched = json.tweet;
-      const t = json.tweet;
+      const t = lastFetched;
       el('usage-author').textContent = t.author ? `@${t.author.username}` : '(unknown)';
       el('usage-time').textContent   = t.created_at ? new Date(t.created_at).toLocaleString('zh-CN') : '';
       el('usage-text').textContent   = t.text || '';
-      el('usage-views').textContent     = (t.metrics.views ?? 0).toLocaleString();
-      el('usage-likes').textContent     = (t.metrics.likes ?? 0).toLocaleString();
-      el('usage-rt').textContent        = (t.metrics.retweets ?? 0).toLocaleString();
-      el('usage-replies').textContent   = (t.metrics.replies ?? 0).toLocaleString();
-      el('usage-quotes').textContent    = (t.metrics.quotes ?? 0).toLocaleString();
-      el('usage-bookmarks').textContent = (t.metrics.bookmarks ?? 0).toLocaleString();
+      el('usage-views').textContent     = (t.metrics.views || 0).toLocaleString();
+      el('usage-likes').textContent     = (t.metrics.likes || 0).toLocaleString();
+      el('usage-rt').textContent        = (t.metrics.retweets || 0).toLocaleString();
+      el('usage-replies').textContent   = (t.metrics.replies || 0).toLocaleString();
+      el('usage-quotes').textContent    = (t.metrics.quotes || 0).toLocaleString();
+      el('usage-bookmarks').textContent = (t.metrics.bookmarks || 0).toLocaleString();
       resultBox.style.display = '';
       btnSave.disabled = !tplSelect.value;
       fetchMsg.textContent = '✓ 已抓取';
@@ -1128,25 +1124,17 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
 
     // 异步: 调 LLM
     try {
-      const apiBase = `http://${location.hostname}:8081`;
-      const r = await fetch(`${apiBase}/api/ai/extract-template`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tweets: items.map(t => ({ text: t.text, views: t.metrics?.views })),
-          angle: currentAngle === '全部' ? null : currentAngle,
-          category: null,
-        }),
-      });
-      const res = await r.json();
-      if (res.ok && Array.isArray(res.templates) && res.templates.length === items.length) {
-        renderCards(items, res.templates, 'ai');
-        exSummary.textContent = `从 ${currentAngle} 类的 top ${items.length} 条爆款, ✨ AI 抽象 (${res.model}). 你可以编辑、勾选要保存的.`;
+      const templates = await window.AIPipeline.extractTemplates(
+        items.map(t => ({ text: t.text, metrics: t.metrics, author: t.author })),
+      );
+      if (templates && templates.length > 0) {
+        renderCards(items, templates, 'ai');
+        exSummary.textContent = '从 ' + currentAngle + ' 类的 top ' + items.length + ' 条爆款, ✨ AI 抽象. 你可以编辑、勾选要保存的.';
       } else {
-        exSummary.textContent = `${exSummary.textContent} · ⚠ AI 提炼失败, 用启发式占位 (${res.error || 'unknown'})`;
+        exSummary.textContent = exSummary.textContent + ' · ⚠ AI 提炼返回空, 用启发式占位';
       }
     } catch (e) {
-      exSummary.textContent = `${exSummary.textContent} · ⚠ AI 提炼网络错误, 用启发式占位`;
+      exSummary.textContent = exSummary.textContent + ' · ⚠ AI 提炼错误, 用启发式占位';
     }
   }
 
@@ -1251,7 +1239,6 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
 
 // ====== ✨ 使用此模板 (AI 套模板填充) ======
 (function(){
-  const API_BASE = `http://${location.hostname}:8081`;
   const modal   = document.getElementById('ai-fill-modal');
   const skelEl  = document.getElementById('ai-fill-skel');
   const slotsEl = document.getElementById('ai-fill-slots');
@@ -1304,27 +1291,22 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
     btnGen.disabled = true; btnGen.textContent = '生成中…';
     msgEl.textContent = ''; msgEl.style.color = '';
     try {
-      const r = await fetch(`${API_BASE}/api/ai/fill-template`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          skeleton: currentTpl.skeleton,
-          slots: currentTpl.required_slots || [],
-          material,
-          angle: currentTpl.angle,
-          category: currentTpl.category,
-        }),
-      });
-      const json = await r.json();
-      if (!json.ok) {
-        msgEl.textContent = '✕ ' + (json.error || ('HTTP ' + r.status));
+      const text = await window.AIPipeline.fillTemplate(
+        currentTpl.skeleton,
+        currentTpl.required_slots || [],
+        material,
+        currentTpl.angle,
+        currentTpl.category,
+      );
+      if (!text) {
+        msgEl.textContent = '✕ AI 生成失败';
         msgEl.style.color = '#A32D2D';
         btnGen.disabled = false; btnGen.textContent = '✨ 生成';
         return;
       }
-      outEl.value = json.text || '';
+      outEl.value = text;
       outWrap.style.display = '';
-      msgEl.textContent = `✓ 生成成功 · 用 ${json.model || 'AI'}`;
+      msgEl.textContent = '✓ 生成成功';
       msgEl.style.color = '#27500A';
     } catch (e) {
       msgEl.textContent = '✕ 网络错误: ' + e.message;

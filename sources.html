@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="styles.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
+<script src="src/provider.js"></script>
 <style>
 
 .config-nav-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--border-radius-md);font-size:12px;color:var(--color-text-secondary);cursor:pointer;margin-bottom:2px;}
@@ -734,25 +735,13 @@ theblock.co
     msgXList.textContent = '调 X API…';
     msgXList.style.color = 'var(--color-text-tertiary)';
     try {
-      const { API_BASE } = window.PALLAX_CONFIG;
-      const r = await fetch(`${API_BASE}/api/twitter/list/${encodeURIComponent(m[1])}/members`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
-      });
-      const res = await r.json();
-      if (!res.ok) {
-        msgXList.textContent = '✕ 失败: ' + (res.error || r.status);
-        msgXList.style.color = '#A32D2D';
-        return;
-      }
-      // 拼成 "@handle    bio" 的行, 直接灌进 textarea (无数量限制)
-      const lines = (res.members || []).map(u => {
+      const members = await window.Provider.fetchListMembers(m[1]);
+      const lines = members.map(u => {
         const bio = u.bio ? '  ' + u.bio.replace(/\s+/g, ' ').slice(0, 60) : '';
         return `@${u.username}${bio}`;
       }).join('\n');
       txtArea.value = (txtArea.value.trim() ? txtArea.value.trim() + '\n' : '') + lines;
-      msgXList.textContent = `✓ 拉到 ${res.count} 个 list 成员`;
+      msgXList.textContent = '✓ 拉到 ' + members.length + ' 个 list 成员';
       msgXList.style.color = '#27500A';
       inpXListUrl.value = '';
       reparse();
@@ -875,7 +864,6 @@ theblock.co
 
 // ====== ↻ 同步: 拉 @handle 近 7 天 → 聚类 → cluster hotspot (RPC) + 🔥 爆款 feed ======
 (function(){
-  const { API_BASE } = window.PALLAX_CONFIG;
   const { SUPABASE_URL, SUPABASE_KEY } = window.PALLAX_CONFIG;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   const SYNC_HOURS = 168;             // 7 天
@@ -1166,19 +1154,12 @@ theblock.co
     ptFetch.disabled = true; ptFetch.textContent = '抓取中…';
     ptMsg.textContent = ''; ptMsg.style.color = '';
     try {
-      const r = await fetch(`${API_BASE}/api/twitter/tweet`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-      });
-      const res = await r.json();
-      if (!res.ok) {
-        ptMsg.textContent = '✕ ' + (res.error || ('HTTP ' + r.status));
+      ptFetched = await window.Provider.fetchSingleTweet(url);
+      if (!ptFetched) {
+        ptMsg.textContent = '✕ 抓取失败: 未获取到推文';
         ptMsg.style.color = '#A32D2D';
         return;
       }
-      ptFetched = res.tweet;
-      // 给 t 加 kind 字段 (singleTweet 不返回 referenced_tweets, 默认 original)
       if (!ptFetched.kind) ptFetched.kind = 'original';
       // preview
       const angle = classifyAngle(ptFetched);
@@ -1257,32 +1238,24 @@ theblock.co
   window.__toast = toast;
 
   async function syncHandle(handle, sourceId, btn) {
-    // 1. 拉 X
+    // 1. 拉 X (via OpenCLI Provider)
     btn.disabled = true;
     btn.textContent = '↻ 拉取中…';
-    let res;
+    let tweets = [];
+    let rateLimit = {};
     try {
-      const r = await fetch(`${API_BASE}/api/twitter/handle/${encodeURIComponent(handle)}/recent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hours: SYNC_HOURS }),
-      });
-      res = await r.json();
-      if (!res.ok) {
-        toast(`✕ 拉 @${handle} 失败: ${res.error || r.status}`, 'error');
-        return;
-      }
+      tweets = await window.Provider.fetchTweetsByHandle(handle, SYNC_HOURS);
     } catch (e) {
-      toast(`✕ 网络错误: ${e.message}`, 'error');
+      toast('✕ 拉 @' + handle + ' 失败: ' + e.message, 'error');
+      btn.disabled = false;
       return;
     } finally {
       btn.disabled = false;
     }
 
-    const tweets = res.tweets || [];
     if (tweets.length === 0) {
       btn.textContent = '↻ 同步';
-      toast(`@${handle}: 近 7 天 0 条推文 (可能账号沉默或被保护)`, 'warn');
+      toast('@' + handle + ': 近 7 天 0 条推文 (可能账号沉默或被保护)', 'warn');
       return;
     }
 
@@ -1311,8 +1284,7 @@ theblock.co
     }
 
     btn.textContent = '↻ 同步';
-    const rateLeft = res.rate_limit?.remaining;
-    const rateNote = rateLeft != null ? `  · 配额剩 ${rateLeft}` : '';
+    const rateNote = '';
 
     // 3. 回写源的 metrics_4w (语义改为 7 天: 这个源在 7 天里关联到多少 hotspot)
     //    (跟下方 🔥 feed 用同一份 hotspots 数据对齐)
@@ -1383,7 +1355,6 @@ theblock.co
 
 // ====== PM 相关度: 工具函数 (导入时自动调用) + 过滤芯片 ======
 (function(){
-  const { API_BASE } = window.PALLAX_CONFIG;
   const { SUPABASE_URL, SUPABASE_KEY } = window.PALLAX_CONFIG;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   const SYNC_HOURS = 168;
@@ -1412,17 +1383,8 @@ theblock.co
   async function evaluateOneSource(source) {
     const handle = source.handle.replace(/^@/, '');
     try {
-      const r = await fetch(`${API_BASE}/api/twitter/handle/${encodeURIComponent(handle)}/recent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hours: SYNC_HOURS }),
-      });
-      const res = await r.json();
-      if (!res.ok) {
-        console.warn('[pm-eval] api fail', handle, res.error);
-        return { ok: false, error: res.error };
-      }
-      const rel = pmRelevance(res.tweets);
+      const tweets = await window.Provider.fetchTweetsByHandle(handle, SYNC_HOURS);
+      const rel = pmRelevance(tweets);
       const nextMetrics = {
         ...(source.metrics_4w || {}),
         pm_score: rel.score,

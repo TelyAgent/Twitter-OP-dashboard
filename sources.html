@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="styles.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
+<script src="src/content-ops.js"></script>
 <script src="src/provider.js"></script>
 <style>
 
@@ -852,128 +853,8 @@ theblock.co
   const HOT_MIN_VIEWS = 10000;          // 要么至少 10k 视图
   const HOT_MIN_ENGAGEMENT = 200;       // 要么互动 ≥ 200 (高质小盘)
 
-  // ── 主实体词典 + 分类词典 (从 content-factory radar-pull.js 抄)
-  const CLUSTER_KEYS = [
-    'polymarket','kalshi','manifold','metaculus','predictit',
-    'fomc','cpi','nfp','pce','gdp','payroll',
-    'powell','trump','biden','harris','musk','lagarde','yellen','sbf',
-    'bitcoin','btc','ethereum','eth','solana','sol','xrp','bnb',
-    'smart money','whale','on-chain','onchain','defi','tvl',
-    'inflation','interest rate','rate cut','rate hike',
-    'election','congress','senate',
-    'hack','exploit','rug','scam',
-  ];
-  const CAT_KW = {
-    A: ['odds','polymarket','kalshi','manifold','prediction market','bet','probability','resolves','contract','yes/no'],
-    C: ['smart money','whale','wallet','0x','on-chain','onchain','defi','position','buys','sells','moves funds'],
-    D: ['new market','new contract','launching','listed','just added','first trade','new listing'],
-    E: ['fomc','fed','cpi','inflation','rate cut','rate hike','election','trump','powell','bitcoin','btc','crypto'],
-  };
-  const ALL_KW = Object.values(CAT_KW).flat();
-
-  function extractKey(text) {
-    const lower = (text || '').toLowerCase();
-    for (const k of CLUSTER_KEYS) if (lower.includes(k)) return k;
-    const m = (text || '').match(/\$[\d,.]+[kKmMbB]?/);
-    return m ? m[0].toLowerCase() : null;
-  }
-  function classifyCategory(text) {
-    const lower = (text || '').toLowerCase();
-    for (const [cat, kws] of Object.entries(CAT_KW)) {
-      if (kws.some(kw => lower.includes(kw))) return cat;
-    }
-    return 'E';
-  }
-
-  // ── 聚类: 同 key + 4h 窗口为一簇; 无 key 的每条自成一簇 (会被低分过滤掉)
-  function clusterTweets(tweets) {
-    const byKey = new Map();
-    const orphans = [];
-    for (const t of tweets) {
-      const k = extractKey(t.text);
-      if (k) {
-        if (!byKey.has(k)) byKey.set(k, []);
-        byKey.get(k).push(t);
-      } else {
-        orphans.push(t);
-      }
-    }
-    const clusters = [];
-    for (const [key, group] of byKey) {
-      group.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-      let curr = [group[0]];
-      for (let i = 1; i < group.length; i++) {
-        const dt = new Date(group[i].created_at) - new Date(curr[curr.length - 1].created_at);
-        if (dt <= CLUSTER_WINDOW_MS) curr.push(group[i]);
-        else { clusters.push({ key, tweets: curr }); curr = [group[i]]; }
-      }
-      clusters.push({ key, tweets: curr });
-    }
-    for (const t of orphans) clusters.push({ key: 'misc', tweets: [t] });
-    return clusters;
-  }
-
-  // ── cluster 评分 (fit / viral / fresh / score)
-  function scoreCluster(tweets) {
-    const allText = tweets.map(t => t.text || '').join(' ').toLowerCase();
-    let matches = 0; for (const kw of ALL_KW) if (allText.includes(kw)) matches++;
-    const fit = Math.min(1, matches / Math.max(tweets.length * 3, 3));
-
-    let totalEng = 0, totalViews = 0;
-    for (const t of tweets) {
-      const m = t.metrics || {};
-      totalEng += (m.likes || 0) + (m.retweets || 0) + (m.replies || 0);
-      totalViews += m.views || 0;
-    }
-    const avgEng = totalEng / tweets.length;
-    const avgViews = totalViews / tweets.length;
-    const viral = avgViews > 0
-      ? Math.min(1, avgEng / Math.max(avgViews * 0.02, 50))
-      : Math.min(1, avgEng / 200);
-
-    const newest = Math.max(...tweets.map(t => new Date(t.created_at).getTime() || 0));
-    const hoursOld = (Date.now() - newest) / 3.6e6;
-    const fresh = Math.max(0, 1 - hoursOld / 72);
-
-    let score = fit * 0.3 + viral * 0.4 + fresh * 0.3;
-    // 地板: 0 互动 = 噪声 (直接 0); 极低互动 = 重罚
-    if (totalEng < 10)       score = 0;
-    else if (viral < 0.05)    score *= 0.3;
-    score = +score.toFixed(3);
-
-    return {
-      fit: +fit.toFixed(2), viral: +viral.toFixed(2), fresh: +fresh.toFixed(2), score,
-      cluster_size: tweets.length, total_views: totalViews, total_engagement: totalEng,
-      avg_views: Math.round(avgViews), avg_engagement: Math.round(avgEng),
-    };
-  }
-
-  // ── 构造 hotspot 行 (准备调 RPC)
-  function buildHotspotFromCluster(cluster) {
-    const tweets = [...cluster.tweets].sort((a, b) => (b.metrics?.views || 0) - (a.metrics?.views || 0));
-    const top = tweets[0];
-    const allText = tweets.map(t => t.text || '').join(' ');
-    const cat = classifyCategory(allText);
-    const sc = scoreCluster(tweets);
-
-    // 4h time bucket from earliest tweet
-    const earliest = Math.min(...tweets.map(t => new Date(t.created_at).getTime() || Date.now()));
-    const bucket = Math.floor(earliest / CLUSTER_WINDOW_MS);
-    const keySlug = cluster.key.replace(/[^a-z0-9]+/gi, '_').slice(0, 30);
-
-    // HOT 双门槛: score 过线 + (绝对 views 或 绝对 eng 至少一个达标)
-    const passAbs = (sc.total_views >= HOT_MIN_VIEWS) || (sc.total_engagement >= HOT_MIN_ENGAGEMENT);
-    const isHot = sc.score >= HOT_THRESHOLD && passAbs;
-
-    return {
-      id: `hs_c_${keySlug}_${bucket}`,
-      title: (top.text || '').slice(0, 120),
-      category: cat,
-      hot_signal: isHot,
-      tweets,
-      metrics: sc,
-    };
-  }
+  // Content operations now in window.ContentOps (src/content-ops.js)
+  const CO = window.ContentOps;
 
   // ─── 工具 ─────────────────────────────────────────────────────────────
   function escapeHtml(s) {
@@ -995,42 +876,7 @@ theblock.co
     return Math.floor(diff/8.64e7) + ' d';
   }
 
-  // 启发式: 从 tweet 文本 + kind 推断 7 angle 之一
-  function classifyAngle(t) {
-    if (!t) return null;
-    const text = String(t.text || '');
-    if (!text) return null;
-
-    // 1. Thread 标记最优先
-    if (/🧵|^\s*1\/|\(1\/\d+\)|\bthread\b/i.test(text)) return 'Thread';
-
-    // 2. 教程
-    if (/\b(full guide|step.?by.?step|tutorial|how to|here'?s how|hour guide|guide:|complete guide|walkthrough)\b/i.test(text)) return '教程';
-
-    // 3. 案例
-    if (/(this guy|made \$[\d,]+|turned \$[\d,.]+ ?into|flipped \$[\d,.]+|\$\d{2,}\s?k\/?(month|day)|profit of \$)/i.test(text)) return '案例';
-
-    // 4. 反直觉 (sensational language + ALL-CAPS 序列)
-    if (/\b(destroyed|killed|finally|everyone (thinks|expects)|nobody (knows|talks|sees)|reality is|truth is|wrong about|but actually|the real |secret|exposed)\b/i.test(text)
-        || /\b[A-Z]{5,}\b/.test(text)) {
-      return '反直觉';
-    }
-
-    // 5. 数据驱动 (数字/比例)
-    if (/\d{1,3}%|\b\d+x\s+(return|gain|profit)|\bwin rate|\broi\b|n\s*=\s*\d+|backtest/i.test(text)) return '数据驱动';
-
-    // 6. KOL 蹭点 (转发/引用/回复 或多 @)
-    if (t.kind === 'quote' || t.kind === 'reply' || t.kind === 'retweet'
-        || (text.match(/@\w+/g) || []).length >= 2) {
-      return 'KOL 蹭点';
-    }
-
-    // 7. 深度 (长 original)
-    if (text.length > 200 && t.kind === 'original') return '深度';
-
-    // 都没命中 → Other 兜底
-    return 'Other';
-  }
+  // classifyAngle now in window.ContentOps (src/content-ops.js)
 
   // ─── 🔥 爆款 feed ────────────────────────────────────────────────────
   async function loadFireFeed() {
@@ -1070,7 +916,7 @@ theblock.co
       const url = t.url || `https://x.com/i/status/${t.id}`;
       const kindBadge = (t.kind && t.kind !== 'original')
         ? `<span style="font-size:10px;background:#EEEDFE;color:#3C3489;padding:1px 5px;border-radius:3px;margin-left:4px">${t.kind}</span>` : '';
-      const angle = classifyAngle(t);
+      const angle = CO.classifyAngle(t);
       const angleBadge = angle ? (() => {
         const bg = angle === 'Other' ? '#ECEAE0' : '#FAEEDA';
         const fg = angle === 'Other' ? '#888780' : '#854F0B';
@@ -1140,7 +986,7 @@ theblock.co
       }
       if (!ptFetched.kind) ptFetched.kind = 'original';
       // preview
-      const angle = classifyAngle(ptFetched);
+      const angle = CO.classifyAngle(ptFetched);
       document.getElementById('pt-author').textContent = ptFetched.author?.username ? '@' + ptFetched.author.username : '?';
       document.getElementById('pt-time').textContent   = ptFetched.created_at ? new Date(ptFetched.created_at).toLocaleString('zh-CN') : '';
       document.getElementById('pt-angle').textContent  = angle || '反直觉';
@@ -1168,12 +1014,7 @@ theblock.co
     const t = ptFetched;
     const m = t.metrics || {};
     const eng = (m.likes || 0) + (m.retweets || 0) + (m.replies || 0);
-    // 简单分类: 看是否命中 CAT_KW (复用 sync IIFE 内的同名常量)
-    const text = (t.text || '').toLowerCase();
-    let cat = 'E';
-    for (const [c, kws] of Object.entries(CAT_KW)) {
-      if (kws.some(k => text.includes(k))) { cat = c; break; }
-    }
+    var cat = CO.classifyCategory(t.text || '');
     const row = {
       id: `hs_manual_${t.id}`,
       title: (t.text || '').slice(0, 120),
@@ -1238,8 +1079,8 @@ theblock.co
     }
 
     // 2. 聚类 → 评分 → 过滤 → 调 RPC
-    const clusters = clusterTweets(tweets);
-    const candidates = clusters.map(buildHotspotFromCluster);
+    const clusters = CO.clusterTweets(tweets, CLUSTER_WINDOW_MS);
+    const candidates = clusters.map(function (c) { return CO.buildHotspotFromCluster(c, { windowMs: CLUSTER_WINDOW_MS, hotThreshold: HOT_THRESHOLD, hotMinViews: HOT_MIN_VIEWS, hotMinEng: HOT_MIN_ENGAGEMENT }); });
     const kept = candidates.filter(h => h.metrics.score >= MIN_CLUSTER_SCORE);
     const dropped = candidates.length - kept.length;
     console.log(`[sync] ${handle}: ${tweets.length} 推 → ${clusters.length} 簇 → 保留 ${kept.length} (丢 ${dropped} low-score)`);
@@ -1337,32 +1178,14 @@ theblock.co
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   const SYNC_HOURS = 168;
 
-  const POLY_KW = [
-    'polymarket','kalshi','manifold','predictit','metaculus',
-    'prediction market','binary market','event contract','odds','probability',
-    'yes/no','resolves','bet on','betting market',
-    'fomc','rate cut','rate hike','election','whale','smart money',
-    'fed','cpi','powell','trump',
-  ];
-
-  function pmRelevance(tweets) {
-    if (!tweets || tweets.length === 0) return { score: 0, matches: 0, total: 0 };
-    let matches = 0;
-    for (const t of tweets) {
-      const text = (t.text || '').toLowerCase();
-      if (POLY_KW.some(kw => text.includes(kw))) matches++;
-    }
-    const ratio = matches / tweets.length;
-    const score = +Math.min(1, ratio / 0.2).toFixed(2);
-    return { score, matches, total: tweets.length };
-  }
+  // pmRelevance now in window.ContentOps (src/content-ops.js)
 
   // 评估单个 source 的 PM 相关度并回写 (供导入流程调用)
   async function evaluateOneSource(source) {
     const handle = source.handle.replace(/^@/, '');
     try {
       const tweets = await window.Provider.fetchTweetsByHandle(handle, SYNC_HOURS);
-      const rel = pmRelevance(tweets);
+      const rel = CO.pmRelevance(tweets);
       const nextMetrics = {
         ...(source.metrics_4w || {}),
         pm_score: rel.score,

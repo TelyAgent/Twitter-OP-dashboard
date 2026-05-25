@@ -8,6 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="/env.js"></script>
+<script src="src/content-ops.js"></script>
 <script src="src/ai/client.js"></script>
 <script src="src/ai/pipeline.js"></script>
 <script src="src/provider.js"></script>
@@ -826,22 +827,8 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
   const { SUPABASE_URL, SUPABASE_KEY } = window.PALLAX_CONFIG;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  // 跟 08-sources / 02-radar 同一份角度分类启发式
-  function classifyAngle(t) {
-    if (!t) return 'Other';
-    const text = String(t.text || '');
-    if (!text) return 'Other';
-    if (/🧵|^\s*1\/|\(1\/\d+\)|\bthread\b/i.test(text)) return 'Thread';
-    if (/\b(full guide|step.?by.?step|tutorial|how to|here'?s how|hour guide|guide:|complete guide|walkthrough)\b/i.test(text)) return '教程';
-    if (/(this guy|made \$[\d,]+|turned \$[\d,.]+ ?into|flipped \$[\d,.]+|\$\d{2,}\s?k\/?(month|day)|profit of \$)/i.test(text)) return '案例';
-    if (/\b(destroyed|killed|finally|everyone (thinks|expects)|nobody (knows|talks|sees)|reality is|truth is|wrong about|but actually|the real |secret|exposed)\b/i.test(text)
-        || /\b[A-Z]{5,}\b/.test(text)) return '反直觉';
-    if (/\d{1,3}%|\b\d+x\s+(return|gain|profit)|\bwin rate|\broi\b|n\s*=\s*\d+|backtest/i.test(text)) return '数据驱动';
-    if (t.kind === 'quote' || t.kind === 'reply' || t.kind === 'retweet'
-        || (text.match(/@\w+/g) || []).length >= 2) return 'KOL 蹭点';
-    if (text.length > 200 && t.kind === 'original') return '深度';
-    return 'Other';
-  }
+  // classifyAngle now in window.ContentOps (src/content-ops.js)
+  const CO = window.ContentOps;
 
   const ANGLES_FOR_TABS = ['全部', '反直觉', '数据驱动', '案例', 'KOL 蹭点', '深度', '教程', 'Thread', 'Other'];
 
@@ -919,7 +906,7 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
       t._manual = h.metrics?.manual === true;
       return t;
     }).filter(Boolean);
-    tweets.forEach(t => { t._angle = classifyAngle(t); });
+    tweets.forEach(t => { t._angle = CO.classifyAngle(t); });
     tweets.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     allFire = tweets;
     renderTabs();
@@ -1057,33 +1044,7 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
   window.__reloadTplMatrix = loadMatrix;
   loadMatrix();
 
-  // ====== ✨ 提炼金模板 (启发式: 数字/URL/@/$ → 槽位) ======
-  const CAT_KW = {
-    A: ['odds','polymarket','kalshi','manifold','prediction market','bet','probability','resolves','contract','yes/no'],
-    C: ['smart money','whale','wallet','0x','on-chain','onchain','defi','position','buys','sells','moves funds'],
-    D: ['new market','new contract','launching','listed','just added','first trade','new listing'],
-    E: ['fomc','fed','cpi','inflation','rate cut','rate hike','election','trump','powell','bitcoin','btc','crypto'],
-  };
-  function classifyCategory(text) {
-    const lower = String(text || '').toLowerCase();
-    for (const [cat, kws] of Object.entries(CAT_KW)) {
-      if (kws.some(kw => lower.includes(kw))) return cat;
-    }
-    return 'E';
-  }
-  function extractSkeleton(text) {
-    let t = String(text || '');
-    t = t.replace(/https?:\/\/\S+/g, '{链接}');
-    t = t.replace(/@\w+/g, '{账号}');
-    t = t.replace(/\$[\d,.]+\s?[kKmMbB]?(\/(month|day|hour|hr))?/g, '{金额}');
-    t = t.replace(/\b\d{1,3}%/g, '{比例}');
-    t = t.replace(/\b\d+x\b/g, '{倍数}');
-    t = t.replace(/\b\d{4,}\b/g, '{数据}');
-    return t;
-  }
-  function slotsOf(skeleton) {
-    return Array.from(new Set((skeleton.match(/\{[^}]+\}/g) || []).map(m => m.slice(1,-1))));
-  }
+  // extractSkeleton, classifyCategory, slotsOf now in window.ContentOps
 
   const exModal   = document.getElementById('extract-modal');
   const exClose   = document.getElementById('extract-close');
@@ -1105,7 +1066,7 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
 
     // 先用启发式占位填充, 然后异步调 LLM 用真抽象覆盖
     exSummary.textContent = `从 ${currentAngle === '全部' ? '全部' : currentAngle} 类的 top ${items.length} 条爆款, 调 AI 抽象模板...`;
-    renderCards(items, items.map(t => ({ skeleton: extractSkeleton(t.text || ''), slots: slotsOf(extractSkeleton(t.text || '')) })), 'regex');
+    renderCards(items, items.map(t => ({ skeleton: CO.extractSkeleton(t.text || ''), slots: CO.slotsOf(CO.extractSkeleton(t.text || '')) })), 'regex');
     exMsg.textContent = '';
     exModal.classList.add('open');
     exModal._tweets = items;
@@ -1130,10 +1091,10 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
 
   function renderCards(items, extracted, sourceTag) {
     exListEl.innerHTML = items.map((t, i) => {
-      const ext = extracted[i] || { skeleton: extractSkeleton(t.text || ''), slots: slotsOf(extractSkeleton(t.text || '')) };
-      const skel = ext.skeleton || extractSkeleton(t.text || '');
-      const slots = ext.slots && ext.slots.length > 0 ? ext.slots : slotsOf(skel);
-      const cat = classifyCategory(t.text || '');
+      const ext = extracted[i] || { skeleton: CO.extractSkeleton(t.text || ''), slots: CO.slotsOf(CO.extractSkeleton(t.text || '')) };
+      const skel = ext.skeleton || CO.extractSkeleton(t.text || '');
+      const slots = ext.slots && ext.slots.length > 0 ? ext.slots : CO.slotsOf(skel);
+      const cat = CO.classifyCategory(t.text || '');
       const angle = t._angle || 'Other';
       const handle = t.author?.username ? '@' + t.author.username : '?';
       const tagBg = sourceTag === 'ai' ? '#EEEDFE' : '#FAEEDA';
@@ -1197,7 +1158,7 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
       const cat  = card.querySelector('.ex-cat').value;
       const t = items[i];
       if (!skel) continue;
-      const slots = slotsOf(skel);
+      const slots = CO.slotsOf(skel);
       const angleVal = (t._angle && t._angle !== 'Other') ? t._angle : '反直觉';
       rows.push({
         id: 'tpl_' + (crypto.randomUUID ? crypto.randomUUID().slice(0,8) : Math.random().toString(36).slice(2,10)),

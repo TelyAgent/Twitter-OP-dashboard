@@ -8,6 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="/env.js"></script>
+<script src="src/content-ops.js"></script>
 <script src="src/ai/client.js"></script>
 <script src="src/ai/pipeline.js"></script>
 <style>
@@ -342,78 +343,7 @@
 
   const CAT_LABEL = { A:'A 赔率', C:'C 链上', D:'D 新合约', E:'E 现实' };
 
-  // 抄自 content-factory radar-pull.js: 用于评分 fit 项 + 兜底自动分类
-  const CAT_KW = {
-    A: ['odds','polymarket','kalshi','manifold','prediction market','bet','probability','resolves','contract','yes/no'],
-    C: ['smart money','whale','wallet','0x','on-chain','onchain','defi','position','buys','sells','moves funds'],
-    D: ['new market','new contract','launching','listed','just added','first trade','new listing'],
-    E: ['fomc','fed','cpi','inflation','rate cut','rate hike','election','trump','powell','bitcoin','btc','crypto'],
-  };
-  const ALL_KW = Object.values(CAT_KW).flat();
-
-  // 三维评分: fit / viral / fresh → score
-  // - fit / viral: 来源数据不变, 优先用 hotspot.metrics 里已存的 (cluster 同步时算好)
-  // - fresh: 始终现算 (会随时间衰减)
-  // 兼容 single-tweet seed hotspot, multi-tweet cluster, 无 metrics 的旧 mock 数据
-  function computeScore(hs) {
-    const tweets = hs.tweets || [];
-    const text = tweets.length > 0
-      ? tweets.map(t => t.text || '').join(' ').toLowerCase()
-      : (hs.title || '').toLowerCase();
-
-    // fit: 优先用 metrics 存的, 否则现算
-    let fit = hs.metrics?.fit;
-    if (fit == null) {
-      let matchCnt = 0;
-      for (const kw of ALL_KW) if (text.includes(kw)) matchCnt++;
-      fit = Math.min(1, matchCnt / Math.max(tweets.length * 3, 3));
-    }
-
-    // viral: 优先用 metrics 存的
-    let viral = hs.metrics?.viral;
-    if (viral == null) {
-      let totalEng = 0, totalViews = 0;
-      const ts = tweets.length > 0 ? tweets : [{ metrics: hs.metrics || {} }];
-      for (const t of ts) {
-        const m = t.metrics || {};
-        totalEng += (m.likes || 0) + (m.retweets || 0) + (m.replies || 0);
-        totalViews += m.views || 0;
-      }
-      const avgEng = totalEng / ts.length;
-      const avgViews = totalViews / ts.length;
-      viral = avgViews > 0
-        ? Math.min(1, avgEng / Math.max(avgViews * 0.02, 50))
-        : Math.min(1, avgEng / 200);
-    }
-
-    // fresh: 总是现算, 用最新 tweet 的 created_at (或 hs.created_at fallback)
-    let newest = 0;
-    for (const t of tweets) {
-      const ts = new Date(t.created_at || 0).getTime();
-      if (ts > newest) newest = ts;
-    }
-    if (newest === 0) newest = new Date(hs.created_at || 0).getTime();
-    const ageHours = newest > 0 ? (Date.now() - newest) / 3.6e6 : 9999;
-    const fresh = Math.max(0, 1 - ageHours / 72);
-
-    // 总互动 — 用于 viral 地板判断
-    let totalEng = 0;
-    for (const t of tweets) {
-      const m = t.metrics || {};
-      totalEng += (m.likes || 0) + (m.retweets || 0) + (m.replies || 0);
-    }
-    if (totalEng === 0 && hs.metrics) {
-      totalEng = (hs.metrics.likes || 0) + (hs.metrics.retweets || 0) + (hs.metrics.replies || 0);
-    }
-
-    let score = fit * 0.3 + viral * 0.4 + fresh * 0.3;
-    // 地板: 0 互动 = 噪声 (直接 0); 极低互动 = 重罚
-    if (totalEng < 10)       score = 0;
-    else if (viral < 0.05)    score *= 0.3;
-    score = +score.toFixed(3);
-
-    return { fit: +fit.toFixed(2), viral: +viral.toFixed(2), fresh: +fresh.toFixed(2), score };
-  }
+  // computeScore, classifyAngle, classifyCategory now in window.ContentOps
 
   // 兜底 mock (未登录或 DB 报错时用) ─────────────────────────────────────────
   const MOCK_HOTSPOTS = [
@@ -490,22 +420,8 @@
     return `<span style="margin-left:auto">${ago} · ${fmt(v || 0)} ${label}</span>`;
   }
 
-  // 启发式: 从 tweet 推断 7 angle (反直觉/数据驱动/案例/KOL 蹭点/深度/教程/Thread)
-  function classifyAngle(t) {
-    if (!t) return null;
-    const text = String(t.text || '');
-    if (!text) return null;
-    if (/🧵|^\s*1\/|\(1\/\d+\)|\bthread\b/i.test(text)) return 'Thread';
-    if (/\b(full guide|step.?by.?step|tutorial|how to|here'?s how|hour guide|guide:|complete guide|walkthrough)\b/i.test(text)) return '教程';
-    if (/(this guy|made \$[\d,]+|turned \$[\d,.]+ ?into|flipped \$[\d,.]+|\$\d{2,}\s?k\/?(month|day)|profit of \$)/i.test(text)) return '案例';
-    if (/\b(destroyed|killed|finally|everyone (thinks|expects)|nobody (knows|talks|sees)|reality is|truth is|wrong about|but actually|the real |secret|exposed)\b/i.test(text)
-        || /\b[A-Z]{5,}\b/.test(text)) return '反直觉';
-    if (/\d{1,3}%|\b\d+x\s+(return|gain|profit)|\bwin rate|\broi\b|n\s*=\s*\d+|backtest/i.test(text)) return '数据驱动';
-    if (t.kind === 'quote' || t.kind === 'reply' || t.kind === 'retweet'
-        || (text.match(/@\w+/g) || []).length >= 2) return 'KOL 蹭点';
-    if (text.length > 200 && t.kind === 'original') return '深度';
-    return 'Other';
-  }
+  // classifyAngle now in window.ContentOps (src/content-ops.js)
+  const CO = window.ContentOps;
 
   // 把同步存的 tweet 形状映射到旧 mock 形状, 兼容 renderTweets
   function normalizeTweet(t) {
@@ -516,7 +432,7 @@
       text:   t.text   || '',
       url:    t.url    || (t.id ? `https://x.com/i/status/${t.id}` : null),
       tag:    t.tag    ?? (t.kind && t.kind !== 'original' ? t.kind : null),
-      angle:  classifyAngle(t),
+      angle:  CO.classifyAngle(t),
       stats: t.stats ?? {
         rt:    t.metrics?.retweets ?? 0,
         like:  t.metrics?.likes    ?? 0,
@@ -765,7 +681,8 @@
       // 计算分数, 写到 hotspot._score / ._fit / ._viral / ._fresh
       const rows = data || [];
       for (const h of rows) {
-        const sc = computeScore(h);
+        const tweets = h.tweets && h.tweets.length > 0 ? h.tweets : [{ text: h.title || '', metrics: h.metrics || {} }];
+        const sc = CO.scoreCluster(tweets);
         h._fit = sc.fit; h._viral = sc.viral; h._fresh = sc.fresh; h._score = sc.score;
         // 用计算分覆盖原 score 字段, 让 hot_signal 显示也跟着算分走
         // (top 15% 为 hot)

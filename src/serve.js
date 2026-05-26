@@ -63,6 +63,60 @@ createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const path = url.pathname;
 
+  // /api/sources/* — mock API endpoints for sources page
+  if (path === '/api/sources/review-summary') {
+    try {
+      const body = await readFile(ROOT + '/src/api/review-summary.json');
+      log(req.method, path, 200);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(body);
+    } catch { res.writeHead(404); res.end('404'); }
+    return;
+  }
+  if (path === '/api/sources/ai-recommendations') {
+    try {
+      const body = await readFile(ROOT + '/src/api/ai-recommendations.json');
+      log(req.method, path, 200);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(body);
+    } catch { res.writeHead(404); res.end('404'); }
+    return;
+  }
+
+  // /api/media-proxy — proxy Twitter media through local server (bypasses CDN blocks)
+  if (path === '/api/media-proxy') {
+    const target = url.searchParams.get('url');
+    if (!target) { res.writeHead(400); res.end('missing url'); return; }
+    try {
+      const https = await import('node:https');
+      const doFetch = (href) => new Promise((resolve, reject) => {
+        https.get(href, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (r) => {
+          if (r.statusCode >= 300 && r.statusCode < 400 && r.headers.location) {
+            doFetch(r.headers.location).then(resolve).catch(reject);
+            return;
+          }
+          const chunks = [];
+          r.on('data', c => chunks.push(c));
+          r.on('end', () => resolve({ body: Buffer.concat(chunks), ct: r.headers['content-type'] || 'image/jpeg' }));
+          r.on('error', reject);
+        }).on('error', reject);
+      });
+      const body = await doFetch(target);
+      log(req.method, path, 200, target.slice(0, 60));
+      res.writeHead(200, {
+        'Content-Type': body.ct,
+        'Cache-Control': 'public, max-age=86400',
+        'Access-Control-Allow-Origin': '*',
+      });
+      res.end(body.body);
+    } catch (e) {
+      log(req.method, path, 502, String(e.message).slice(0, 60));
+      res.writeHead(502);
+      res.end('proxy error');
+    }
+    return;
+  }
+
   // /api/opencli/* — execute OpenCLI commands via CLI (handles auth automatically)
   if (path.startsWith('/api/opencli/')) {
     const sub = path.replace('/api/opencli', '');
@@ -76,13 +130,13 @@ createServer(async (req, res) => {
         return;
       } else if (sub === '/api/twitter/user-timeline') {
         var h = url.searchParams.get('handle') || '';
-        args = ['twitter', 'tweets', h, '--limit', '10', '--format', 'json'];
+        args = ['twitter', 'tweets', h, '--limit', '50', '--format', 'json'];
       } else if (sub === '/api/twitter/tweet') {
         var tweetUrl = url.searchParams.get('url') || '';
         // Extract username from URL, get recent tweets, client will filter by id
         var m = tweetUrl.match(/(?:x\.com|twitter\.com)\/([^/]+)/i);
         var user = m ? m[1] : '';
-        args = ['twitter', 'tweets', user, '--limit', '10', '--format', 'json'];
+        args = ['twitter', 'tweets', user, '--limit', '50', '--format', 'json'];
       } else if (sub === '/api/twitter/list-members') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, count: 0, members: [], note: 'list members not available via OpenCLI — paste handles manually' }));

@@ -125,35 +125,35 @@
 
 <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
 
-<div class="review-banner">
+<div class="review-banner" id="review-banner">
 <span class="pulse"></span>
-<div style="flex:1">
+<div style="flex:1" id="review-banner-text">
 <span style="font-weight:500">下次周一 review:</span>
-明天 09:00 SGT · 系统将自动汇总各源 4 周表现 · 给出"主力 / 观察 / 退役"建议 · 已生成 5 个 AI 推荐新增
+加载中…
 </div>
-<button class="btn-ghost" style="background:#fff">↗ 立即手动 review</button>
+<button class="btn-ghost" style="background:#fff" id="btn-manual-review">↗ 立即手动 review</button>
 </div>
 
 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
 <div class="metric-card">
 <div class="metric-label">账号总数</div>
-<div class="metric-val">42</div>
-<div class="metric-delta info">主力 28 · 观察 9 · 待退 5</div>
+<div class="metric-val" id="mc-total">—</div>
+<div class="metric-delta info" id="mc-total-delta">加载中…</div>
 </div>
 <div class="metric-card">
 <div class="metric-label">本周触发热点</div>
-<div class="metric-val">87 <span style="font-size:11px;color:var(--color-text-tertiary);font-weight:400">次</span></div>
-<div class="metric-delta up">↗ +14 vs W18</div>
+<div class="metric-val" id="mc-hits">— <span style="font-size:11px;color:var(--color-text-tertiary);font-weight:400">次</span></div>
+<div class="metric-delta up" id="mc-hits-delta">加载中…</div>
 </div>
 <div class="metric-card">
 <div class="metric-label">爆款贡献源</div>
-<div class="metric-val">11</div>
-<div class="metric-delta info">26% 账号贡献全部爆款</div>
+<div class="metric-val" id="mc-fire">—</div>
+<div class="metric-delta info" id="mc-fire-delta">加载中…</div>
 </div>
 <div class="metric-card">
 <div class="metric-label">沉默账号 ≥ 4 周</div>
-<div class="metric-val">3</div>
-<div class="metric-delta down">建议清理</div>
+<div class="metric-val" id="mc-silent">—</div>
+<div class="metric-delta down" id="mc-silent-delta">加载中…</div>
 </div>
 </div>
 
@@ -161,10 +161,10 @@
 
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
 <div class="tab-row">
-<div class="tab active">𝕏 推特 KOL<span class="count">28</span></div>
-<div class="tab">▦ 链上钱包<span class="count">9</span></div>
-<div class="tab">📰 媒体 RSS<span class="count">5</span></div>
-<div class="tab" style="background:#EEEDFE;color:#3C3489">✨ AI 推荐<span class="count">+5</span></div>
+<div class="tab active" data-type="twitter">𝕏 推特 KOL<span class="count" id="tab-count-twitter">—</span></div>
+<div class="tab" data-type="onchain">▦ 链上钱包<span class="count" id="tab-count-onchain">—</span></div>
+<div class="tab" data-type="market">📰 媒体 RSS<span class="count" id="tab-count-market">—</span></div>
+<div class="tab" data-type="recommend" style="background:#EEEDFE;color:#3C3489">✨ AI 推荐<span class="count" id="tab-count-recommend">+5</span></div>
 </div>
 <div style="display:flex;align-items:center;gap:6px">
 <input style="border:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:6px 10px;font-size: 12px;width:160px" placeholder="搜索 @handle..."/>
@@ -194,74 +194,27 @@
 </table>
 
 <div style="margin-top:10px;padding-top:10px;border-top:0.5px solid var(--color-border-tertiary);font-size:11px;color:var(--color-text-tertiary);display:flex;align-items:center;justify-content:space-between">
-<div>显示 7 / 28 推特 KOL · <span class="act-link">查看全部</span></div>
-<div>本周新增 0 · 退役 0 · 待 review 5</div>
+<div id="table-summary-display">显示 — / — 推特 KOL · <span class="act-link">查看全部</span></div>
+<div id="table-summary-stats">本周新增 — · 退役 — · 待 review —</div>
 </div>
 
 </div>
 
-<div class="card">
-<div class="card-head">
-<div class="card-title">✨ AI 推荐新增 · 5 个候选</div>
-<span class="muted">基于"贡献过爆款源的二度关系"自动发现</span>
-</div>
-
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-
-<div class="ai-rec-card">
-<div class="ai-rec-handle">@RektAlpha <span class="status new">推荐</span></div>
-<div class="ai-rec-reason">本周 3 个爆款源都引用过他 · C 链上 · 67k 粉丝 · 推文互动率 4.2%</div>
-<div class="ai-rec-actions">
-<button class="btn-mini-add">+ 加入主力</button>
-<button class="btn-mini-skip">观察</button>
-<button class="btn-mini-skip">忽略</button>
-</div>
-</div>
-
-<div class="ai-rec-card">
-<div class="ai-rec-handle">@PolyTraderX <span class="status new">推荐</span></div>
-<div class="ai-rec-reason">A 赔率 · 上周 FOMC 行情前 4h 准确预判 · 与 @JimGCryptos 内容风格互补</div>
-<div class="ai-rec-actions">
-<button class="btn-mini-add">+ 加入主力</button>
-<button class="btn-mini-skip">观察</button>
-<button class="btn-mini-skip">忽略</button>
-</div>
-</div>
-
-<div class="ai-rec-card">
-<div class="ai-rec-handle">@WhaleWatcher_ <span class="status new">推荐</span></div>
-<div class="ai-rec-reason">C 链上 · 与现有 @OnchainBob 重合度 91% · 备份候选 · 推送频率更高</div>
-<div class="ai-rec-actions">
-<button class="btn-mini-add">+ 加入观察</button>
-<button class="btn-mini-skip">备用</button>
-<button class="btn-mini-skip">忽略</button>
-</div>
-</div>
-
-<div class="ai-rec-card">
-<div class="ai-rec-handle">@ElectionMaths <span class="status new">推荐</span></div>
-<div class="ai-rec-reason">E 现实 · 大选模型权威 · 弥补当前 E 类账号产能 6% 偏低</div>
-<div class="ai-rec-actions">
-<button class="btn-mini-add">+ 加入主力</button>
-<button class="btn-mini-skip">观察</button>
-<button class="btn-mini-skip">忽略</button>
-</div>
-</div>
-
-</div>
-
-<div style="margin-top:10px;font-size:11px;color:var(--color-text-tertiary)">
-ⓘ AI 推荐在每周一自动更新 · 接受新增后将进入 4 周观察期 · 表现达标转主力
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-<!-- ============ 🔥 爆款推文 (从所有监控源同步出的 hot_signal=true 推文) ============ -->
-<div id="fire-card" class="card" style="padding:14px 16px;margin-top:14px">
+<div class="card" id="ai-rec-card">
+	<div class="card-head">
+	<div class="card-title">✨ AI 推荐新增 · <span id="ai-rec-count">—</span> 个候选</div>
+	<span class="muted">基于"贡献过爆款源的二度关系"自动发现</span>
+	</div>
+	
+	<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" id="ai-rec-grid">
+	<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--color-text-tertiary);font-size:12px">加载中…</div>
+	</div>
+	
+	<div style="margin-top:10px;font-size:11px;color:var(--color-text-tertiary)" id="ai-rec-note">
+	ⓘ AI 推荐在每周一自动更新 · 接受新增后将进入 4 周观察期 · 表现达标转主力
+	</div>
+	
+	</div><div id="fire-card" class="card" style="padding:14px 16px;margin-top:14px">
   <div class="card-head" style="margin-bottom:10px">
     <div class="card-title">🔥 爆款推文 · 来自监控源</div>
     <span class="muted" id="fire-summary" style="margin-right:auto;margin-left:10px">加载中…</span>
@@ -463,18 +416,49 @@ theblock.co
     return rows;
   }
 
+  function updateMetricsCards(rows) {
+    var total = rows.length;
+    var live = rows.filter(function(r) { return r.status === 'live'; }).length;
+    var observe = rows.filter(function(r) { return r.status === 'observe'; }).length;
+    var retired = rows.filter(function(r) { return r.status === 'retired'; }).length;
+    var totalHits = 0, fireSources = 0;
+    var fourWeeksAgo = Date.now() - 28 * 24 * 3600e3;
+    var silentCount = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var m = rows[i].metrics_4w || {};
+      totalHits += (m.hits || 0);
+      if ((m.fire || 0) > 0) fireSources++;
+      var lastActive = rows[i].last_active_at ? new Date(rows[i].last_active_at).getTime() : 0;
+      if (!rows[i].last_active_at || lastActive < fourWeeksAgo) silentCount++;
+    }
+    var el = function(id) { return document.getElementById(id); };
+    if (el('mc-total')) { el('mc-total').innerHTML = total; el('mc-total-delta').textContent = '主力 ' + live + ' · 观察 ' + observe + ' · 待退 ' + retired; }
+    if (el('mc-hits')) { el('mc-hits').innerHTML = totalHits + ' <span style="font-size:11px;color:var(--color-text-tertiary);font-weight:400">次</span>'; el('mc-hits-delta').textContent = totalHits > 0 ? '近 7 天累计' : '暂无数据 · 点同步更新'; }
+    if (el('mc-fire')) { el('mc-fire').textContent = fireSources; el('mc-fire-delta').textContent = total > 0 ? Math.round(fireSources / total * 100) + '% 账号贡献爆款' : '暂无数据'; }
+    if (el('mc-silent')) { el('mc-silent').textContent = silentCount; el('mc-silent-delta').textContent = silentCount > 0 ? '≥ 4 周无活动' : '全部活跃'; }
+    // Tab counts
+    var types = { twitter: 0, onchain: 0, market: 0, rss: 0 };
+    for (var j = 0; j < rows.length; j++) { var t = rows[j].type; if (types[t] !== undefined) types[t]++; }
+    if (document.getElementById('tab-count-twitter')) document.getElementById('tab-count-twitter').textContent = types.twitter;
+    if (document.getElementById('tab-count-onchain')) document.getElementById('tab-count-onchain').textContent = types.onchain;
+    if (document.getElementById('tab-count-market')) document.getElementById('tab-count-market').textContent = types.market;
+    if (document.getElementById('tab-count-rss')) document.getElementById('tab-count-rss').textContent = types.rss;
+    // Table summary
+    var pmFiltered = rows.filter(function(r) { return (r.metrics_4w && r.metrics_4w.pm_score != null && r.metrics_4w.pm_score >= 0.4); });
+    if (document.getElementById('table-summary-display')) document.getElementById('table-summary-display').innerHTML = pmFiltered.length + ' / ' + total + ' 推特 KOL · <span class="act-link">查看全部</span>';
+    if (document.getElementById('table-summary-stats')) document.getElementById('table-summary-stats').textContent = '本周新增 — · 退役 — · 待 review —';
+  }
+
   function renderTable(rows){
     __allSources = rows;
-    const visible = applyFilters();
-    const tbody = document.getElementById('sources-tbody');
+    var visible = applyFilters();
+    var tbody = document.getElementById('sources-tbody');
     if (visible.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--color-text-tertiary);font-size: 12px">${rows.length === 0 ? '暂无监控源 · 用右上「↥ 批量导入」' : `当前过滤无匹配 (共 ${rows.length} 条)`}</td></tr>`;
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--color-text-tertiary);font-size: 12px">' + (rows.length === 0 ? '暂无监控源 · 用右上「↥ 批量导入」' : '当前过滤无匹配 (共 ' + rows.length + ' 条)') + '</td></tr>';
     } else {
       tbody.innerHTML = visible.map(renderSourceRow).join('');
     }
-    // 顶部统计始终同步 (含 0)
-    document.querySelector('.metric-card .metric-val').textContent = rows.length;
-    document.querySelector('.tab.active .count').textContent = rows.filter(r => r.type === 'twitter').length;
+    updateMetricsCards(rows);
   }
 
   async function loadSourcesFromDB(){
@@ -504,11 +488,90 @@ theblock.co
     });
   }
 
+  async function loadReviewSummary() {
+    try {
+      var res = await fetch('/api/sources/review-summary');
+      if (!res.ok) return;
+      var data = await res.json();
+      var bannerText = document.getElementById('review-banner-text');
+      if (bannerText && data) {
+        bannerText.innerHTML = '<span style="font-weight:500">下次周一 review:</span> ' + data.next_review_label + ' · ' + data.summary_text;
+      }
+      if (data && data.table_summary) {
+        var ts = data.table_summary;
+        if (document.getElementById('table-summary-stats')) {
+          document.getElementById('table-summary-stats').textContent = '本周新增 ' + ts.new_this_week + ' · 退役 ' + ts.retired + ' · 待 review ' + ts.pending_review;
+        }
+      }
+    } catch (e) { console.warn('review-summary load failed:', e.message); }
+  }
+
+  async function loadAIRecommendations() {
+    try {
+      var res = await fetch('/api/sources/ai-recommendations');
+      if (!res.ok) return;
+      var data = await res.json();
+      var grid = document.getElementById('ai-rec-grid');
+      var countEl = document.getElementById('ai-rec-count');
+      var noteEl = document.getElementById('ai-rec-note');
+      if (!grid || !data || !data.candidates) return;
+      var candidates = data.candidates;
+      if (countEl) countEl.textContent = candidates.length;
+      if (noteEl && data.note) noteEl.innerHTML = 'ⓘ ' + data.note;
+      grid.innerHTML = candidates.map(function(c) {
+        return '<div class="ai-rec-card">' +
+          '<div class="ai-rec-handle">' + c.handle + ' <span class="status new">推荐</span></div>' +
+          '<div class="ai-rec-reason">' + c.reason + '</div>' +
+          '<div class="ai-rec-actions">' +
+            '<button class="btn-mini-add ai-rec-act" data-handle="' + c.handle + '" data-action="live">+ 加入' + (c.suggested_action === '观察' ? '观察' : '主力') + '</button>' +
+            '<button class="btn-mini-skip ai-rec-act" data-handle="' + c.handle + '" data-action="observe">观察</button>' +
+            '<button class="btn-mini-skip ai-rec-act" data-handle="' + c.handle + '" data-action="ignore">忽略</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+      // Event delegation for AI rec action buttons
+      grid.querySelectorAll('.ai-rec-act').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          var handle = this.getAttribute('data-handle');
+          var action = this.getAttribute('data-action');
+          if (action === 'ignore') {
+            this.closest('.ai-rec-card').style.opacity = '0.4';
+            this.closest('.ai-rec-card').style.pointerEvents = 'none';
+            if (window.__toast) window.__toast(handle + ' 已忽略', 'info', 2000);
+          } else {
+            // Add to sources as new entry
+            if (dbReady) {
+              var type = 'twitter';
+              var status = action === 'live' ? 'live' : 'observe';
+              sb.from('sources').insert({
+                id: 'src_' + (crypto.randomUUID ? crypto.randomUUID().slice(0,8) : Math.random().toString(36).slice(2,10)),
+                type: type, handle: handle, status: status,
+                metrics_4w: { hits: 0, spark: [3,3,3,3], fire: 0 }
+              }).then(function(res) {
+                if (res.error) {
+                  if (window.__toast) window.__toast('添加失败: ' + res.error.message, 'error');
+                } else {
+                  if (window.__toast) window.__toast('✓ ' + handle + ' 已加入' + (status === 'live' ? '主力' : '观察'), 'success', 3000);
+                  window.__reloadSourcesTable();
+                }
+              });
+            } else {
+              if (window.__toast) window.__toast('DB 未就绪, 无法添加 ' + handle, 'warn');
+            }
+          }
+        });
+      });
+    } catch (e) { console.warn('ai-recommendations load failed:', e.message); }
+  }
+
   async function bootstrap(){
     setWriteButtonsEnabled(false, '加载中…');
     const rows = await loadSourcesFromDB();
     dbReady = rows !== null;
     renderTable(rows || []);
+    loadReviewSummary();
+    loadAIRecommendations();
     var muted = document.querySelector('.page-header .right .muted');
     if (dbReady) {
       if (muted) muted.textContent = '☁ 已同步 · ' + (rows || []).length + ' 条';
@@ -898,52 +961,35 @@ theblock.co
     }
     posts.sort((a, b) => (b.metrics?.views || 0) - (a.metrics?.views || 0));
     summaryEl.textContent = `按 views 降序 · top ${posts.length}`;
+    grid.style.gridTemplateColumns = 'repeat(3, 1fr)';
     grid.innerHTML = posts.map(t => {
       const m = t.metrics || {};
-      const handle = t.author?.username ? `@${t.author.username}` : '(unknown)';
-      const url = t.url || `https://x.com/i/status/${t.id}`;
+      const handle = t.author?.username ? '@' + t.author.username : '(unknown)';
+      const url = t.url || 'https://x.com/i/status/' + t.id;
       const kindBadge = (t.kind && t.kind !== 'original')
-        ? `<span style="font-size:10px;background:#EEEDFE;color:#3C3489;padding:1px 5px;border-radius:3px;margin-left:4px">${t.kind}</span>` : '';
+        ? '<span style="font-size:10px;background:#EEEDFE;color:#3C3489;padding:1px 5px;border-radius:3px;margin-left:4px">' + t.kind + '</span>' : '';
       const angle = CO.classifyAngle(t);
-      const angleBadge = angle ? (() => {
-        const bg = angle === 'Other' ? '#ECEAE0' : '#FAEEDA';
-        const fg = angle === 'Other' ? '#888780' : '#854F0B';
-        return `<span style="font-size:10px;background:${bg};color:${fg};padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:500">${angle}</span>`;
-      })() : '';
+      const angleBadge = angle ? ('<span style="font-size:10px;background:' + (angle === 'Other' ? '#ECEAE0' : '#FAEEDA') + ';color:' + (angle === 'Other' ? '#888780' : '#854F0B') + ';padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:500">' + angle + '</span>') : '';
       const manualBadge = t._manual
-        ? `<span style="font-size:10px;background:#E6F1FB;color:#185FA5;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:500">manual</span>` : '';
-      var mediaHtml = '';
-      if (t.media_urls && t.media_urls.length > 0) {
-        mediaHtml = t.media_urls.slice(0, 2).map(function (mu) {
-          var isVideo = /\.(mp4|mov|webm|m3u8)(\?|$)/i.test(mu) || /video|twimg\.com\/.*\/vid\//i.test(mu);
-          if (isVideo) {
-            return '<video src="' + mu + '" controls style="width:100%;border-radius:8px;margin-top:8px;max-height:260px" preload="metadata"></video>';
-          }
-          return '<img src="' + mu + '" style="width:100%;border-radius:8px;margin-top:8px;max-height:260px;object-fit:cover" loading="lazy" />';
-        }).join('');
-      }
-      return `
-        <a href="${url}" target="_blank" rel="noopener" style="display:block;text-decoration:none;color:inherit">
-          <div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:4px;flex-wrap:wrap">
-            <span style="font-weight:500;color:var(--color-text-primary)">${escapeHtml(handle)}</span>
-            <span style="color:var(--color-text-tertiary)">· ${timeAgo(t.created_at)}</span>${kindBadge}${angleBadge}${manualBadge}
-          </div>
-          <div style="font-size:13px;line-height:1.55">${escapeHtml(t.text || '')}</div>
-          ${mediaHtml}
-          <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:6px;display:flex;gap:14px">
-            <span>↻ ${fmt(m.retweets)}</span>
-            <span>♡ ${fmt(m.likes)}</span>
-            <span>💬 ${fmt(m.replies)}</span>
-            <span>👁 ${fmt(m.views)}</span>
-          </div>
-        </a>`;
+        ? '<span style="font-size:10px;background:#E6F1FB;color:#185FA5;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:500">manual</span>' : '';
+      return '<a href="' + url + '" target="_blank" rel="noopener" style="display:block;text-decoration:none;color:inherit;background:var(--color-background-secondary);border-radius:8px;padding:10px 12px;border:0.5px solid transparent;transition:border-color 0.15s">' +
+        '<div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:4px;flex-wrap:wrap">' +
+          '<span style="font-weight:500;color:var(--color-text-primary)">' + escapeHtml(handle) + '</span>' +
+          '<span style="color:var(--color-text-tertiary)">· ' + timeAgo(t.created_at) + '</span>' + kindBadge + angleBadge + manualBadge +
+        '</div>' +
+        '<div style="font-size:13px;line-height:1.55">' + escapeHtml(t.text || '') + '</div>' +
+        '<div style="font-size:11px;color:var(--color-text-tertiary);margin-top:6px;display:flex;gap:14px">' +
+          '<span>↻ ' + fmt(m.retweets) + '</span>' +
+          '<span>♡ ' + fmt(m.likes) + '</span>' +
+          '<span>💬 ' + fmt(m.replies) + '</span>' +
+          '<span>👁 ' + fmt(m.views) + '</span>' +
+        '</div>' +
+      '</a>';
     }).join('');
   }
 
   // 暴露给外部调用
   window.__reloadFireFeed = loadFireFeed;
-
-  // 初次加载 + 登录后立刻拉一次
   loadFireFeed();
 
   // ====== ↥ 粘贴推文 (手动添加到爆款池, tag=manual) ======

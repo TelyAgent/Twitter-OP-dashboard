@@ -12,6 +12,65 @@
      DeepSeek API (api.deepseek.com)  ← 云端 LLM 推理
 ```
 
+## 认证
+
+Magic Link 免密登录，无自建后端——完全依赖 Supabase Auth（BaaS）。
+
+### 页面鉴权策略
+
+| 页面 | 鉴权方式 | 说明 |
+|------|----------|------|
+| dashboard.html | Magic Link（Supabase Auth） | 需登录才能操作，`bootApp()` 检查 session |
+| preview.html | Magic Link（Supabase Auth） | 同 dashboard |
+| radar.html | anon RLS | 无需登录，直接读 Supabase |
+| templates.html | anon RLS | 无需登录，直接读 Supabase |
+| sources.html | anon RLS | 无需登录，直接读 Supabase |
+
+### 认证时序
+
+```
+页面加载
+  → 加载 supabase-js SDK（CDN）
+  → 加载 /config.js（注入 SUPABASE_URL / SUPABASE_KEY）
+  → sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+
+bootApp()
+  → sb.auth.getSession()                          // 检查本地 session
+  → 有 session → 隐藏 #wr-auth，显示 #wr-root，调用 cloudBootstrap()
+  → 无 session → 显示 #wr-auth（登录遮罩），订阅 onAuthStateChange
+
+用户点击"发送登录链接"
+  → sb.auth.signInWithOtp({ email, options })     // 浏览器直连 Supabase Auth API
+  → 显示"邮件已发送，请点击邮件中的链接"
+
+Supabase 发送 Magic Link 邮件
+  → 用户点击邮件链接
+  → Supabase 验证 token，重定向回 http://localhost:8080
+  → onAuthStateChange 触发 → location.reload()
+  → bootApp() 再次执行 → getSession() 返回有效 session
+```
+
+### 关键点
+
+- **无后端认证代码**。`serve.js` 不做 session 校验、token 签发、用户管理，只负责注入凭据到 `/config.js`
+- 浏览器持有 `anon` key + JWT access_token，直接调用 Supabase REST API
+- 登出：`sb.auth.signOut()` → 清除本地 session → `location.reload()`
+
+### Supabase Redirect URL 白名单
+
+Magic Link 邮件中的回调链接受 Supabase 后台白名单控制。代码中传了 `emailRedirectTo: window.location.href`，但如果该 URL 不在白名单中，Supabase 会**静默忽略**，改用后台配置的默认重定向地址。
+
+**必须配置**：进入 [Supabase Dashboard](https://supabase.com/dashboard) → Authentication → URL Configuration → Redirect URLs，添加所有部署环境的 URL：
+
+```
+http://localhost:8080/**
+https://op-dashboard-psi.vercel.app/**
+```
+
+每新增一个部署环境（preview/staging/production），都需要将其域名加入白名单，否则 Magic Link 认证在该环境不可用。
+
+---
+
 ## 文件层级
 
 ```

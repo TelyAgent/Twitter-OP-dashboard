@@ -3,9 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>金模板库 · Pallax 内容工厂</title>
-<link rel="stylesheet" href="styles.css">
+<title>模板库</title>
+<link rel="stylesheet" href="src/styles.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/config.js"></script>
+<script src="src/content-ops.js"></script>
+<script src="src/ai/client.js"></script>
+<script src="src/ai/pipeline.js"></script>
+<script src="src/provider.js"></script>
 <style>
 
 .config-nav-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--border-radius-md);font-size:12px;color:var(--color-text-secondary);cursor:pointer;margin-bottom:2px;}
@@ -80,13 +85,13 @@
 <nav class="topnav">
   <div class="topnav-brand">
     <div class="logo">P</div>
-    <div class="name">Pallax 内容工厂</div>
+    <div class="name">内容工厂</div>
   </div>
   <div class="topnav-tabs">
-    <a href="../" class="nav-item"><span class="ic">▢</span>数据复盘</a>
-    <a href="02-radar.html" class="nav-item"><span class="ic">◉</span>热点雷达</a>
-    <a href="07-templates.html" class="nav-item active"><span class="ic">◫</span>金模板库</a>
-    <a href="08-sources.html" class="nav-item"><span class="ic">⊙</span>监控源</a>
+    <a href="dashboard.html" class="nav-item"><span class="ic">▢</span>数据复盘</a>
+    <a href="radar.html" class="nav-item"><span class="ic">◉</span>热点雷达</a>
+    <a href="templates.html" class="nav-item active"><span class="ic">◫</span>模板库</a>
+    <a href="sources.html" class="nav-item"><span class="ic">⊙</span>监控源</a>
   </div>
 </nav>
 <main class="main">
@@ -139,94 +144,39 @@
 
 <!-- ✨ 最近提炼模板 (real DB-driven list) -->
 
-<div class="card">
-<div class="card-head">
-<div class="card-title">
-<span class="tag tag-A">A 赔率</span>
-<span style="margin:0 4px;color:var(--color-text-tertiary)">×</span>
-<span style="background:#EEEDFE;color:#3C3489;padding:2px 6px;border-radius:3px;font-size: 11px;font-weight:500">数据驱动</span>
-<span style="margin-left:6px;font-size:13px;font-weight:500">爆款级模板 · 8 次使用</span>
-</div>
-<div style="display:flex;align-items:center;gap:6px">
-<span style="font-size:11px;color:#993C1D;font-weight:500">🔥 当前最爆</span>
-<button class="btn-ghost">✎ 编辑</button>
-</div>
-</div>
-
-<div style="display:grid;grid-template-columns:1.4fr 1fr;gap:14px">
-
-<div>
-<div class="tpl-detail-card">
-<div style="font-size:11px;color:var(--color-text-tertiary);margin-bottom:6px;letter-spacing:0.3px">模板骨架 · slot 替换式</div>
-<div class="tpl-skeleton">
-<div><span class="tpl-slot">{合约名}</span> 赔率在 <span class="tpl-slot">{时间窗}</span> 内从 <span class="tpl-slot">{起赔率}</span> 跳到 <span class="tpl-slot">{终赔率}</span>。</div>
-<div style="margin-top:6px"><span class="tpl-slot">{异常信号}</span> · <span class="tpl-slot">{反共识 takeaway}</span></div>
-<div style="margin-top:6px">→ 在 PredX 跟踪 <span class="tpl-slot">{追踪对象}</span>: <span class="tpl-slot">{产品链接}</span></div>
-</div>
-<div style="font-size: 11px;color:var(--color-text-tertiary);margin-top:8px;line-height:1.5">必填 slot: 合约名 / 时间窗 / 起赔率 / 终赔率 / 产品链接 · 选填: 异常信号 · takeaway</div>
-</div>
-
-<div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
-<div class="kv"><span class="k">最优 angle 配比</span><span>反直觉 + 数据驱动</span></div>
-<div class="kv"><span class="k">最优形式</span><span>单推 + 数据图</span></div>
-<div class="kv"><span class="k">最佳发布窗口</span><span>美东开盘前 1h</span></div>
-<div class="kv"><span class="k">配图类型</span><span>赔率轨迹截图</span></div>
-</div>
-</div>
-
-<div>
-<div style="font-size:11px;color:var(--color-text-tertiary);margin-bottom:6px;letter-spacing:0.3px">历史命中爆款 · 8 / 8</div>
-
-<div class="example-row">
-<span style="color:#D85A30">🔥</span>
-<div class="name">FOMC 前夜赔率 0.42 → 0.38</div>
-<span class="views">128k</span>
-</div>
-<div class="example-row">
-<span style="color:#D85A30">🔥</span>
-<div class="name">Trump 媒体股赔率剧变</div>
-<span class="views">87k</span>
-</div>
-<div class="example-row">
-<span style="color:#D85A30">🔥</span>
-<div class="name">SBF 上诉合约成交激增</div>
-<span class="views">71k</span>
-</div>
-<div class="example-row">
-<span style="color:#3B6D11">✓</span>
-<div class="name">苹果发布会赔率回落</div>
-<span class="views">54k</span>
-</div>
-<div class="example-row">
-<span style="color:#3B6D11">✓</span>
-<div class="name">+ 4 条 (查看全部)</div>
-<span class="views" style="color:var(--color-text-tertiary);font-weight:400">avg 47k</span>
-</div>
-
-<div style="margin-top:10px;font-size:11px;color:var(--color-text-tertiary)">命中率 100% · 平均 view 68k · 累计 view 547k</div>
-<div class="usage-bar"><div class="usage-fill" style="width:100%"></div></div>
-</div>
-
-</div>
-
-<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:14px;padding-top:12px;border-top:0.5px solid var(--color-border-tertiary)">
-<div style="font-size:11px;color:var(--color-text-secondary);display:flex;align-items:center;gap:14px">
-<span>⏱ v3 · 上次更新 W17 周日</span>
-<span>👤 由 Lareina 提炼</span>
-</div>
-<div style="display:flex;gap:6px">
-<button class="btn-ghost">↗ 查看版本历史</button>
-<button class="btn-ghost">↗ 复制为新模板</button>
-<a href="03-briefing.html" class="btn-primary" style="text-decoration:none">✨ 用此模板生成 angle</a>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-<!-- ====== ✨ 最近提炼模板 · 按 7 角度分块 ====== -->
+<!-- ✨ 精选模板 (DB-driven) -->
+	<div class="card" id="featured-tpl-card">
+	<div class="card-head">
+	<div class="card-title" id="ft-head">
+	<span class="tag tag-A" id="ft-cat-badge">—</span>
+	<span style="margin:0 4px;color:var(--color-text-tertiary)">×</span>
+	<span id="ft-angle-badge" style="background:#EEEDFE;color:#3C3489;padding:2px 6px;border-radius:3px;font-size: 11px;font-weight:500">—</span>
+	<span id="ft-subtitle" style="margin-left:6px;font-size:13px;font-weight:500">加载中…</span>
+	</div>
+	<div style="display:flex;align-items:center;gap:6px">
+	<span id="ft-status-badge" style="font-size:11px;color:var(--color-text-tertiary);font-weight:500">加载中…</span>
+	<button class="btn-ghost">✎ 编辑</button>
+	</div>
+	</div>
+	
+	<div id="ft-content" style="display:grid;grid-template-columns:1.4fr 1fr;gap:14px;padding:0 0 10px 0">
+	<div style="text-align:center;padding:24px;color:var(--color-text-tertiary);font-size:12px;grid-column:1/-1">加载中…</div>
+	</div>
+	
+	<div id="ft-footer" style="display:none;align-items:center;justify-content:space-between;gap:8px;margin-top:14px;padding-top:12px;border-top:0.5px solid var(--color-border-tertiary)">
+	<div style="font-size:11px;color:var(--color-text-secondary);display:flex;align-items:center;gap:14px">
+	<span id="ft-version">—</span>
+	<span id="ft-author">—</span>
+	</div>
+	<div style="display:flex;gap:6px">
+	<button class="btn-ghost">↗ 查看版本历史</button>
+	<button class="btn-ghost">↗ 复制为新模板</button>
+	</div>
+	</div>
+	
+	</div>
+	
+	<!-- ====== ✨ 最近提炼模板 · 按 7 角度分块 ====== -->
 <div class="card" id="recent-tpl-card" style="margin-top:14px;padding:16px 18px">
   <div class="card-head" style="margin-bottom:12px">
     <div class="card-title">✨ 最近提炼模板 · 按角度分块</div>
@@ -524,34 +474,44 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
     });
   }
 
-  function extractFromTweet(handle, text, cat, angle, slots){
-    // Mock AI 提炼: 用 slot 名替换文本里的具体数字/实体
-    let skel = text;
-    const replacements = {
-      '0.42': '{起赔率}', '0.38': '{终赔率}', '38 min': '{时间窗}',
-      '$691k': '{金额}', '6h': '{观察窗口}', '$1.7M': '{成交量}',
-      '128k': '{views}', '12 个月': '{回测周期}', '73%': '{胜率}',
-      'FOMC': '{事件}', 'Trump': '{标的}',
-    };
-    for (const [k,v] of Object.entries(replacements)) {
-      skel = skel.split(k).join(`<span class="tpl-slot">${v}</span>`);
-    }
-    // 兜底：第一句加几个通用 slot
-    if (!skel.includes('tpl-slot')) {
-      skel = `<span class="tpl-slot">{触发事件}</span> · ${skel} → <span class="tpl-slot">{takeaway}</span>`;
-    }
-    return { handle, source: text, skeleton: skel, cat, angle, slots };
-  }
+  // extractFromTweet removed — now uses CO.extractSkeleton() + AIPipeline.extractTemplates() directly
 
-  function runExtract(){
+  async function runExtract(){
     let sourceTweets = [];
     if (currentMode === 'viral') {
       sourceTweets = VIRAL_POOL.filter(t => selectedViral.has(t.id));
+      extractedTpls = sourceTweets.map(function(t) {
+        return { handle: t.handle, source: t.text, skeleton: window.ContentOps.extractSkeleton(t.text), cat: t.cat, angle: t.angle, slots: t.slots };
+      });
     } else {
-      sourceTweets = parsedFromUrls;
+      // Real tweets from Provider — use heuristic first, then AI
+      extractedTpls = sourceTweets.map(function(t) {
+        var skel = window.ContentOps.extractSkeleton(t.text);
+        return { handle: t.handle, source: t.text, skeleton: skel, cat: t.cat, angle: t.angle, slots: window.ContentOps.slotsOf(skel) };
+      });
     }
-    extractedTpls = sourceTweets.map(t => extractFromTweet(t.handle, t.text, t.cat, t.angle, t.slots));
     renderPreview();
+    
+    // Async: call real AI pipeline for better skeletons
+    if (currentMode !== 'viral' && sourceTweets.length > 0) {
+      try {
+        var aiTpls = await window.AIPipeline.extractTemplates(
+          sourceTweets.map(function(t) { return { text: t.text, metrics: t.metrics || {}, author: t.source ? t.source.author : null }; })
+        );
+        if (aiTpls && aiTpls.length > 0) {
+          for (var i = 0; i < Math.min(aiTpls.length, extractedTpls.length); i++) {
+            if (aiTpls[i].skeleton) {
+              extractedTpls[i].skeleton = aiTpls[i].skeleton;
+              extractedTpls[i].slots = aiTpls[i].slots || window.ContentOps.slotsOf(aiTpls[i].skeleton);
+              extractedTpls[i]._aiRefined = true;
+            }
+          }
+          renderPreview();
+        }
+      } catch (e) {
+        console.warn('[runExtract] AI pipeline failed, using heuristic:', e.message);
+      }
+    }
   }
 
   function renderPreview(){
@@ -592,22 +552,32 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
   }
 
   let parsedFromUrls = [];
-  function parseUrls(){
+  let urlParseBusy = false;
+  async function parseUrls(){
     const lines = urlTextarea.value.split('\n').map(l => l.trim()).filter(Boolean);
-    parsedFromUrls = lines.map((url, i) => {
+    const parsed = [];
+    for (const url of lines) {
       const m = url.match(/(?:x\.com|twitter\.com)\/([A-Za-z0-9_]+)\/status\/(\d+)/i);
-      if (!m) return null;
-      // Mock: 假装从 URL 拉到推文内容，从 VIRAL_POOL 随机挑一条作为内容（演示用）
-      const seed = VIRAL_POOL[i % VIRAL_POOL.length];
-      return {
-        id: 'url-' + m[2],
-        handle: '@' + m[1],
-        text: seed.text,
-        cat: seed.cat,
-        angle: seed.angle,
-        slots: seed.slots,
-      };
-    }).filter(Boolean);
+      if (!m) continue;
+      try {
+        const tweet = await window.Provider.fetchSingleTweet(url);
+        if (!tweet) continue;
+        const cat = window.ContentOps.classifyCategory(tweet.text || '');
+        const angle = window.ContentOps.classifyAngle(tweet);
+        parsed.push({
+          id: 'url-' + m[2],
+          handle: tweet.author ? '@' + tweet.author.username : '@' + m[1],
+          text: tweet.text || '',
+          cat: cat,
+          angle: angle,
+          metrics: tweet.metrics || {},
+          source: tweet,
+        });
+      } catch (e) {
+        console.warn('[parseUrls] fetch failed for', url, e.message);
+      }
+    }
+    parsedFromUrls = parsed;
   }
 
   let currentMode = 'viral';
@@ -631,13 +601,29 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
     runExtract();
   });
 
-  btnUrlParse.addEventListener('click', () => {
-    parseUrls();
-    if (parsedFromUrls.length === 0) {
-      preview.innerHTML = '<div style="padding:14px;text-align:center;font-size: 12px;color:#A32D2D;background:#FCEBEB;border-radius:var(--border-radius-md)">⚠ 没有解析到有效的推文链接 · 需含 /status/{id}</div>';
-      return;
+  btnUrlParse.addEventListener('click', async () => {
+    if (urlParseBusy) return;
+    urlParseBusy = true;
+    btnUrlParse.disabled = true;
+    btnUrlParse.textContent = '抓取中…';
+    progressEl.textContent = '正在拉取推文数据…';
+    try {
+      await parseUrls();
+      if (parsedFromUrls.length === 0) {
+        preview.innerHTML = '<div style="padding:14px;text-align:center;font-size: 12px;color:#A32D2D;background:#FCEBEB;border-radius:var(--border-radius-md)">⚠ 没有解析到有效的推文链接 · 需含 /status/{id} · 或拉取失败</div>';
+        progressEl.textContent = '';
+        return;
+      }
+      progressEl.textContent = '✓ 拉取 ' + parsedFromUrls.length + ' 条, AI 提炼中…';
+      await runExtract();
+      progressEl.textContent = '';
+    } catch(e) {
+      progressEl.textContent = '✕ 错误: ' + e.message;
+    } finally {
+      urlParseBusy = false;
+      btnUrlParse.disabled = false;
+      btnUrlParse.textContent = '↗ 解析并提炼';
     }
-    runExtract();
   });
 
   function open(mode){
@@ -660,31 +646,38 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
 
   btnConfirm.addEventListener('click', async () => {
     btnConfirm.disabled = true;
-    let ok = 0;
+    let ok = 0, fail = 0;
     for (const tpl of extractedTpls) {
-      // 真实环境: await fetch('/api/templates', { method:'POST', body: JSON.stringify({ category:tpl.cat, angle:tpl.angle, skeleton:tpl.skeleton, source_tweet:tpl.handle }) })
-      await new Promise(res => setTimeout(res, 50));
-      ok++;
-      progressEl.textContent = `提交中 ${ok} / ${extractedTpls.length}`;
+      try {
+        const row = {
+          id: 'tpl_' + (crypto.randomUUID ? crypto.randomUUID().slice(0,8) : Math.random().toString(36).slice(2,10)),
+          category: tpl.cat,
+          angle: tpl.angle,
+          skeleton: tpl.skeleton,
+          required_slots: tpl.slots || [],
+          source_tweet_url: tpl.handle || null,
+          status: 'observe',
+        };
+        const { error } = await sb.from('templates').insert(row);
+        if (error) { fail++; console.warn('[save tpl]', error); }
+        else ok++;
+        progressEl.textContent = '提交中 ' + (ok+fail) + ' / ' + extractedTpls.length;
+      } catch(e) { fail++; }
     }
-    progressEl.textContent = `✓ 已入库 ${ok} 个模板`;
-    progressEl.style.color = '#3B6D11';
-    // 更新页面总数
-    const totalEl = document.getElementById('tpl-total');
-    if (totalEl) totalEl.textContent = parseInt(totalEl.textContent, 10) + ok;
+    progressEl.textContent = '✓ 已入库 ' + ok + (fail > 0 ? ' · 失败 ' + fail : '') + ' 个模板';
+    progressEl.style.color = fail > 0 ? '#854F0B' : '#3B6D11';
+    if (window.__reloadTplMatrix) await window.__reloadTplMatrix();
     setTimeout(() => {
       progressEl.textContent = '';
       progressEl.style.color = '';
       close();
-    }, 900);
+    }, 1200);
   });
 })();
 
 // ====== 记录使用 (real backend: pallax-api + Supabase template_uses) ======
 (function(){
-  const API_BASE = `http://${location.hostname}:8081`;
-  const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
+  const { SUPABASE_URL, SUPABASE_KEY } = window.PALLAX_CONFIG;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   const el = (id) => document.getElementById(id);
@@ -703,24 +696,13 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
 
   let lastFetched = null;
   let templatesLoaded = false;
-  let hasSession = false;
 
-  // 登录检查 + UI 锁定
+  // Enable write buttons immediately (anon RLS, no login needed)
   (async () => {
-    btnOpen.disabled = true;
-    btnOpen.title = '检查登录状态…';
-    btnOpen.style.opacity = '0.55';
-    const { data: { session } } = await sb.auth.getSession();
-    hasSession = !!session;
-    if (hasSession) {
-      btnOpen.disabled = false;
-      btnOpen.style.opacity = '';
-      btnOpen.removeAttribute('title');
-    } else {
-      btnOpen.title = '请先到 dashboard 登录后才能记录使用';
-      btnOpen.style.cursor = 'not-allowed';
-      statusEl.innerHTML = '⚠ 未登录 · <a href="../" style="color:#185FA5;text-decoration:underline">去登录</a> · 写入已禁用';
-    }
+    btnOpen.disabled = false;
+    btnOpen.style.opacity = '';
+    btnOpen.removeAttribute('title');
+    statusEl.textContent = '可直接使用 · 无需登录';
   })();
 
   async function loadTemplates() {
@@ -765,28 +747,22 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
     fetchMsg.style.color = ''; fetchMsg.textContent = '抓取中…';
     btnFetch.disabled = true; btnSave.disabled = true;
     try {
-      const res = await fetch(`${API_BASE}/api/twitter/tweet`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-      });
-      const json = await res.json();
-      if (!json.ok) {
-        fetchMsg.textContent = '失败: ' + (json.error || res.status);
+      lastFetched = await window.Provider.fetchSingleTweet(url);
+      if (!lastFetched) {
+        fetchMsg.textContent = '失败: 未获取到推文';
         fetchMsg.style.color = '#A32D2D';
         return;
       }
-      lastFetched = json.tweet;
-      const t = json.tweet;
+      const t = lastFetched;
       el('usage-author').textContent = t.author ? `@${t.author.username}` : '(unknown)';
       el('usage-time').textContent   = t.created_at ? new Date(t.created_at).toLocaleString('zh-CN') : '';
       el('usage-text').textContent   = t.text || '';
-      el('usage-views').textContent     = (t.metrics.views ?? 0).toLocaleString();
-      el('usage-likes').textContent     = (t.metrics.likes ?? 0).toLocaleString();
-      el('usage-rt').textContent        = (t.metrics.retweets ?? 0).toLocaleString();
-      el('usage-replies').textContent   = (t.metrics.replies ?? 0).toLocaleString();
-      el('usage-quotes').textContent    = (t.metrics.quotes ?? 0).toLocaleString();
-      el('usage-bookmarks').textContent = (t.metrics.bookmarks ?? 0).toLocaleString();
+      el('usage-views').textContent     = (t.metrics.views || 0).toLocaleString();
+      el('usage-likes').textContent     = (t.metrics.likes || 0).toLocaleString();
+      el('usage-rt').textContent        = (t.metrics.retweets || 0).toLocaleString();
+      el('usage-replies').textContent   = (t.metrics.replies || 0).toLocaleString();
+      el('usage-quotes').textContent    = (t.metrics.quotes || 0).toLocaleString();
+      el('usage-bookmarks').textContent = (t.metrics.bookmarks || 0).toLocaleString();
       resultBox.style.display = '';
       btnSave.disabled = !tplSelect.value;
       fetchMsg.textContent = '✓ 已抓取';
@@ -837,26 +813,11 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
 
 // ====== 🔥 爆款推文池 · 按 7 角度分类 ======
 (function(){
-  const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
+  const { SUPABASE_URL, SUPABASE_KEY } = window.PALLAX_CONFIG;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  // 跟 08-sources / 02-radar 同一份角度分类启发式
-  function classifyAngle(t) {
-    if (!t) return 'Other';
-    const text = String(t.text || '');
-    if (!text) return 'Other';
-    if (/🧵|^\s*1\/|\(1\/\d+\)|\bthread\b/i.test(text)) return 'Thread';
-    if (/\b(full guide|step.?by.?step|tutorial|how to|here'?s how|hour guide|guide:|complete guide|walkthrough)\b/i.test(text)) return '教程';
-    if (/(this guy|made \$[\d,]+|turned \$[\d,.]+ ?into|flipped \$[\d,.]+|\$\d{2,}\s?k\/?(month|day)|profit of \$)/i.test(text)) return '案例';
-    if (/\b(destroyed|killed|finally|everyone (thinks|expects)|nobody (knows|talks|sees)|reality is|truth is|wrong about|but actually|the real |secret|exposed)\b/i.test(text)
-        || /\b[A-Z]{5,}\b/.test(text)) return '反直觉';
-    if (/\d{1,3}%|\b\d+x\s+(return|gain|profit)|\bwin rate|\broi\b|n\s*=\s*\d+|backtest/i.test(text)) return '数据驱动';
-    if (t.kind === 'quote' || t.kind === 'reply' || t.kind === 'retweet'
-        || (text.match(/@\w+/g) || []).length >= 2) return 'KOL 蹭点';
-    if (text.length > 200 && t.kind === 'original') return '深度';
-    return 'Other';
-  }
+  // classifyAngle now in window.ContentOps (src/content-ops.js)
+  const CO = window.ContentOps;
 
   const ANGLES_FOR_TABS = ['全部', '反直觉', '数据驱动', '案例', 'KOL 蹭点', '深度', '教程', 'Thread', 'Other'];
 
@@ -919,7 +880,7 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
 
   async function load() {
     const { data, error } = await sb.from('hotspots')
-      .select('id, tweets, created_at')
+      .select('id, tweets, metrics, created_at')
       .eq('hot_signal', true)
       .order('created_at', { ascending: false })
       .limit(300);
@@ -934,7 +895,7 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
       t._manual = h.metrics?.manual === true;
       return t;
     }).filter(Boolean);
-    tweets.forEach(t => { t._angle = classifyAngle(t); });
+    tweets.forEach(t => { t._angle = CO.classifyAngle(t); });
     tweets.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     allFire = tweets;
     renderTabs();
@@ -1067,38 +1028,114 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
 
     // 缓存 templates 给 AI 套用 modal 用
     window.__tplsById = Object.fromEntries(tpls.map(t => [t.id, t]));
+    // Also refresh featured template
+    await renderFeaturedTemplate();
+  }
+
+  // ====== ✨ 精选模板 (most-used template from DB) ======
+  async function renderFeaturedTemplate() {
+    var card = document.getElementById('featured-tpl-card');
+    if (!card) return;
+    
+    var { data: tpls, error } = await sb.from('templates')
+      .select('*')
+      .order('uses', { ascending: false })
+      .limit(1);
+    
+    if (error || !tpls || tpls.length === 0) {
+      document.getElementById('ft-subtitle').textContent = '暂无模板';
+      document.getElementById('ft-content').innerHTML = '<div style="text-align:center;padding:24px;color:var(--color-text-tertiary);font-size:12px;grid-column:1/-1">还没有模板数据 · 用「✨ 提炼金模板」创建第一个</div>';
+      return;
+    }
+    
+    var tpl = tpls[0];
+    var CAT_LABELS = { A: 'A 赔率', C: 'C 链上', D: 'D 新合约', E: 'E 现实' };
+    var catLabel = CAT_LABELS[tpl.category] || tpl.category;
+    var statusLabel = tpl.status === 'fire' ? '🔥 当前最爆' : tpl.status === 'solid' ? '✓ 主力' : '观察中';
+    var statusColor = tpl.status === 'fire' ? '#993C1D' : tpl.status === 'solid' ? '#27500A' : '#888780';
+    
+    // Update header
+    var catBadge = document.getElementById('ft-cat-badge');
+    if (catBadge) { catBadge.textContent = catLabel; catBadge.className = 'tag tag-' + tpl.category; }
+    var angleBadge = document.getElementById('ft-angle-badge');
+    if (angleBadge) angleBadge.textContent = tpl.angle || '—';
+    var subtitle = document.getElementById('ft-subtitle');
+    if (subtitle) subtitle.textContent = (tpl.status === 'fire' ? '爆款级模板 · ' : '') + (tpl.uses || 0) + ' 次使用';
+    var statusBadge = document.getElementById('ft-status-badge');
+    if (statusBadge) { statusBadge.textContent = statusLabel; statusBadge.style.color = statusColor; }
+    
+    // Query usage history
+    var { data: uses, error: usesErr } = await sb.from('template_uses')
+      .select('*')
+      .eq('template_id', tpl.id)
+      .order('created_at', { ascending: false })
+      .limit(8);
+    
+    var totalUses = tpl.uses || 0;
+    var hitRate = totalUses > 0 ? Math.round((uses && uses.filter(function(u) { return (u.views || 0) >= 20000; }).length || 0) / Math.min(totalUses, 8) * 100) : 0;
+    var avgViews = tpl.avg_views || 0;
+    var totalViews = (tpl.avg_views || 0) * totalUses;
+    
+    // Render content
+    var contentHtml = '<div>' +
+      '<div class="tpl-detail-card">' +
+      '<div style="font-size:11px;color:var(--color-text-tertiary);margin-bottom:6px;letter-spacing:0.3px">模板骨架 · slot 替换式</div>' +
+      '<div class="tpl-skeleton">' + (tpl.skeleton || '(空)').replace(/\{([^}]+)\}/g, '<span class="tpl-slot">{$1}</span>') + '</div>';
+    
+    if (tpl.required_slots && tpl.required_slots.length > 0) {
+      contentHtml += '<div style="font-size: 11px;color:var(--color-text-tertiary);margin-top:8px;line-height:1.5">必填 slot: ' + tpl.required_slots.map(function(s) { return s; }).join(' / ') + '</div>';
+    }
+    contentHtml += '</div>' +
+      '<div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+      '<div class="kv"><span class="k">分类</span><span>' + catLabel + '</span></div>' +
+      '<div class="kv"><span class="k">角度</span><span>' + (tpl.angle || '—') + '</span></div>' +
+      '<div class="kv"><span class="k">状态</span><span>' + (tpl.status || 'observe') + '</span></div>' +
+      '<div class="kv"><span class="k">使用次数</span><span>' + totalUses + '</span></div>' +
+      '</div>' +
+      '</div>';
+    
+    // Usage history
+    contentHtml += '<div>' +
+      '<div style="font-size:11px;color:var(--color-text-tertiary);margin-bottom:6px;letter-spacing:0.3px">历史命中 · ' + (uses ? uses.length : 0) + ' / ' + totalUses + '</div>';
+    
+    if (uses && uses.length > 0) {
+      for (var i = 0; i < uses.length; i++) {
+        var u = uses[i];
+        var isHot = (u.views || 0) >= 50000;
+        var icon = isHot ? '🔥' : '✓';
+        var iconColor = isHot ? '#D85A30' : '#3B6D11';
+        var text = u.snapshot && u.snapshot.text ? u.snapshot.text.slice(0, 60) : '推文';
+        contentHtml += '<div class="example-row">' +
+          '<span style="color:' + iconColor + '">' + icon + '</span>' +
+          '<div class="name">' + text + '</div>' +
+          '<span class="views">' + (u.views || 0).toLocaleString() + '</span>' +
+          '</div>';
+      }
+    } else {
+      contentHtml += '<div style="padding:12px;text-align:center;font-size:12px;color:var(--color-text-tertiary)">暂无使用记录</div>';
+    }
+    
+    contentHtml += '<div style="margin-top:10px;font-size:11px;color:var(--color-text-tertiary)">命中率 ' + hitRate + '% · 平均 view ' + (avgViews || 0).toLocaleString() + ' · 累计 view ' + (totalViews || 0).toLocaleString() + '</div>' +
+      '<div class="usage-bar"><div class="usage-fill" style="width:' + hitRate + '%"></div></div>' +
+      '</div>';
+    
+    document.getElementById('ft-content').innerHTML = contentHtml;
+    
+    // Footer
+    var footer = document.getElementById('ft-footer');
+    if (footer) {
+      footer.style.display = 'flex';
+      var versionEl = document.getElementById('ft-version');
+      if (versionEl) versionEl.textContent = '⏱ ' + (tpl.updated_at ? new Date(tpl.updated_at).toLocaleDateString('zh-CN') : '—');
+      var authorEl = document.getElementById('ft-author');
+      if (authorEl) authorEl.textContent = '👤 来源: ' + (tpl.source_tweet_url ? '推文提取' : '手工创建');
+    }
   }
 
   window.__reloadTplMatrix = loadMatrix;
   loadMatrix();
 
-  // ====== ✨ 提炼金模板 (启发式: 数字/URL/@/$ → 槽位) ======
-  const CAT_KW = {
-    A: ['odds','polymarket','kalshi','manifold','prediction market','bet','probability','resolves','contract','yes/no'],
-    C: ['smart money','whale','wallet','0x','on-chain','onchain','defi','position','buys','sells','moves funds'],
-    D: ['new market','new contract','launching','listed','just added','first trade','new listing'],
-    E: ['fomc','fed','cpi','inflation','rate cut','rate hike','election','trump','powell','bitcoin','btc','crypto'],
-  };
-  function classifyCategory(text) {
-    const lower = String(text || '').toLowerCase();
-    for (const [cat, kws] of Object.entries(CAT_KW)) {
-      if (kws.some(kw => lower.includes(kw))) return cat;
-    }
-    return 'E';
-  }
-  function extractSkeleton(text) {
-    let t = String(text || '');
-    t = t.replace(/https?:\/\/\S+/g, '{链接}');
-    t = t.replace(/@\w+/g, '{账号}');
-    t = t.replace(/\$[\d,.]+\s?[kKmMbB]?(\/(month|day|hour|hr))?/g, '{金额}');
-    t = t.replace(/\b\d{1,3}%/g, '{比例}');
-    t = t.replace(/\b\d+x\b/g, '{倍数}');
-    t = t.replace(/\b\d{4,}\b/g, '{数据}');
-    return t;
-  }
-  function slotsOf(skeleton) {
-    return Array.from(new Set((skeleton.match(/\{[^}]+\}/g) || []).map(m => m.slice(1,-1))));
-  }
+  // extractSkeleton, classifyCategory, slotsOf now in window.ContentOps
 
   const exModal   = document.getElementById('extract-modal');
   const exClose   = document.getElementById('extract-close');
@@ -1120,7 +1157,7 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
 
     // 先用启发式占位填充, 然后异步调 LLM 用真抽象覆盖
     exSummary.textContent = `从 ${currentAngle === '全部' ? '全部' : currentAngle} 类的 top ${items.length} 条爆款, 调 AI 抽象模板...`;
-    renderCards(items, items.map(t => ({ skeleton: extractSkeleton(t.text || ''), slots: slotsOf(extractSkeleton(t.text || '')) })), 'regex');
+    renderCards(items, items.map(t => ({ skeleton: CO.extractSkeleton(t.text || ''), slots: CO.slotsOf(CO.extractSkeleton(t.text || '')) })), 'regex');
     exMsg.textContent = '';
     exModal.classList.add('open');
     exModal._tweets = items;
@@ -1129,34 +1166,26 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
 
     // 异步: 调 LLM
     try {
-      const apiBase = `http://${location.hostname}:8081`;
-      const r = await fetch(`${apiBase}/api/ai/extract-template`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tweets: items.map(t => ({ text: t.text, views: t.metrics?.views })),
-          angle: currentAngle === '全部' ? null : currentAngle,
-          category: null,
-        }),
-      });
-      const res = await r.json();
-      if (res.ok && Array.isArray(res.templates) && res.templates.length === items.length) {
-        renderCards(items, res.templates, 'ai');
-        exSummary.textContent = `从 ${currentAngle} 类的 top ${items.length} 条爆款, ✨ AI 抽象 (${res.model}). 你可以编辑、勾选要保存的.`;
+      const templates = await window.AIPipeline.extractTemplates(
+        items.map(t => ({ text: t.text, metrics: t.metrics, author: t.author })),
+      );
+      if (templates && templates.length > 0) {
+        renderCards(items, templates, 'ai');
+        exSummary.textContent = '从 ' + currentAngle + ' 类的 top ' + items.length + ' 条爆款, ✨ AI 抽象. 你可以编辑、勾选要保存的.';
       } else {
-        exSummary.textContent = `${exSummary.textContent} · ⚠ AI 提炼失败, 用启发式占位 (${res.error || 'unknown'})`;
+        exSummary.textContent = exSummary.textContent + ' · ⚠ AI 提炼返回空, 用启发式占位';
       }
     } catch (e) {
-      exSummary.textContent = `${exSummary.textContent} · ⚠ AI 提炼网络错误, 用启发式占位`;
+      exSummary.textContent = exSummary.textContent + ' · ⚠ AI 提炼错误, 用启发式占位';
     }
   }
 
   function renderCards(items, extracted, sourceTag) {
     exListEl.innerHTML = items.map((t, i) => {
-      const ext = extracted[i] || { skeleton: extractSkeleton(t.text || ''), slots: slotsOf(extractSkeleton(t.text || '')) };
-      const skel = ext.skeleton || extractSkeleton(t.text || '');
-      const slots = ext.slots && ext.slots.length > 0 ? ext.slots : slotsOf(skel);
-      const cat = classifyCategory(t.text || '');
+      const ext = extracted[i] || { skeleton: CO.extractSkeleton(t.text || ''), slots: CO.slotsOf(CO.extractSkeleton(t.text || '')) };
+      const skel = ext.skeleton || CO.extractSkeleton(t.text || '');
+      const slots = ext.slots && ext.slots.length > 0 ? ext.slots : CO.slotsOf(skel);
+      const cat = CO.classifyCategory(t.text || '');
       const angle = t._angle || 'Other';
       const handle = t.author?.username ? '@' + t.author.username : '?';
       const tagBg = sourceTag === 'ai' ? '#EEEDFE' : '#FAEEDA';
@@ -1220,7 +1249,7 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
       const cat  = card.querySelector('.ex-cat').value;
       const t = items[i];
       if (!skel) continue;
-      const slots = slotsOf(skel);
+      const slots = CO.slotsOf(skel);
       const angleVal = (t._angle && t._angle !== 'Other') ? t._angle : '反直觉';
       rows.push({
         id: 'tpl_' + (crypto.randomUUID ? crypto.randomUUID().slice(0,8) : Math.random().toString(36).slice(2,10)),
@@ -1252,7 +1281,6 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
 
 // ====== ✨ 使用此模板 (AI 套模板填充) ======
 (function(){
-  const API_BASE = `http://${location.hostname}:8081`;
   const modal   = document.getElementById('ai-fill-modal');
   const skelEl  = document.getElementById('ai-fill-skel');
   const slotsEl = document.getElementById('ai-fill-slots');
@@ -1305,27 +1333,22 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
     btnGen.disabled = true; btnGen.textContent = '生成中…';
     msgEl.textContent = ''; msgEl.style.color = '';
     try {
-      const r = await fetch(`${API_BASE}/api/ai/fill-template`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          skeleton: currentTpl.skeleton,
-          slots: currentTpl.required_slots || [],
-          material,
-          angle: currentTpl.angle,
-          category: currentTpl.category,
-        }),
-      });
-      const json = await r.json();
-      if (!json.ok) {
-        msgEl.textContent = '✕ ' + (json.error || ('HTTP ' + r.status));
+      const text = await window.AIPipeline.fillTemplate(
+        currentTpl.skeleton,
+        currentTpl.required_slots || [],
+        material,
+        currentTpl.angle,
+        currentTpl.category,
+      );
+      if (!text) {
+        msgEl.textContent = '✕ AI 生成失败';
         msgEl.style.color = '#A32D2D';
         btnGen.disabled = false; btnGen.textContent = '✨ 生成';
         return;
       }
-      outEl.value = json.text || '';
+      outEl.value = text;
       outWrap.style.display = '';
-      msgEl.textContent = `✓ 生成成功 · 用 ${json.model || 'AI'}`;
+      msgEl.textContent = '✓ 生成成功';
       msgEl.style.color = '#27500A';
     } catch (e) {
       msgEl.textContent = '✕ 网络错误: ' + e.message;
@@ -1347,10 +1370,8 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
   });
 
   // ====== ✕ 删除模板 (anchored confirm popover) ======
-  const sbDel = window.supabase.createClient(
-    'https://snflonpxmzkeytzytqpg.supabase.co',
-    'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD'
-  );
+  const { SUPABASE_URL: SU_DEL, SUPABASE_KEY: SK_DEL } = window.PALLAX_CONFIG || {};
+  const sbDel = window.supabase.createClient(SU_DEL, SK_DEL);
 
   function confirmDelAt(anchorEl, tplId) {
     let pop = document.getElementById('tpl-del-pop');

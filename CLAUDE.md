@@ -1,191 +1,71 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+本文件为 Claude Code 在此仓库中工作时提供指引。
 
-## Project Shape
+## 项目形态
 
-This repo is a small multi-surface product made of static HTML pages plus one Node API:
+本地优先的产品面板。5 个静态 HTML 页面 + 极简 Node.js 静态服务，Supabase 远程持久化，DeepSeek API 云端 AI 推理，OpenCLI Chrome 插件抓取 Twitter 数据。
 
-- `pallax_weekly_dashboard.html` is the main weekly operations dashboard.
-- `pallax_weekly_dashboard_preview.html` is a preview variant of the main dashboard.
-- `weeklyreport/02-radar.html` is the hotspot radar view.
-- `weeklyreport/07-templates.html` is the template library / template usage flow.
-- `weeklyreport/08-sources.html` is the source management and source-sync flow.
-- `apps/api/server.js` is the only backend service; it proxies X/Twitter API reads for the frontend.
+```
+src/pages/*.html  ──supabase-js──→  Supabase（远程，仅持久化，anon RLS）
+src/pages/*.html  ──fetch────────→  DeepSeek API（云端 LLM）
+src/pages/*.html  ──fetch────────→  OpenCLI Daemon :19825（数据抓取）
+```
 
-There is no root app framework, bundler, or router. Navigation is done with plain links between HTML files, and most frontend logic is inline in each page.
+## 常用命令
 
-## Common Commands
+```bash
+cp .env.example .env       # 填入 DEEPSEEK_API_KEY
+node src/serve.js          # → http://localhost:8080
+```
 
-### Local frontend work
+OpenCLI Daemon 随 Chrome 插件自动启动。DeepSeek API 由浏览器 JS 直接调用。
 
-There is no checked-in frontend build step. Pages are standalone HTML files.
+## 架构
 
-- Serve the repo root locally with a simple static server:
-  - `python3 -m http.server 8080`
-- Then open:
-  - `http://localhost:8080/pallax_weekly_dashboard.html`
-  - `http://localhost:8080/pallax_weekly_dashboard_preview.html`
-  - `http://localhost:8080/weeklyreport/02-radar.html`
-  - `http://localhost:8080/weeklyreport/07-templates.html`
-  - `http://localhost:8080/weeklyreport/08-sources.html`
+### 前端结构
 
-### Local API work
+每个页面是几乎独立的 HTML 文档：大段内联 CSS、大段内联 JS、直接 DOM 操作、页面本地可变状态。逻辑分散在多个 IIFE 中。编辑 UI 行为前先通读整个页面。
 
-Run commands from `apps/api`:
+### 共享模块（`src/`，通过 `<script>` 加载，暴露 `window.*`）
 
-- Install dependencies: `npm install`
-- Start in watch mode: `npm run dev`
-- Start once: `npm start`
+| 文件 | 全局 | 职责 |
+|------|------|------|
+| `src/provider.js` | `window.Provider` | OpenCLI 数据抓取（fetchTweetsByHandle / fetchSingleTweet / fetchListMembers） |
+| `src/content-ops.js` | `window.ContentOps` | 启发式分析：分类/聚类/评分/模板提取（纯函数，无 I/O） |
+| `src/ai/client.js` | `window.AIClient` | DeepSeek API 封装（chat / embed / cosineSimilarity） |
+| `src/ai/pipeline.js` | `window.AIPipeline` | AI 分析管线（scoreCluster / classifyBatch / generateIntel / extractTemplates / fillTemplate / runPipeline） |
 
-The API expects `.env` values for:
+加载顺序：`/config.js → content-ops.js → ai/client.js → ai/pipeline.js → provider.js`
 
-- `TWITTER_BEARER_TOKEN`
-- `PORT` (defaults to `8081`)
-- `HOST` (defaults to `0.0.0.0`)
+### 持久化：localStorage + Supabase
 
-Useful local check:
+- dashboard：localStorage 离线优先 → Supabase 异步同步（teams / schemas / weekly_data）
+- sources/radar/templates：直接 Supabase 读写（sources / hotspots / templates / template_uses）
+- 全部 `anon` RLS，无需认证
 
-- `curl http://localhost:8081/api/health`
+### AI 双轨策略
 
-### Tests / linting
+每个分析任务 LLM 主路径 + 启发式回退。LLM 失败时自动降级到 `ContentOps.*`。
 
-- There are currently no checked-in lint scripts.
-- There are currently no checked-in automated test scripts.
-- There is no repo-defined single-test command.
+### 数据库
 
-### Deployment
+权威 schema：`src/db/supabase_setup_v2.sql`（v3，anon RLS，无 trigger/view 分析逻辑）
 
-Repo-level static page deploy:
+## 功能边界
 
-- `./deploy.sh`
+| 页面 | 功能 |
+|------|------|
+| `src/pages/dashboard.html` | 周报复盘、产品组管理、NSM、漏斗指标、任务、复盘 |
+| `src/pages/sources.html` | 监控源管理、批量导入、单源同步、PM 相关度 |
+| `src/pages/radar.html` | 热点池、AI 情报、评分排序 |
+| `src/pages/templates.html` | 模板矩阵、AI 提炼/填充、使用追踪 |
 
-This pushes:
+## 工作约定
 
-- `pallax_weekly_dashboard.html` -> remote `index.html`
-- `pallax_weekly_dashboard_preview.html` -> remote `preview.html`
-- `weeklyreport/*.html` and `weeklyreport/*.css` -> remote `weeklyreport/`
-
-API deploy:
-
-- `./deploy-api.sh`
-
-This uploads `apps/api/server.js` and `apps/api/package.json`, installs production deps remotely, provisions a `systemd` unit, and restarts `pallax-api.service`.
-
-Both deploy scripts are server-specific and assume the existing SSH key, host, and remote directory values checked into those scripts.
-
-## Architecture
-
-### Frontend structure
-
-The frontend is not componentized. Each page is a mostly self-contained HTML document with:
-
-- large inline CSS blocks
-- large inline script blocks
-- direct DOM querying and event listeners
-- page-local mutable state
-- occasional globals on `window` for cross-block coordination
-
-`weeklyreport/styles.css` exists, but substantial page styling still lives inside each HTML file.
-
-When editing UI behavior, read the whole page first. Logic is often spread across multiple IIFEs in the same file rather than separated into modules.
-
-### State and persistence model
-
-The main dashboard uses an offline-first pattern:
-
-- local mutable JS objects hold the active state
-- state is persisted to `localStorage`
-- Supabase is used to sync that state to the cloud
-
-The core dashboard entities are:
-
-- `teams`
-- `team_schemas`
-- `team_api_configs`
-- `weekly_data`
-
-The dashboard stores week/team data in `localStorage` first, then mirrors it to Supabase.
-
-The weeklyreport pages are more DB-first, but still rely on browser session/local storage behavior for auth reuse.
-
-### Auth and shared session model
-
-All product surfaces use the same Supabase project and publishable key in-page.
-
-Important consequence:
-
-- `weeklyreport/08-sources.html`, `weeklyreport/07-templates.html`, and `weeklyreport/02-radar.html` reuse the session established by the main dashboard because they share the same Supabase project in the same browser.
-
-If a content-factory page appears to be "logged out," check whether the dashboard session exists first.
-
-### Backend and data flow
-
-`apps/api/server.js` is a thin Fastify service used only for X/Twitter enrichment. It exposes:
-
-- `GET /api/health`
-- `POST /api/twitter/tweet`
-- `POST /api/twitter/handle/:handle/recent`
-- `POST /api/twitter/list/:listId/members`
-
-The usual flow is:
-
-1. browser page calls the local/remote API on port `8081`
-2. API fetches X/Twitter data via bearer token
-3. browser page writes derived records into Supabase
-
-The frontend computes `API_BASE` as `http://${location.hostname}:8081`, so the static pages and API are expected to run on the same host.
-
-## Data Model
-
-The authoritative schema reference is `supabase_setup_v2.sql`.
-
-It combines two connected domains:
-
-1. weekly ops dashboard tables
-   - `teams`
-   - `team_schemas`
-   - `team_api_configs`
-   - `weekly_data`
-2. content factory tables
-   - `user_profiles`
-   - `sources`
-   - `hotspots`
-   - `templates`
-   - `template_uses`
-
-Also important in that file:
-
-- RLS policies assume authenticated users have full access to the business tables.
-- `set_updated_at()` and trigger wiring maintain `updated_at` fields.
-- `bump_template_stats()` updates `templates.uses`, `avg_views`, `fire_count`, and status from `template_uses` inserts.
-- cross-domain views provide derived reporting:
-  - `v_weekly_hotspot_stats`
-  - `v_template_perf`
-  - `v_source_contribution`
-
-Seed/reference SQL files:
-
-- `seed_hotspots.sql`
-- `seed_user_profiles.sql`
-
-Use these when you need example record shapes or want to understand intended semantics.
-
-## Feature Boundaries
-
-The main business areas map cleanly by page:
-
-- `pallax_weekly_dashboard.html`: weekly review, team metrics, schemas, retros, auth entrypoint
-- `weeklyreport/08-sources.html`: monitored account/source management, list import, source syncing, PM relevance scoring
-- `weeklyreport/02-radar.html`: hotspot review, scoring, evidence display, radar-style prioritization
-- `weeklyreport/07-templates.html`: template library, angle classification, template usage tracking against tweet performance
-
-A lot of behavior is coupled through the database rather than through shared frontend code.
-
-## Working Conventions For This Repo
-
-- Prefer small, surgical edits inside the existing HTML pages rather than introducing new abstractions.
-- Preserve the current page-local style: direct DOM updates, inline scripts, and incremental changes.
-- Check `supabase_setup_v2.sql` before changing any field names or assumptions used in the weeklyreport pages.
-- If you touch X/Twitter-related flows, inspect both the page logic and `apps/api/server.js`; the browser/API boundary is part of the feature.
-- If you touch auth-dependent content-factory behavior, verify whether the page is reusing the dashboard session rather than implementing its own login flow.
+- 优先在现有页面内做小范围编辑，直接 DOM 更新，内联脚本
+- 修改字段名前先检查 `src/db/supabase_setup_v2.sql`
+- 共享逻辑放 `src/`，页面特有逻辑保留内联
+- AI 分析调用经 `src/ai/client.js` → DeepSeek API
+- Prompt 变更仅在 `src/ai/prompts.js`
+- Supabase 仅持久化 — 无 trigger/function/view 分析逻辑

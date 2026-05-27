@@ -3,9 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>监控源 list · Pallax 内容工厂</title>
-<link rel="stylesheet" href="styles.css">
+<title>监控源</title>
+<link rel="stylesheet" href="src/styles.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/config.js"></script>
+<script src="src/content-ops.js"></script>
+<script src="src/provider.js"></script>
 <style>
 
 .config-nav-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--border-radius-md);font-size:12px;color:var(--color-text-secondary);cursor:pointer;margin-bottom:2px;}
@@ -100,13 +103,13 @@
 <nav class="topnav">
   <div class="topnav-brand">
     <div class="logo">P</div>
-    <div class="name">Pallax 内容工厂</div>
+    <div class="name">内容工厂</div>
   </div>
   <div class="topnav-tabs">
-    <a href="../" class="nav-item"><span class="ic">▢</span>数据复盘</a>
-    <a href="02-radar.html" class="nav-item"><span class="ic">◉</span>热点雷达</a>
-    <a href="07-templates.html" class="nav-item"><span class="ic">◫</span>金模板库</a>
-    <a href="08-sources.html" class="nav-item active"><span class="ic">⊙</span>监控源</a>
+    <a href="dashboard.html" class="nav-item"><span class="ic">▢</span>数据复盘</a>
+    <a href="radar.html" class="nav-item"><span class="ic">◉</span>热点雷达</a>
+    <a href="templates.html" class="nav-item"><span class="ic">◫</span>模板库</a>
+    <a href="sources.html" class="nav-item active"><span class="ic">⊙</span>监控源</a>
   </div>
 </nav>
 <main class="main">
@@ -122,35 +125,35 @@
 
 <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
 
-<div class="review-banner">
+<div class="review-banner" id="review-banner">
 <span class="pulse"></span>
-<div style="flex:1">
+<div style="flex:1" id="review-banner-text">
 <span style="font-weight:500">下次周一 review:</span>
-明天 09:00 SGT · 系统将自动汇总各源 4 周表现 · 给出"主力 / 观察 / 退役"建议 · 已生成 5 个 AI 推荐新增
+加载中…
 </div>
-<button class="btn-ghost" style="background:#fff">↗ 立即手动 review</button>
+<button class="btn-ghost" style="background:#fff" id="btn-manual-review">↗ 立即手动 review</button>
 </div>
 
 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
 <div class="metric-card">
 <div class="metric-label">账号总数</div>
-<div class="metric-val">42</div>
-<div class="metric-delta info">主力 28 · 观察 9 · 待退 5</div>
+<div class="metric-val" id="mc-total">—</div>
+<div class="metric-delta info" id="mc-total-delta">加载中…</div>
 </div>
 <div class="metric-card">
 <div class="metric-label">本周触发热点</div>
-<div class="metric-val">87 <span style="font-size:11px;color:var(--color-text-tertiary);font-weight:400">次</span></div>
-<div class="metric-delta up">↗ +14 vs W18</div>
+<div class="metric-val" id="mc-hits">— <span style="font-size:11px;color:var(--color-text-tertiary);font-weight:400">次</span></div>
+<div class="metric-delta up" id="mc-hits-delta">加载中…</div>
 </div>
 <div class="metric-card">
 <div class="metric-label">爆款贡献源</div>
-<div class="metric-val">11</div>
-<div class="metric-delta info">26% 账号贡献全部爆款</div>
+<div class="metric-val" id="mc-fire">—</div>
+<div class="metric-delta info" id="mc-fire-delta">加载中…</div>
 </div>
 <div class="metric-card">
 <div class="metric-label">沉默账号 ≥ 4 周</div>
-<div class="metric-val">3</div>
-<div class="metric-delta down">建议清理</div>
+<div class="metric-val" id="mc-silent">—</div>
+<div class="metric-delta down" id="mc-silent-delta">加载中…</div>
 </div>
 </div>
 
@@ -158,10 +161,10 @@
 
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
 <div class="tab-row">
-<div class="tab active">𝕏 推特 KOL<span class="count">28</span></div>
-<div class="tab">▦ 链上钱包<span class="count">9</span></div>
-<div class="tab">📰 媒体 RSS<span class="count">5</span></div>
-<div class="tab" style="background:#EEEDFE;color:#3C3489">✨ AI 推荐<span class="count">+5</span></div>
+<div class="tab active" data-type="twitter">𝕏 推特 KOL<span class="count" id="tab-count-twitter">—</span></div>
+<div class="tab" data-type="onchain">▦ 链上钱包<span class="count" id="tab-count-onchain">—</span></div>
+<div class="tab" data-type="market">📰 媒体 RSS<span class="count" id="tab-count-market">—</span></div>
+<div class="tab" data-type="recommend" style="background:#EEEDFE;color:#3C3489">✨ AI 推荐<span class="count" id="tab-count-recommend">+5</span></div>
 </div>
 <div style="display:flex;align-items:center;gap:6px">
 <input style="border:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:6px 10px;font-size: 12px;width:160px" placeholder="搜索 @handle..."/>
@@ -191,74 +194,27 @@
 </table>
 
 <div style="margin-top:10px;padding-top:10px;border-top:0.5px solid var(--color-border-tertiary);font-size:11px;color:var(--color-text-tertiary);display:flex;align-items:center;justify-content:space-between">
-<div>显示 7 / 28 推特 KOL · <span class="act-link">查看全部</span></div>
-<div>本周新增 0 · 退役 0 · 待 review 5</div>
+<div id="table-summary-display">显示 — / — 推特 KOL · <span class="act-link">查看全部</span></div>
+<div id="table-summary-stats">本周新增 — · 退役 — · 待 review —</div>
 </div>
 
 </div>
 
-<div class="card">
-<div class="card-head">
-<div class="card-title">✨ AI 推荐新增 · 5 个候选</div>
-<span class="muted">基于"贡献过爆款源的二度关系"自动发现</span>
-</div>
-
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-
-<div class="ai-rec-card">
-<div class="ai-rec-handle">@RektAlpha <span class="status new">推荐</span></div>
-<div class="ai-rec-reason">本周 3 个爆款源都引用过他 · C 链上 · 67k 粉丝 · 推文互动率 4.2%</div>
-<div class="ai-rec-actions">
-<button class="btn-mini-add">+ 加入主力</button>
-<button class="btn-mini-skip">观察</button>
-<button class="btn-mini-skip">忽略</button>
-</div>
-</div>
-
-<div class="ai-rec-card">
-<div class="ai-rec-handle">@PolyTraderX <span class="status new">推荐</span></div>
-<div class="ai-rec-reason">A 赔率 · 上周 FOMC 行情前 4h 准确预判 · 与 @JimGCryptos 内容风格互补</div>
-<div class="ai-rec-actions">
-<button class="btn-mini-add">+ 加入主力</button>
-<button class="btn-mini-skip">观察</button>
-<button class="btn-mini-skip">忽略</button>
-</div>
-</div>
-
-<div class="ai-rec-card">
-<div class="ai-rec-handle">@WhaleWatcher_ <span class="status new">推荐</span></div>
-<div class="ai-rec-reason">C 链上 · 与现有 @OnchainBob 重合度 91% · 备份候选 · 推送频率更高</div>
-<div class="ai-rec-actions">
-<button class="btn-mini-add">+ 加入观察</button>
-<button class="btn-mini-skip">备用</button>
-<button class="btn-mini-skip">忽略</button>
-</div>
-</div>
-
-<div class="ai-rec-card">
-<div class="ai-rec-handle">@ElectionMaths <span class="status new">推荐</span></div>
-<div class="ai-rec-reason">E 现实 · 大选模型权威 · 弥补当前 E 类账号产能 6% 偏低</div>
-<div class="ai-rec-actions">
-<button class="btn-mini-add">+ 加入主力</button>
-<button class="btn-mini-skip">观察</button>
-<button class="btn-mini-skip">忽略</button>
-</div>
-</div>
-
-</div>
-
-<div style="margin-top:10px;font-size:11px;color:var(--color-text-tertiary)">
-ⓘ AI 推荐在每周一自动更新 · 接受新增后将进入 4 周观察期 · 表现达标转主力
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-<!-- ============ 🔥 爆款推文 (从所有监控源同步出的 hot_signal=true 推文) ============ -->
-<div id="fire-card" class="card" style="padding:14px 16px;margin-top:14px">
+<div class="card" id="ai-rec-card">
+	<div class="card-head">
+	<div class="card-title">✨ AI 推荐新增 · <span id="ai-rec-count">—</span> 个候选</div>
+	<span class="muted">基于"贡献过爆款源的二度关系"自动发现</span>
+	</div>
+	
+	<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" id="ai-rec-grid">
+	<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--color-text-tertiary);font-size:12px">加载中…</div>
+	</div>
+	
+	<div style="margin-top:10px;font-size:11px;color:var(--color-text-tertiary)" id="ai-rec-note">
+	ⓘ AI 推荐在每周一自动更新 · 接受新增后将进入 4 周观察期 · 表现达标转主力
+	</div>
+	
+	</div><div id="fire-card" class="card" style="padding:14px 16px;margin-top:14px">
   <div class="card-head" style="margin-bottom:10px">
     <div class="card-title">🔥 爆款推文 · 来自监控源</div>
     <span class="muted" id="fire-summary" style="margin-right:auto;margin-left:10px">加载中…</span>
@@ -370,23 +326,13 @@ theblock.co
 <script>
 (function(){
   // ─── Supabase 客户端 (跟 weekly_dashboard 共用同一项目) ───────────────
-  const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
+  const { SUPABASE_URL, SUPABASE_KEY } = window.PALLAX_CONFIG;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   let dbReady = false;       // 是否真连上 DB 并有会话
   let currentSession = null; // session
   let currentProfile = null; // user_profiles 一行
 
-  // 表内 mock 数据 (兜底 · 没登录 / DB 空时使用)
-  const MOCK_SOURCES = [
-    { id:'mock1', type:'twitter', handle:'@JimGCryptos',      name:'A 赔率 · 链上分析师', status:'live',    uploader:{initials:'LR', display_name:'Lareina', avatar_color:''},   metrics_4w:{hits:14, spark:[10,13,15,18], fire:3, note:'avg'}, added_ago:'3 月前' },
-    { id:'mock2', type:'twitter', handle:'@OnchainBob',       name:'C 链上 · 钱包追踪',  status:'live',    uploader:{initials:'KA', display_name:'Kay',    avatar_color:'r1'},  metrics_4w:{hits:11, spark:[9,11,14,14], fire:2}, added_ago:'2 月前' },
-    { id:'mock3', type:'twitter', handle:'@HayesEconomics',   name:'A 赔率 · 宏观',      status:'live',    uploader:{initials:'JY', display_name:'Jay',    avatar_color:'r2'},  metrics_4w:{hits:9,  spark:[11,10,11,12], fire:1}, added_ago:'5 周前' },
-    { id:'mock4', type:'twitter', handle:'@PolymarketPro',    name:'D 新合约 · 官方账号', status:'live',    uploader:{initials:'LR', display_name:'Lareina', avatar_color:''},   metrics_4w:{hits:7,  spark:[7,9,11,13],   fire:1}, added_ago:'6 周前' },
-    { id:'mock5', type:'twitter', handle:'@SmartKalshi',      name:'A 赔率 · Kalshi 玩家', status:'observe', uploader:{initials:'VL', display_name:'Valeria', avatar_color:'r3'}, metrics_4w:{hits:3,  spark:[13,9,7,5],    fire:0}, added_ago:'3 周前' },
-    { id:'mock6', type:'twitter', handle:'@CryptoTrendz2023', name:'综合 · 通用账号',    status:'retired', uploader:{initials:'LR', display_name:'Lareina', avatar_color:''},   metrics_4w:{hits:0,  spark:[3,2,2,2],     fire:0, note:'5 周无新推'}, added_ago:'7 月前' },
-    { id:'mock7', type:'twitter', handle:'@PunditGuru99',     name:'E 现实 · 误报率高',  status:'retired', uploader:{initials:'KA', display_name:'Kay',    avatar_color:'r1'},  metrics_4w:{hits:2,  spark:[5,3,2,2],     fire:0, false_rate:0.78}, added_ago:'4 月前' },
-  ];
+  // No mock — always read from DB (anon RLS)
 
   function ago(ts){
     if (!ts) return '刚刚';
@@ -470,18 +416,49 @@ theblock.co
     return rows;
   }
 
+  function updateMetricsCards(rows) {
+    var total = rows.length;
+    var live = rows.filter(function(r) { return r.status === 'live'; }).length;
+    var observe = rows.filter(function(r) { return r.status === 'observe'; }).length;
+    var retired = rows.filter(function(r) { return r.status === 'retired'; }).length;
+    var totalHits = 0, fireSources = 0;
+    var fourWeeksAgo = Date.now() - 28 * 24 * 3600e3;
+    var silentCount = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var m = rows[i].metrics_4w || {};
+      totalHits += (m.hits || 0);
+      if ((m.fire || 0) > 0) fireSources++;
+      var lastActive = rows[i].last_active_at ? new Date(rows[i].last_active_at).getTime() : 0;
+      if (!rows[i].last_active_at || lastActive < fourWeeksAgo) silentCount++;
+    }
+    var el = function(id) { return document.getElementById(id); };
+    if (el('mc-total')) { el('mc-total').innerHTML = total; el('mc-total-delta').textContent = '主力 ' + live + ' · 观察 ' + observe + ' · 待退 ' + retired; }
+    if (el('mc-hits')) { el('mc-hits').innerHTML = totalHits + ' <span style="font-size:11px;color:var(--color-text-tertiary);font-weight:400">次</span>'; el('mc-hits-delta').textContent = totalHits > 0 ? '近 7 天累计' : '暂无数据 · 点同步更新'; }
+    if (el('mc-fire')) { el('mc-fire').textContent = fireSources; el('mc-fire-delta').textContent = total > 0 ? Math.round(fireSources / total * 100) + '% 账号贡献爆款' : '暂无数据'; }
+    if (el('mc-silent')) { el('mc-silent').textContent = silentCount; el('mc-silent-delta').textContent = silentCount > 0 ? '≥ 4 周无活动' : '全部活跃'; }
+    // Tab counts
+    var types = { twitter: 0, onchain: 0, market: 0, rss: 0 };
+    for (var j = 0; j < rows.length; j++) { var t = rows[j].type; if (types[t] !== undefined) types[t]++; }
+    if (document.getElementById('tab-count-twitter')) document.getElementById('tab-count-twitter').textContent = types.twitter;
+    if (document.getElementById('tab-count-onchain')) document.getElementById('tab-count-onchain').textContent = types.onchain;
+    if (document.getElementById('tab-count-market')) document.getElementById('tab-count-market').textContent = types.market;
+    if (document.getElementById('tab-count-rss')) document.getElementById('tab-count-rss').textContent = types.rss;
+    // Table summary
+    var pmFiltered = rows.filter(function(r) { return (r.metrics_4w && r.metrics_4w.pm_score != null && r.metrics_4w.pm_score >= 0.4); });
+    if (document.getElementById('table-summary-display')) document.getElementById('table-summary-display').innerHTML = pmFiltered.length + ' / ' + total + ' 推特 KOL · <span class="act-link">查看全部</span>';
+    if (document.getElementById('table-summary-stats')) document.getElementById('table-summary-stats').textContent = '本周新增 — · 退役 — · 待 review —';
+  }
+
   function renderTable(rows){
     __allSources = rows;
-    const visible = applyFilters();
-    const tbody = document.getElementById('sources-tbody');
+    var visible = applyFilters();
+    var tbody = document.getElementById('sources-tbody');
     if (visible.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--color-text-tertiary);font-size: 12px">${rows.length === 0 ? '暂无监控源 · 用右上「↥ 批量导入」' : `当前过滤无匹配 (共 ${rows.length} 条)`}</td></tr>`;
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--color-text-tertiary);font-size: 12px">' + (rows.length === 0 ? '暂无监控源 · 用右上「↥ 批量导入」' : '当前过滤无匹配 (共 ' + rows.length + ' 条)') + '</td></tr>';
     } else {
       tbody.innerHTML = visible.map(renderSourceRow).join('');
     }
-    // 顶部统计始终同步 (含 0)
-    document.querySelector('.metric-card .metric-val').textContent = rows.length;
-    document.querySelector('.tab.active .count').textContent = rows.filter(r => r.type === 'twitter').length;
+    updateMetricsCards(rows);
   }
 
   async function loadSourcesFromDB(){
@@ -511,44 +488,96 @@ theblock.co
     });
   }
 
+  async function loadReviewSummary() {
+    try {
+      var res = await fetch('/api/sources/review-summary');
+      if (!res.ok) return;
+      var data = await res.json();
+      var bannerText = document.getElementById('review-banner-text');
+      if (bannerText && data) {
+        bannerText.innerHTML = '<span style="font-weight:500">下次周一 review:</span> ' + data.next_review_label + ' · ' + data.summary_text;
+      }
+      if (data && data.table_summary) {
+        var ts = data.table_summary;
+        if (document.getElementById('table-summary-stats')) {
+          document.getElementById('table-summary-stats').textContent = '本周新增 ' + ts.new_this_week + ' · 退役 ' + ts.retired + ' · 待 review ' + ts.pending_review;
+        }
+      }
+    } catch (e) { console.warn('review-summary load failed:', e.message); }
+  }
+
+  async function loadAIRecommendations() {
+    try {
+      var res = await fetch('/api/sources/ai-recommendations');
+      if (!res.ok) return;
+      var data = await res.json();
+      var grid = document.getElementById('ai-rec-grid');
+      var countEl = document.getElementById('ai-rec-count');
+      var noteEl = document.getElementById('ai-rec-note');
+      if (!grid || !data || !data.candidates) return;
+      var candidates = data.candidates;
+      if (countEl) countEl.textContent = candidates.length;
+      if (noteEl && data.note) noteEl.innerHTML = 'ⓘ ' + data.note;
+      grid.innerHTML = candidates.map(function(c) {
+        return '<div class="ai-rec-card">' +
+          '<div class="ai-rec-handle">' + c.handle + ' <span class="status new">推荐</span></div>' +
+          '<div class="ai-rec-reason">' + c.reason + '</div>' +
+          '<div class="ai-rec-actions">' +
+            '<button class="btn-mini-add ai-rec-act" data-handle="' + c.handle + '" data-action="live">+ 加入' + (c.suggested_action === '观察' ? '观察' : '主力') + '</button>' +
+            '<button class="btn-mini-skip ai-rec-act" data-handle="' + c.handle + '" data-action="observe">观察</button>' +
+            '<button class="btn-mini-skip ai-rec-act" data-handle="' + c.handle + '" data-action="ignore">忽略</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+      // Event delegation for AI rec action buttons
+      grid.querySelectorAll('.ai-rec-act').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          var handle = this.getAttribute('data-handle');
+          var action = this.getAttribute('data-action');
+          if (action === 'ignore') {
+            this.closest('.ai-rec-card').style.opacity = '0.4';
+            this.closest('.ai-rec-card').style.pointerEvents = 'none';
+            if (window.__toast) window.__toast(handle + ' 已忽略', 'info', 2000);
+          } else {
+            // Add to sources as new entry
+            if (dbReady) {
+              var type = 'twitter';
+              var status = action === 'live' ? 'live' : 'observe';
+              sb.from('sources').insert({
+                id: 'src_' + (crypto.randomUUID ? crypto.randomUUID().slice(0,8) : Math.random().toString(36).slice(2,10)),
+                type: type, handle: handle, status: status,
+                metrics_4w: { hits: 0, spark: [3,3,3,3], fire: 0 }
+              }).then(function(res) {
+                if (res.error) {
+                  if (window.__toast) window.__toast('添加失败: ' + res.error.message, 'error');
+                } else {
+                  if (window.__toast) window.__toast('✓ ' + handle + ' 已加入' + (status === 'live' ? '主力' : '观察'), 'success', 3000);
+                  window.__reloadSourcesTable();
+                }
+              });
+            } else {
+              if (window.__toast) window.__toast('DB 未就绪, 无法添加 ' + handle, 'warn');
+            }
+          }
+        });
+      });
+    } catch (e) { console.warn('ai-recommendations load failed:', e.message); }
+  }
+
   async function bootstrap(){
-    // 默认：禁用写按钮直到确认 DB 可写
     setWriteButtonsEnabled(false, '加载中…');
-
-    // 1. 复用 weekly_dashboard 的 session (同 supabase URL → localStorage 共享)
-    const { data: { session } } = await sb.auth.getSession();
-    currentSession = session;
-
-    if (session) {
-      // 2. 拉用户档案
-      const { data: profile } = await sb.from('user_profiles').select('*').eq('id', session.user.id).single();
-      currentProfile = profile;
-      if (profile) {
-        document.querySelector('.page-header .avatar').textContent = profile.initials;
-        if (window.__refreshUploaderDisplay) window.__refreshUploaderDisplay();
-      }
-
-      // 3. 拉 sources
-      const rows = await loadSourcesFromDB();
-      if (rows !== null) {
-        dbReady = true;
-        renderTable(rows);
-        const muted = document.querySelector('.page-header .right .muted');
-        if (muted) muted.textContent = `☁ 已同步 · ${rows.length} 条 · ${profile?.display_name || session.user.email}`;
-        setWriteButtonsEnabled(true);
-      } else {
-        // DB 报错 (表不存在 / RLS 没过等) → 降级 mock + 禁用写
-        renderTable(MOCK_SOURCES);
-        setWriteButtonsEnabled(false, 'DB 读取失败，无法写入（请联系管理员）');
-        const muted = document.querySelector('.page-header .right .muted');
-        if (muted) muted.innerHTML = '⚠ DB 读取失败 · 当前数据为 mock · 写入已禁用';
-      }
+    const rows = await loadSourcesFromDB();
+    dbReady = rows !== null;
+    renderTable(rows || []);
+    loadReviewSummary();
+    loadAIRecommendations();
+    var muted = document.querySelector('.page-header .right .muted');
+    if (dbReady) {
+      if (muted) muted.textContent = '☁ 已同步 · ' + (rows || []).length + ' 条';
+      setWriteButtonsEnabled(true);
     } else {
-      // 未登录 → 渲染 mock + 顶部提示 + 禁用写
-      const muted = document.querySelector('.page-header .right .muted');
-      if (muted) muted.innerHTML = '⚠ 未登录 · <a href="../" style="color:#185FA5;text-decoration:underline">去登录</a> · 当前数据为 mock · 写入已禁用';
-      renderTable(MOCK_SOURCES);
-      setWriteButtonsEnabled(false, '请先登录后才能导入到数据库');
+      if (muted) muted.innerHTML = '⚠ DB 连接失败 · 请检查 Supabase';
     }
   }
 
@@ -583,14 +612,16 @@ theblock.co
     }
     const av = document.querySelector('.page-header .avatar');
     const init = av ? av.textContent.trim() : 'LR';
-    const MAP = {
+    // Local user ID for anon inserts (Supabase anon RLS)
+    var localId = 'local_' + (init || 'anon');
+    var MAP = {
       LR: { name: 'Lareina', role: 'Owner', color: '' },
       KA: { name: 'Kay',     role: 'Researcher', color: 'r1' },
       JY: { name: 'Jay',     role: 'Researcher', color: 'r2' },
       VL: { name: 'Valeria', role: 'Researcher', color: 'r3' },
     };
-    const meta = MAP[init] || { name: init, role: '', color: '' };
-    return { id: null, init, ...meta };
+    var meta = MAP[init] || { name: init || 'anon', role: '', color: '' };
+    return { id: localId, init: init || '?', name: meta.name, role: meta.role, color: meta.color };
   }
   const uAv = document.getElementById('bulk-uploader-av');
   const uName = document.getElementById('bulk-uploader-name');
@@ -734,25 +765,13 @@ theblock.co
     msgXList.textContent = '调 X API…';
     msgXList.style.color = 'var(--color-text-tertiary)';
     try {
-      const API_BASE = `http://${location.hostname}:8081`;
-      const r = await fetch(`${API_BASE}/api/twitter/list/${encodeURIComponent(m[1])}/members`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
-      });
-      const res = await r.json();
-      if (!res.ok) {
-        msgXList.textContent = '✕ 失败: ' + (res.error || r.status);
-        msgXList.style.color = '#A32D2D';
-        return;
-      }
-      // 拼成 "@handle    bio" 的行, 直接灌进 textarea (无数量限制)
-      const lines = (res.members || []).map(u => {
+      const members = await window.Provider.fetchListMembers(m[1]);
+      const lines = members.map(u => {
         const bio = u.bio ? '  ' + u.bio.replace(/\s+/g, ' ').slice(0, 60) : '';
         return `@${u.username}${bio}`;
       }).join('\n');
       txtArea.value = (txtArea.value.trim() ? txtArea.value.trim() + '\n' : '') + lines;
-      msgXList.textContent = `✓ 拉到 ${res.count} 个 list 成员`;
+      msgXList.textContent = '✓ 拉到 ' + members.length + ' 个 list 成员';
       msgXList.style.color = '#27500A';
       inpXListUrl.value = '';
       reparse();
@@ -781,7 +800,7 @@ theblock.co
     let ok = 0;
 
     const u = getCurrentUser();
-    if (dbReady && u.id) {
+    if (dbReady) {
       // ─── DB 模式: 真插入 sources 表 ──────────────────────────
       const payload = fresh.map(r => ({
         id: 'src_' + (crypto.randomUUID ? crypto.randomUUID().slice(0,8) : Math.random().toString(36).slice(2,10)),
@@ -789,10 +808,10 @@ theblock.co
         handle: r.handle,
         name: r.bio || null,
         status: 'observe',
-        uploader_id: u.id,
         metrics_4w: { hits:0, spark:[3,3,3,3], fire:0 },
+        // uploader_id omitted (anon RLS, no auth system)
       }));
-      progressEl.textContent = `写入 DB ${fresh.length} 条…`;
+      progressEl.textContent = '写入 DB ' + fresh.length + ' 条…';
       const { data, error } = await sb.from('sources').insert(payload).select('*, uploader:user_profiles!sources_uploader_id_fkey(initials,display_name,avatar_color)');
       if (error) {
         progressEl.textContent = '✕ DB 写入失败: ' + error.message.slice(0, 60);
@@ -875,9 +894,7 @@ theblock.co
 
 // ====== ↻ 同步: 拉 @handle 近 7 天 → 聚类 → cluster hotspot (RPC) + 🔥 爆款 feed ======
 (function(){
-  const API_BASE = `http://${location.hostname}:8081`;
-  const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
+  const { SUPABASE_URL, SUPABASE_KEY } = window.PALLAX_CONFIG;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   const SYNC_HOURS = 168;             // 7 天
   const CLUSTER_WINDOW_MS = 4 * 3600e3; // 4h 聚类窗口
@@ -887,128 +904,8 @@ theblock.co
   const HOT_MIN_VIEWS = 10000;          // 要么至少 10k 视图
   const HOT_MIN_ENGAGEMENT = 200;       // 要么互动 ≥ 200 (高质小盘)
 
-  // ── 主实体词典 + 分类词典 (从 content-factory radar-pull.js 抄)
-  const CLUSTER_KEYS = [
-    'polymarket','kalshi','manifold','metaculus','predictit',
-    'fomc','cpi','nfp','pce','gdp','payroll',
-    'powell','trump','biden','harris','musk','lagarde','yellen','sbf',
-    'bitcoin','btc','ethereum','eth','solana','sol','xrp','bnb',
-    'smart money','whale','on-chain','onchain','defi','tvl',
-    'inflation','interest rate','rate cut','rate hike',
-    'election','congress','senate',
-    'hack','exploit','rug','scam',
-  ];
-  const CAT_KW = {
-    A: ['odds','polymarket','kalshi','manifold','prediction market','bet','probability','resolves','contract','yes/no'],
-    C: ['smart money','whale','wallet','0x','on-chain','onchain','defi','position','buys','sells','moves funds'],
-    D: ['new market','new contract','launching','listed','just added','first trade','new listing'],
-    E: ['fomc','fed','cpi','inflation','rate cut','rate hike','election','trump','powell','bitcoin','btc','crypto'],
-  };
-  const ALL_KW = Object.values(CAT_KW).flat();
-
-  function extractKey(text) {
-    const lower = (text || '').toLowerCase();
-    for (const k of CLUSTER_KEYS) if (lower.includes(k)) return k;
-    const m = (text || '').match(/\$[\d,.]+[kKmMbB]?/);
-    return m ? m[0].toLowerCase() : null;
-  }
-  function classifyCategory(text) {
-    const lower = (text || '').toLowerCase();
-    for (const [cat, kws] of Object.entries(CAT_KW)) {
-      if (kws.some(kw => lower.includes(kw))) return cat;
-    }
-    return 'E';
-  }
-
-  // ── 聚类: 同 key + 4h 窗口为一簇; 无 key 的每条自成一簇 (会被低分过滤掉)
-  function clusterTweets(tweets) {
-    const byKey = new Map();
-    const orphans = [];
-    for (const t of tweets) {
-      const k = extractKey(t.text);
-      if (k) {
-        if (!byKey.has(k)) byKey.set(k, []);
-        byKey.get(k).push(t);
-      } else {
-        orphans.push(t);
-      }
-    }
-    const clusters = [];
-    for (const [key, group] of byKey) {
-      group.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-      let curr = [group[0]];
-      for (let i = 1; i < group.length; i++) {
-        const dt = new Date(group[i].created_at) - new Date(curr[curr.length - 1].created_at);
-        if (dt <= CLUSTER_WINDOW_MS) curr.push(group[i]);
-        else { clusters.push({ key, tweets: curr }); curr = [group[i]]; }
-      }
-      clusters.push({ key, tweets: curr });
-    }
-    for (const t of orphans) clusters.push({ key: 'misc', tweets: [t] });
-    return clusters;
-  }
-
-  // ── cluster 评分 (fit / viral / fresh / score)
-  function scoreCluster(tweets) {
-    const allText = tweets.map(t => t.text || '').join(' ').toLowerCase();
-    let matches = 0; for (const kw of ALL_KW) if (allText.includes(kw)) matches++;
-    const fit = Math.min(1, matches / Math.max(tweets.length * 3, 3));
-
-    let totalEng = 0, totalViews = 0;
-    for (const t of tweets) {
-      const m = t.metrics || {};
-      totalEng += (m.likes || 0) + (m.retweets || 0) + (m.replies || 0);
-      totalViews += m.views || 0;
-    }
-    const avgEng = totalEng / tweets.length;
-    const avgViews = totalViews / tweets.length;
-    const viral = avgViews > 0
-      ? Math.min(1, avgEng / Math.max(avgViews * 0.02, 50))
-      : Math.min(1, avgEng / 200);
-
-    const newest = Math.max(...tweets.map(t => new Date(t.created_at).getTime() || 0));
-    const hoursOld = (Date.now() - newest) / 3.6e6;
-    const fresh = Math.max(0, 1 - hoursOld / 72);
-
-    let score = fit * 0.3 + viral * 0.4 + fresh * 0.3;
-    // 地板: 0 互动 = 噪声 (直接 0); 极低互动 = 重罚
-    if (totalEng < 10)       score = 0;
-    else if (viral < 0.05)    score *= 0.3;
-    score = +score.toFixed(3);
-
-    return {
-      fit: +fit.toFixed(2), viral: +viral.toFixed(2), fresh: +fresh.toFixed(2), score,
-      cluster_size: tweets.length, total_views: totalViews, total_engagement: totalEng,
-      avg_views: Math.round(avgViews), avg_engagement: Math.round(avgEng),
-    };
-  }
-
-  // ── 构造 hotspot 行 (准备调 RPC)
-  function buildHotspotFromCluster(cluster) {
-    const tweets = [...cluster.tweets].sort((a, b) => (b.metrics?.views || 0) - (a.metrics?.views || 0));
-    const top = tweets[0];
-    const allText = tweets.map(t => t.text || '').join(' ');
-    const cat = classifyCategory(allText);
-    const sc = scoreCluster(tweets);
-
-    // 4h time bucket from earliest tweet
-    const earliest = Math.min(...tweets.map(t => new Date(t.created_at).getTime() || Date.now()));
-    const bucket = Math.floor(earliest / CLUSTER_WINDOW_MS);
-    const keySlug = cluster.key.replace(/[^a-z0-9]+/gi, '_').slice(0, 30);
-
-    // HOT 双门槛: score 过线 + (绝对 views 或 绝对 eng 至少一个达标)
-    const passAbs = (sc.total_views >= HOT_MIN_VIEWS) || (sc.total_engagement >= HOT_MIN_ENGAGEMENT);
-    const isHot = sc.score >= HOT_THRESHOLD && passAbs;
-
-    return {
-      id: `hs_c_${keySlug}_${bucket}`,
-      title: (top.text || '').slice(0, 120),
-      category: cat,
-      hot_signal: isHot,
-      tweets,
-      metrics: sc,
-    };
-  }
+  // Content operations now in window.ContentOps (src/content-ops.js)
+  const CO = window.ContentOps;
 
   // ─── 工具 ─────────────────────────────────────────────────────────────
   function escapeHtml(s) {
@@ -1030,42 +927,7 @@ theblock.co
     return Math.floor(diff/8.64e7) + ' d';
   }
 
-  // 启发式: 从 tweet 文本 + kind 推断 7 angle 之一
-  function classifyAngle(t) {
-    if (!t) return null;
-    const text = String(t.text || '');
-    if (!text) return null;
-
-    // 1. Thread 标记最优先
-    if (/🧵|^\s*1\/|\(1\/\d+\)|\bthread\b/i.test(text)) return 'Thread';
-
-    // 2. 教程
-    if (/\b(full guide|step.?by.?step|tutorial|how to|here'?s how|hour guide|guide:|complete guide|walkthrough)\b/i.test(text)) return '教程';
-
-    // 3. 案例
-    if (/(this guy|made \$[\d,]+|turned \$[\d,.]+ ?into|flipped \$[\d,.]+|\$\d{2,}\s?k\/?(month|day)|profit of \$)/i.test(text)) return '案例';
-
-    // 4. 反直觉 (sensational language + ALL-CAPS 序列)
-    if (/\b(destroyed|killed|finally|everyone (thinks|expects)|nobody (knows|talks|sees)|reality is|truth is|wrong about|but actually|the real |secret|exposed)\b/i.test(text)
-        || /\b[A-Z]{5,}\b/.test(text)) {
-      return '反直觉';
-    }
-
-    // 5. 数据驱动 (数字/比例)
-    if (/\d{1,3}%|\b\d+x\s+(return|gain|profit)|\bwin rate|\broi\b|n\s*=\s*\d+|backtest/i.test(text)) return '数据驱动';
-
-    // 6. KOL 蹭点 (转发/引用/回复 或多 @)
-    if (t.kind === 'quote' || t.kind === 'reply' || t.kind === 'retweet'
-        || (text.match(/@\w+/g) || []).length >= 2) {
-      return 'KOL 蹭点';
-    }
-
-    // 7. 深度 (长 original)
-    if (text.length > 200 && t.kind === 'original') return '深度';
-
-    // 都没命中 → Other 兜底
-    return 'Other';
-  }
+  // classifyAngle now in window.ContentOps (src/content-ops.js)
 
   // ─── 🔥 爆款 feed ────────────────────────────────────────────────────
   async function loadFireFeed() {
@@ -1099,41 +961,35 @@ theblock.co
     }
     posts.sort((a, b) => (b.metrics?.views || 0) - (a.metrics?.views || 0));
     summaryEl.textContent = `按 views 降序 · top ${posts.length}`;
+    grid.style.gridTemplateColumns = 'repeat(3, 1fr)';
     grid.innerHTML = posts.map(t => {
       const m = t.metrics || {};
-      const handle = t.author?.username ? `@${t.author.username}` : '(unknown)';
-      const url = t.url || `https://x.com/i/status/${t.id}`;
+      const handle = t.author?.username ? '@' + t.author.username : '(unknown)';
+      const url = t.url || 'https://x.com/i/status/' + t.id;
       const kindBadge = (t.kind && t.kind !== 'original')
-        ? `<span style="font-size:10px;background:#EEEDFE;color:#3C3489;padding:1px 5px;border-radius:3px;margin-left:4px">${t.kind}</span>` : '';
-      const angle = classifyAngle(t);
-      const angleBadge = angle ? (() => {
-        const bg = angle === 'Other' ? '#ECEAE0' : '#FAEEDA';
-        const fg = angle === 'Other' ? '#888780' : '#854F0B';
-        return `<span style="font-size:10px;background:${bg};color:${fg};padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:500">${angle}</span>`;
-      })() : '';
+        ? '<span style="font-size:10px;background:#EEEDFE;color:#3C3489;padding:1px 5px;border-radius:3px;margin-left:4px">' + t.kind + '</span>' : '';
+      const angle = CO.classifyAngle(t);
+      const angleBadge = angle ? ('<span style="font-size:10px;background:' + (angle === 'Other' ? '#ECEAE0' : '#FAEEDA') + ';color:' + (angle === 'Other' ? '#888780' : '#854F0B') + ';padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:500">' + angle + '</span>') : '';
       const manualBadge = t._manual
-        ? `<span style="font-size:10px;background:#E6F1FB;color:#185FA5;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:500">manual</span>` : '';
-      return `
-        <a href="${url}" target="_blank" rel="noopener" style="display:block;text-decoration:none;color:inherit">
-          <div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:4px;flex-wrap:wrap">
-            <span style="font-weight:500;color:var(--color-text-primary)">${escapeHtml(handle)}</span>
-            <span style="color:var(--color-text-tertiary)">· ${timeAgo(t.created_at)}</span>${kindBadge}${angleBadge}${manualBadge}
-          </div>
-          <div style="font-size:13px;line-height:1.55">${escapeHtml(t.text || '')}</div>
-          <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:6px;display:flex;gap:14px">
-            <span>↻ ${fmt(m.retweets)}</span>
-            <span>♡ ${fmt(m.likes)}</span>
-            <span>💬 ${fmt(m.replies)}</span>
-            <span>👁 ${fmt(m.views)}</span>
-          </div>
-        </a>`;
+        ? '<span style="font-size:10px;background:#E6F1FB;color:#185FA5;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:500">manual</span>' : '';
+      return '<a href="' + url + '" target="_blank" rel="noopener" style="display:block;text-decoration:none;color:inherit;background:var(--color-background-secondary);border-radius:8px;padding:10px 12px;border:0.5px solid transparent;transition:border-color 0.15s">' +
+        '<div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:4px;flex-wrap:wrap">' +
+          '<span style="font-weight:500;color:var(--color-text-primary)">' + escapeHtml(handle) + '</span>' +
+          '<span style="color:var(--color-text-tertiary)">· ' + timeAgo(t.created_at) + '</span>' + kindBadge + angleBadge + manualBadge +
+        '</div>' +
+        '<div style="font-size:13px;line-height:1.55">' + escapeHtml(t.text || '') + '</div>' +
+        '<div style="font-size:11px;color:var(--color-text-tertiary);margin-top:6px;display:flex;gap:14px">' +
+          '<span>↻ ' + fmt(m.retweets) + '</span>' +
+          '<span>♡ ' + fmt(m.likes) + '</span>' +
+          '<span>💬 ' + fmt(m.replies) + '</span>' +
+          '<span>👁 ' + fmt(m.views) + '</span>' +
+        '</div>' +
+      '</a>';
     }).join('');
   }
 
   // 暴露给外部调用
   window.__reloadFireFeed = loadFireFeed;
-
-  // 初次加载 + 登录后立刻拉一次
   loadFireFeed();
 
   // ====== ↥ 粘贴推文 (手动添加到爆款池, tag=manual) ======
@@ -1167,22 +1023,15 @@ theblock.co
     ptFetch.disabled = true; ptFetch.textContent = '抓取中…';
     ptMsg.textContent = ''; ptMsg.style.color = '';
     try {
-      const r = await fetch(`${API_BASE}/api/twitter/tweet`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-      });
-      const res = await r.json();
-      if (!res.ok) {
-        ptMsg.textContent = '✕ ' + (res.error || ('HTTP ' + r.status));
+      ptFetched = await window.Provider.fetchSingleTweet(url);
+      if (!ptFetched) {
+        ptMsg.textContent = '✕ 抓取失败: 未获取到推文';
         ptMsg.style.color = '#A32D2D';
         return;
       }
-      ptFetched = res.tweet;
-      // 给 t 加 kind 字段 (singleTweet 不返回 referenced_tweets, 默认 original)
       if (!ptFetched.kind) ptFetched.kind = 'original';
       // preview
-      const angle = classifyAngle(ptFetched);
+      const angle = CO.classifyAngle(ptFetched);
       document.getElementById('pt-author').textContent = ptFetched.author?.username ? '@' + ptFetched.author.username : '?';
       document.getElementById('pt-time').textContent   = ptFetched.created_at ? new Date(ptFetched.created_at).toLocaleString('zh-CN') : '';
       document.getElementById('pt-angle').textContent  = angle || '反直觉';
@@ -1210,12 +1059,7 @@ theblock.co
     const t = ptFetched;
     const m = t.metrics || {};
     const eng = (m.likes || 0) + (m.retweets || 0) + (m.replies || 0);
-    // 简单分类: 看是否命中 CAT_KW (复用 sync IIFE 内的同名常量)
-    const text = (t.text || '').toLowerCase();
-    let cat = 'E';
-    for (const [c, kws] of Object.entries(CAT_KW)) {
-      if (kws.some(k => text.includes(k))) { cat = c; break; }
-    }
+    var cat = CO.classifyCategory(t.text || '');
     const row = {
       id: `hs_manual_${t.id}`,
       title: (t.text || '').slice(0, 120),
@@ -1258,38 +1102,30 @@ theblock.co
   window.__toast = toast;
 
   async function syncHandle(handle, sourceId, btn) {
-    // 1. 拉 X
+    // 1. 拉 X (via OpenCLI Provider)
     btn.disabled = true;
     btn.textContent = '↻ 拉取中…';
-    let res;
+    let tweets = [];
+    let rateLimit = {};
     try {
-      const r = await fetch(`${API_BASE}/api/twitter/handle/${encodeURIComponent(handle)}/recent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hours: SYNC_HOURS }),
-      });
-      res = await r.json();
-      if (!res.ok) {
-        toast(`✕ 拉 @${handle} 失败: ${res.error || r.status}`, 'error');
-        return;
-      }
+      tweets = await window.Provider.fetchTweetsByHandle(handle, SYNC_HOURS);
     } catch (e) {
-      toast(`✕ 网络错误: ${e.message}`, 'error');
+      toast('✕ 拉 @' + handle + ' 失败: ' + e.message, 'error');
+      btn.disabled = false;
       return;
     } finally {
       btn.disabled = false;
     }
 
-    const tweets = res.tweets || [];
     if (tweets.length === 0) {
       btn.textContent = '↻ 同步';
-      toast(`@${handle}: 近 7 天 0 条推文 (可能账号沉默或被保护)`, 'warn');
+      toast('@' + handle + ': 近 7 天 0 条推文 (可能账号沉默或被保护)', 'warn');
       return;
     }
 
     // 2. 聚类 → 评分 → 过滤 → 调 RPC
-    const clusters = clusterTweets(tweets);
-    const candidates = clusters.map(buildHotspotFromCluster);
+    const clusters = CO.clusterTweets(tweets, CLUSTER_WINDOW_MS);
+    const candidates = clusters.map(function (c) { return CO.buildHotspotFromCluster(c, { windowMs: CLUSTER_WINDOW_MS, hotThreshold: HOT_THRESHOLD, hotMinViews: HOT_MIN_VIEWS, hotMinEng: HOT_MIN_ENGAGEMENT }); });
     const kept = candidates.filter(h => h.metrics.score >= MIN_CLUSTER_SCORE);
     const dropped = candidates.length - kept.length;
     console.log(`[sync] ${handle}: ${tweets.length} 推 → ${clusters.length} 簇 → 保留 ${kept.length} (丢 ${dropped} low-score)`);
@@ -1297,23 +1133,24 @@ theblock.co
     btn.textContent = `↻ 入库 0/${kept.length}`;
     let inserted = 0, errors = 0;
     for (const h of kept) {
-      const { error } = await sb.rpc('upsert_cluster_hotspot', {
-        p_id:          h.id,
-        p_title:       h.title,
-        p_category:    h.category,
-        p_hot_signal:  h.hot_signal,
-        p_source_id:   sourceId,
-        p_tweets:      h.tweets,
-        p_metrics:     h.metrics,
-      });
-      if (error) { errors++; console.warn('[sync] rpc fail', h.id, error.message); }
+      const { error } = await sb.from('hotspots').upsert({
+        id:          h.id,
+        title:       h.title,
+        category:    h.category,
+        hot_signal:  h.hot_signal,
+        status:      h.hot_signal ? 'hot' : 'pool',
+        sources:     [sourceId],
+        tweets:      h.tweets,
+        metrics:     h.metrics,
+        created_at:  new Date().toISOString(),
+      }, { onConflict: 'id' });
+      if (error) { errors++; console.warn('[sync] upsert fail', h.id, error.message); }
       else inserted++;
-      btn.textContent = `↻ 入库 ${inserted+errors}/${kept.length}`;
+      btn.textContent = '↻ 入库 ' + (inserted+errors) + '/' + kept.length;
     }
 
     btn.textContent = '↻ 同步';
-    const rateLeft = res.rate_limit?.remaining;
-    const rateNote = rateLeft != null ? `  · 配额剩 ${rateLeft}` : '';
+    const rateNote = '';
 
     // 3. 回写源的 metrics_4w (语义改为 7 天: 这个源在 7 天里关联到多少 hotspot)
     //    (跟下方 🔥 feed 用同一份 hotspots 数据对齐)
@@ -1384,47 +1221,18 @@ theblock.co
 
 // ====== PM 相关度: 工具函数 (导入时自动调用) + 过滤芯片 ======
 (function(){
-  const API_BASE = `http://${location.hostname}:8081`;
-  const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
+  const { SUPABASE_URL, SUPABASE_KEY } = window.PALLAX_CONFIG;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   const SYNC_HOURS = 168;
 
-  const POLY_KW = [
-    'polymarket','kalshi','manifold','predictit','metaculus',
-    'prediction market','binary market','event contract','odds','probability',
-    'yes/no','resolves','bet on','betting market',
-    'fomc','rate cut','rate hike','election','whale','smart money',
-    'fed','cpi','powell','trump',
-  ];
-
-  function pmRelevance(tweets) {
-    if (!tweets || tweets.length === 0) return { score: 0, matches: 0, total: 0 };
-    let matches = 0;
-    for (const t of tweets) {
-      const text = (t.text || '').toLowerCase();
-      if (POLY_KW.some(kw => text.includes(kw))) matches++;
-    }
-    const ratio = matches / tweets.length;
-    const score = +Math.min(1, ratio / 0.2).toFixed(2);
-    return { score, matches, total: tweets.length };
-  }
+  // pmRelevance now in window.ContentOps (src/content-ops.js)
 
   // 评估单个 source 的 PM 相关度并回写 (供导入流程调用)
   async function evaluateOneSource(source) {
     const handle = source.handle.replace(/^@/, '');
     try {
-      const r = await fetch(`${API_BASE}/api/twitter/handle/${encodeURIComponent(handle)}/recent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hours: SYNC_HOURS }),
-      });
-      const res = await r.json();
-      if (!res.ok) {
-        console.warn('[pm-eval] api fail', handle, res.error);
-        return { ok: false, error: res.error };
-      }
-      const rel = pmRelevance(res.tweets);
+      const tweets = await window.Provider.fetchTweetsByHandle(handle, SYNC_HOURS);
+      const rel = CO.pmRelevance(tweets);
       const nextMetrics = {
         ...(source.metrics_4w || {}),
         pm_score: rel.score,
@@ -1453,8 +1261,7 @@ theblock.co
 
 // ====== 内联 live / retired / ✕ 直接改 status / 删除 (✕ 锚定式 popover 确认) ======
 (function(){
-  const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
+  const { SUPABASE_URL, SUPABASE_KEY } = window.PALLAX_CONFIG;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   // 点 .kol-handle 文本 → 就地变 input → blur/Enter 保存 → Esc 取消
@@ -1588,8 +1395,7 @@ theblock.co
 
 // ====== ↻ 批量同步 PM 相关源 (★★+) ======
 (function(){
-  const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
+  const { SUPABASE_URL, SUPABASE_KEY } = window.PALLAX_CONFIG;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   const PM_THRESHOLD = 0.4;  // ★★+ 才算 PM 相关

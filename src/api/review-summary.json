@@ -1,0 +1,12 @@
+{
+  "next_review": "2026-05-27T09:00:00+08:00",
+  "next_review_label": "明天 09:00 SGT",
+  "summary_text": "系统将自动汇总各源 4 周表现 · 给出\"主力 / 观察 / 退役\"建议 · 已生成 5 个 AI 推荐新增",
+  "table_summary": {
+    "displayed": 7,
+    "total": 28,
+    "new_this_week": 2,
+    "retired": 1,
+    "pending_review": 5
+  }
+}

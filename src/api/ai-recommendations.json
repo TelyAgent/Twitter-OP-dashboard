@@ -1,0 +1,30 @@
+{
+  "updated_at": "2026-05-25T18:00:00Z",
+  "candidates": [
+    {
+      "id": "rec_001",
+      "handle": "@RektAlpha",
+      "reason": "本周 3 个爆款源都引用过他 · C 链上 · 67k 粉丝 · 推文互动率 4.2%",
+      "suggested_action": "主力"
+    },
+    {
+      "id": "rec_002",
+      "handle": "@PolyTraderX",
+      "reason": "A 赔率 · 上周 FOMC 行情前 4h 准确预判 · 与 @JimGCryptos 内容风格互补",
+      "suggested_action": "主力"
+    },
+    {
+      "id": "rec_003",
+      "handle": "@WhaleWatcher_",
+      "reason": "C 链上 · 与现有 @OnchainBob 重合度 91% · 备份候选 · 推送频率更高",
+      "suggested_action": "观察"
+    },
+    {
+      "id": "rec_004",
+      "handle": "@ElectionMaths",
+      "reason": "E 现实 · 大选模型权威 · 弥补当前 E 类账号产能 6% 偏低",
+      "suggested_action": "主力"
+    }
+  ],
+  "note": "AI 推荐在每周一自动更新 · 接受新增后将进入 4 周观察期 · 表现达标转主力"
+}

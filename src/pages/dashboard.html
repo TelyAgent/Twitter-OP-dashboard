@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pallax 数据复盘</title>
+<title>数据复盘</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
   /* Design tokens · v2 (Claude Design) */
@@ -35,7 +38,7 @@
   --r-md: 10px;
   --r-lg: 14px;
   --r-xl: 20px;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
   --shadow-md: 0 4px 16px rgba(0,0,0,0.06);
@@ -64,11 +67,10 @@ body {
   color: var(--ink);
   font-feature-settings: "ss01", "cv11", "tnum";
   -webkit-font-smoothing: antialiased;
-  padding: 28px 28px 80px;
-  max-width: 1240px;
-  margin: 0 auto;
-  font-size: 14px;
+  font-size: 15px;
+  line-height: 1.55;
 }
+.wr-shell { padding: 28px 32px 100px; max-width: 1440px; margin: 0 auto; }
 input, select, textarea, button { font-family: inherit; color: inherit; }
 input[type="text"], input[type="number"], input[type="week"], input[type="email"], select, textarea {
   border: 0.5px solid var(--line);
@@ -414,18 +416,163 @@ details.wr-collapsible[open] summary { color: var(--ink-2); margin-bottom: 8px; 
 .wr-ns-ring-side .k { color: var(--nsm-amber-label); font-weight: 500; }
 .wr-ns-ring-side .v { font-weight: 600; font-variant-numeric: tabular-nums; }
 
+/* ========== Theme variants ========== */
+[data-accent="mono"] {
+  --info: #1a1a1a;
+  --info-bg: #ececeae8;
+  --nsm-amber: #1a1a1a;
+  --nsm-amber-deep: #1a1a1a;
+  --nsm-amber-soft: #efede7;
+  --nsm-amber-mid: #404040;
+  --nsm-amber-text: #404040;
+  --nsm-amber-label: #6b6b6b;
+  --warn: #404040;
+  --warn-bg: #ececeae8;
+  --ok: #1a1a1a;
+  --ok-bg: #d8d6cf;
+  --bad: #6b6b6b;
+  --bad-bg: #e6e4dc;
+}
+[data-accent="darkhero"] .wr-ns-card { background: #1a1a1a; }
+[data-accent="darkhero"] .wr-ns-card { --nsm-amber-soft: #1a1a1a; --nsm-amber-deep: #fff7e6; --nsm-amber-text: #f6e0a8; --nsm-amber-label: #d3a85a; --nsm-amber-mid: #f0b54e; }
+[data-accent="darkhero"] .wr-ns-pin { background: rgba(243, 200, 113, 0.18); color: #f6e0a8; }
+[data-accent="darkhero"] .wr-ns-trend { background: rgba(255,255,255,0.06); }
+[data-accent="darkhero"] .wr-ns-meta-item input { background: rgba(255,255,255,0.1); color: #fff7e6; }
+[data-accent="darkhero"] .wr-ns-meta-item input:focus { background: rgba(255,255,255,0.2); }
+[data-accent="darkhero"] .wr-ns-card input[data-f="name"]:focus,
+[data-accent="darkhero"] .wr-ns-val input:focus,
+[data-accent="darkhero"] .wr-ns-unit-input:focus { background: rgba(255,255,255,0.15); }
+
+/* ========== Overview v2 upgrades ========== */
+.wr-ovw-team-card { display: grid; grid-template-columns: 1.4fr 1fr 1fr 110px; gap: 14px; align-items: center; padding: 18px 22px; position: relative; }
+.wr-ovw-team-card.health-ok { border-left: 3px solid var(--ok); padding-left: 19px; }
+.wr-ovw-team-card.health-warn { border-left: 3px solid var(--nsm-amber-mid); padding-left: 19px; }
+.wr-ovw-team-card.health-bad { border-left: 3px solid var(--bad); padding-left: 19px; }
+.wr-ovw-team-card.health-na { border-left: 3px solid var(--line-2); padding-left: 19px; }
+.wr-ovw-team-name-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.wr-ovw-team-name-row::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); flex-shrink: 0; }
+.wr-ovw-team-card.health-ok .wr-ovw-team-name-row::before { background: var(--ok); }
+.wr-ovw-team-card.health-warn .wr-ovw-team-name-row::before { background: var(--nsm-amber-mid); }
+.wr-ovw-team-card.health-bad .wr-ovw-team-name-row::before { background: var(--bad); }
+.wr-ovw-team-flag { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; padding: 2px 7px; border-radius: 99px; text-transform: uppercase; }
+.wr-ovw-team-flag.hot { background: var(--ok-bg); color: var(--ok); }
+.wr-ovw-team-flag.attention { background: var(--bad-bg); color: var(--bad); }
+
+.wr-ovw-highlights { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-bottom: 22px; }
+.wr-ovw-highlight { background: var(--bg-card); border: 0.5px solid var(--line); border-radius: var(--r-lg); padding: 18px 20px; position: relative; overflow: hidden; }
+.wr-ovw-highlight.kind-good { background: linear-gradient(180deg, var(--ok-bg) 0%, var(--bg-card) 38%); }
+.wr-ovw-highlight.kind-bad { background: linear-gradient(180deg, var(--bad-bg) 0%, var(--bg-card) 38%); }
+.wr-ovw-highlight.kind-info { background: linear-gradient(180deg, var(--nsm-amber-soft) 0%, var(--bg-card) 38%); }
+.wr-ovw-highlight-tag { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; border-radius: 99px; display: inline-block; margin-bottom: 8px; }
+.wr-ovw-highlight.kind-good .wr-ovw-highlight-tag { background: var(--ok-bg); color: var(--ok); }
+.wr-ovw-highlight.kind-bad .wr-ovw-highlight-tag { background: var(--bad-bg); color: var(--bad); }
+.wr-ovw-highlight.kind-info .wr-ovw-highlight-tag { background: var(--info-bg); color: var(--info); }
+.wr-ovw-highlight-val { font-size: 24px; font-weight: 600; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; line-height: 1.15; margin-bottom: 4px; }
+.wr-ovw-highlight-sub { font-size: 12px; color: var(--ink-2); }
+.wr-ovw-highlight-team { font-size: 11px; color: var(--ink-3); margin-top: 6px; font-family: var(--font-mono); }
+
+/* ========== Funnel stepped (alternate viz) ========== */
+.wr-funnel-stepped { display: flex; align-items: stretch; gap: 0; margin-bottom: 18px; border-radius: var(--r-md); overflow: hidden; }
+.wr-funnel-step { flex: 1; padding: 14px 16px; background: var(--bg-soft); position: relative; cursor: pointer; border-right: 1px solid var(--bg); transition: background 0.15s; }
+.wr-funnel-step:last-child { border-right: none; }
+.wr-funnel-step:hover { background: var(--bg-softer); }
+.wr-funnel-step.active { background: var(--ink); color: #fff; }
+.wr-funnel-step.active .wr-funnel-step-lbl,
+.wr-funnel-step.active .wr-funnel-step-val { color: rgba(255,255,255,0.7); }
+.wr-funnel-step-lbl { font-size: 11px; color: var(--ink-3); font-weight: 500; font-family: var(--font-mono); }
+.wr-funnel-step-name { font-size: 14px; font-weight: 600; margin-top: 2px; }
+.wr-funnel-step-val { font-size: 11px; color: var(--ink-2); margin-top: 6px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* ========== Tweaks panel ========== */
+.wr-tweaks-toggle { position: fixed; bottom: 24px; right: 24px; z-index: 70; width: 38px; height: 38px; border-radius: 50%; background: var(--ink); color: #fff; border: none; cursor: pointer; box-shadow: var(--shadow-md); display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.wr-tweaks-toggle:hover { background: var(--ink-1); }
+.wr-tweaks-panel { position: fixed; bottom: 76px; right: 24px; z-index: 80; width: 260px; background: #1a1a1a; color: #f4f4f0; border-radius: var(--r-lg); box-shadow: var(--shadow-lg); font-size: 12px; overflow: hidden; }
+.wr-tweaks-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-bottom: 0.5px solid rgba(255,255,255,0.1); }
+.wr-tweaks-title { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.wr-tweaks-close { background: transparent; border: none; color: #f4f4f0; cursor: pointer; font-size: 16px; padding: 0 4px; }
+.wr-tweaks-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 14px; }
+.wr-tweak-group { display: flex; flex-direction: column; gap: 6px; }
+.wr-tweak-group-lbl { font-size: 11px; color: #9a9a9a; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
+.wr-tweak-seg { display: flex; background: rgba(255,255,255,0.08); border-radius: 6px; padding: 2px; gap: 2px; }
+.wr-tweak-seg button { flex: 1; padding: 6px 8px; font-size: 11px; border: none; background: transparent; color: #b8b8b8; border-radius: 4px; cursor: pointer; }
+.wr-tweak-seg button:hover { color: #fff; }
+.wr-tweak-seg button.active { background: rgba(255,255,255,0.15); color: #fff; }
+
+/* ========== Value shimmer (count-up entrance) ========== */
+@keyframes valueShimmer {
+  0% { opacity: 0.4; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.wr-cu-anim { animation: valueShimmer 0.5s cubic-bezier(0.22, 1, 0.36, 1); }
+
+/* ========== Page-level top nav (数据复盘 / 热点雷达 / 金模板库 / 监控源) ========== */
+.pg-topnav {
+  background: var(--bg-card);
+  border-bottom: 0.5px solid var(--line);
+  padding: 14px 32px;
+  position: sticky; top: 0; z-index: 210;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 24px;
+}
+.pg-brand { display: flex; align-items: center; gap: 10px; }
+.pg-brand .logo { width: 28px; height: 28px; border-radius: 8px; background: var(--ink); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; letter-spacing: -0.01em; }
+.pg-brand .name { font-size: 14px; font-weight: 600; letter-spacing: -0.005em; }
+.pg-tabs {
+  display: inline-flex;
+  background: var(--bg-soft);
+  padding: 4px;
+  border-radius: 10px;
+  gap: 2px;
+  justify-self: center;
+}
+.pg-tab {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: 7px;
+  font-size: 14px; font-weight: 500;
+  color: var(--ink-2); text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+.pg-tab:hover { color: var(--ink); }
+.pg-tab.active {
+  background: var(--bg-card);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+.pg-tab .ic { font-size: 14px; line-height: 1; flex-shrink: 0; }
+@media (max-width: 720px) {
+  .pg-topnav { grid-template-columns: 1fr; padding: 12px 16px; }
+  .pg-brand { justify-self: start; }
+  .pg-tabs { justify-self: start; flex-wrap: wrap; }
+}
+
 /* ========== Responsive ========== */
 @media (max-width: 880px) {
   .wr-ns-row { grid-template-columns: 1fr; }
   .wr-ns-val input { font-size: 48px !important; }
-  .wr-ovw-team-row { grid-template-columns: 1fr; row-gap: 12px; }
+  .wr-ovw-team-card { grid-template-columns: 1fr; row-gap: 12px; }
+  .wr-tweaks-panel { width: calc(100vw - 48px); right: 24px; }
 }
 </style>
 </head>
 <body>
+<nav class="pg-topnav">
+  <div class="pg-brand">
+    <div class="logo">P</div>
+    <div class="name">数据复盘</div>
+  </div>
+  <div class="pg-tabs">
+    <a href="dashboard.html" class="pg-tab active"><span class="ic">▢</span>数据复盘</a>
+    <a href="radar.html" class="pg-tab"><span class="ic">◉</span>热点雷达</a>
+    <a href="templates.html" class="pg-tab"><span class="ic">◫</span>模板库</a>
+    <a href="sources.html" class="pg-tab"><span class="ic">⊙</span>监控源</a>
+  </div>
+</nav>
+<div class="wr-shell">
 <div class="wr-auth-bg" id="wr-auth" style="display: none;">
   <div class="wr-auth-card">
-    <h3>Pallax 数据复盘登录</h3>
+    <h3>数据复盘登录</h3>
     <p>用公司邮箱接收一次性登录链接（Magic Link）。</p>
     <input type="email" id="wr-auth-email" placeholder="you@company.com" autocomplete="email" />
     <button id="wr-auth-send">发送登录链接</button>
@@ -433,12 +580,6 @@ details.wr-collapsible[open] summary { color: var(--ink-2); margin-bottom: 8px; 
   </div>
 </div>
 <div class="wr wr-anchor" id="wr-root" style="display: none;">
-<div class="wr-head">
-  <div>
-    <h3 class="wr-title">数据复盘</h3>
-    <p class="wr-sub">流量 → 互动 → 转化 → 付费 (默认漏斗, 可自定义)</p>
-  </div>
-</div>
 <div class="wr-tabs-row">
   <div class="wr-tabs" id="wr-team-tabs"></div>
   <button class="wr-addteam-icon" id="wr-add-team" title="新增产品组">+</button>
@@ -548,12 +689,26 @@ details.wr-collapsible[open] summary { color: var(--ink-2); margin-bottom: 8px; 
 </div>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/config.js"></script>
 <script>
 (function() {
-  const SUPABASE_URL = 'https://snflonpxmzkeytzytqpg.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_AIJ7GbAmcE0pqDjPGb5cfg_JZj01ZyD';
+  const { SUPABASE_URL, SUPABASE_KEY } = window.PALLAX_CONFIG;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   let currentUser = null;
+
+  const TWEAKS_KEY = 'pallax_weekly_tweaks_v1';
+  let tweaks = (() => {
+    try { return JSON.parse(localStorage.getItem(TWEAKS_KEY)) || {}; } catch (e) { return {}; }
+  })();
+  if (!tweaks.accent) tweaks.accent = 'default';
+  if (!tweaks.funnelViz) tweaks.funnelViz = 'stages';
+
+  function persistTweaks() { localStorage.setItem(TWEAKS_KEY, JSON.stringify(tweaks)); }
+  function applyTweaks() {
+    if (tweaks.accent && tweaks.accent !== 'default') document.body.setAttribute('data-accent', tweaks.accent);
+    else document.body.removeAttribute('data-accent');
+  }
+  applyTweaks();
 
   function setCloudStatus(state, text) {
     const dot = document.getElementById('wr-cloud-dot');
@@ -712,6 +867,9 @@ details.wr-collapsible[open] summary { color: var(--ink-2); margin-bottom: 8px; 
     cloudUpsertWeekly(state.team, state.week, payload);
     document.getElementById('wr-status').textContent = '已保存 · ' + payload.savedAt;
   }
+  let _shimmerOnce = false;
+  function flagShimmer() { _shimmerOnce = true; }
+
   let _saveTimer = null;
   function scheduleSave() {
     if (_saveTimer) clearTimeout(_saveTimer);
@@ -827,6 +985,7 @@ details.wr-collapsible[open] summary { color: var(--ink-2); margin-bottom: 8px; 
 
   function switchToTeam(id) {
     state.team = id;
+    flagShimmer();
     if (id === '__overview') {
       document.getElementById('wr-overview-view').style.display = '';
       document.getElementById('wr-team-view').style.display = 'none';
@@ -871,39 +1030,101 @@ details.wr-collapsible[open] summary { color: var(--ink-2); margin-bottom: 8px; 
     const teamsWithGrowth = teamSummaries.filter(s => typeof s.cur === 'number' && typeof s.prev === 'number' && s.prev !== 0).length;
     const teamsGrowing = teamSummaries.filter(s => typeof s.cur === 'number' && typeof s.prev === 'number' && s.prev !== 0 && s.cur > s.prev).length;
 
+    // Compute per-team derived fields
+    teamSummaries.forEach(s => {
+      // health
+      if (typeof s.cur === 'number' && typeof s.goal === 'number' && s.goal !== 0) {
+        const r = s.cur / s.goal;
+        s.health = r >= 1 ? 'ok' : r >= 0.6 ? 'warn' : 'bad';
+      } else { s.health = 'na'; }
+      // delta pct
+      s.deltaPct = (typeof s.cur === 'number' && typeof s.prev === 'number' && s.prev !== 0)
+        ? ((s.cur - s.prev) / Math.abs(s.prev)) * 100 : null;
+      // attainment pct
+      s.attPct = (typeof s.cur === 'number' && typeof s.goal === 'number' && s.goal !== 0)
+        ? (s.cur / s.goal) * 100 : null;
+    });
+
+    // Find highlight candidates: top mover, biggest miss, hottest streak
+    const movers = teamSummaries.filter(s => s.deltaPct !== null).sort((a, b) => b.deltaPct - a.deltaPct);
+    const topMover = movers[0];
+    const worstMover = movers[movers.length - 1];
+    const closestToGoal = teamSummaries.filter(s => s.attPct !== null && s.attPct < 100).sort((a, b) => b.attPct - a.attPct)[0];
+    const hitters = teamSummaries.filter(s => s.attPct !== null && s.attPct >= 100);
+
     let html = '<div class="wr-section"><div class="wr-shead"><span class="wr-snum">◧</span><h4 class="wr-stitle">全组总览</h4><span class="wr-shint">基于各组最新一周存档汇总</span></div>';
-    html += '<div class="wr-ovw-hero">';
-    html += '<div class="wr-ovw-stat"><div class="wr-ovw-stat-lbl">产品组数</div><div class="wr-ovw-stat-val">' + totalTeams + '</div></div>';
-    html += '<div class="wr-ovw-stat"><div class="wr-ovw-stat-lbl">达成目标</div><div class="wr-ovw-stat-val">' + teamsHittingGoal + '<span style="font-size: 14px; color: var(--color-text-tertiary); margin-left: 4px;">/ ' + teamsWithGoal + '</span></div></div>';
-    html += '<div class="wr-ovw-stat"><div class="wr-ovw-stat-lbl">平均完成度</div><div class="wr-ovw-stat-val">' + (avgCompletion === null ? '—' : avgCompletion.toFixed(0) + '%') + '</div></div>';
-    html += '<div class="wr-ovw-stat"><div class="wr-ovw-stat-lbl">环比上行</div><div class="wr-ovw-stat-val">' + teamsGrowing + '<span style="font-size: 14px; color: var(--color-text-tertiary); margin-left: 4px;">/ ' + teamsWithGrowth + '</span></div></div>';
+
+    // Highlight cards
+    html += '<div class="wr-ovw-highlights">';
+    if (topMover && topMover.deltaPct > 0.5) {
+      html += '<div class="wr-ovw-highlight kind-good">'
+        + '<div class="wr-ovw-highlight-tag">本周领涨</div>'
+        + '<div class="wr-ovw-highlight-val">▲ ' + topMover.deltaPct.toFixed(1) + '%</div>'
+        + '<div class="wr-ovw-highlight-sub">' + escapeHtml(topMover.schema.nsm.name || '北极星') + ' 环比上行</div>'
+        + '<div class="wr-ovw-highlight-team">' + escapeHtml(topMover.team.label) + '</div>'
+        + '</div>';
+    }
+    if (worstMover && worstMover.deltaPct < -0.5 && worstMover !== topMover) {
+      html += '<div class="wr-ovw-highlight kind-bad">'
+        + '<div class="wr-ovw-highlight-tag">需关注</div>'
+        + '<div class="wr-ovw-highlight-val">▼ ' + Math.abs(worstMover.deltaPct).toFixed(1) + '%</div>'
+        + '<div class="wr-ovw-highlight-sub">' + escapeHtml(worstMover.schema.nsm.name || '北极星') + ' 环比下行</div>'
+        + '<div class="wr-ovw-highlight-team">' + escapeHtml(worstMover.team.label) + '</div>'
+        + '</div>';
+    }
+    if (hitters.length > 0) {
+      html += '<div class="wr-ovw-highlight kind-info">'
+        + '<div class="wr-ovw-highlight-tag">达标</div>'
+        + '<div class="wr-ovw-highlight-val">' + hitters.length + ' / ' + teamsWithGoal + '</div>'
+        + '<div class="wr-ovw-highlight-sub">本周达成目标的组数</div>'
+        + '<div class="wr-ovw-highlight-team">' + hitters.map(h => escapeHtml(h.team.label)).join(' · ') + '</div>'
+        + '</div>';
+    } else if (closestToGoal) {
+      html += '<div class="wr-ovw-highlight kind-info">'
+        + '<div class="wr-ovw-highlight-tag">最接近达标</div>'
+        + '<div class="wr-ovw-highlight-val">' + closestToGoal.attPct.toFixed(0) + '%</div>'
+        + '<div class="wr-ovw-highlight-sub">距目标差 ' + (100 - closestToGoal.attPct).toFixed(0) + 'pp</div>'
+        + '<div class="wr-ovw-highlight-team">' + escapeHtml(closestToGoal.team.label) + '</div>'
+        + '</div>';
+    }
     html += '</div>';
 
+    // Stats row
+    html += '<div class="wr-ovw-hero">';
+    html += '<div class="wr-ovw-stat"><div class="wr-ovw-stat-lbl">产品组数</div><div class="wr-ovw-stat-val">' + totalTeams + '</div></div>';
+    html += '<div class="wr-ovw-stat"><div class="wr-ovw-stat-lbl">达成目标</div><div class="wr-ovw-stat-val">' + teamsHittingGoal + '<span style="font-size: 14px; color: var(--ink-3); margin-left: 4px;">/ ' + teamsWithGoal + '</span></div></div>';
+    html += '<div class="wr-ovw-stat"><div class="wr-ovw-stat-lbl">平均完成度</div><div class="wr-ovw-stat-val">' + (avgCompletion === null ? '—' : avgCompletion.toFixed(0) + '%') + '</div></div>';
+    html += '<div class="wr-ovw-stat"><div class="wr-ovw-stat-lbl">环比上行</div><div class="wr-ovw-stat-val">' + teamsGrowing + '<span style="font-size: 14px; color: var(--ink-3); margin-left: 4px;">/ ' + teamsWithGrowth + '</span></div></div>';
+    html += '</div>';
+
+    // Team cards
     teamSummaries.forEach((s, idx) => {
       const t = s.team;
       const nsmName = s.schema.nsm.name || '北极星指标';
       const unit = s.schema.nsm.unit || '';
       let deltaTxt = '—', deltaCls = 'wr-flat';
-      if (typeof s.cur === 'number' && typeof s.prev === 'number' && s.prev !== 0) {
-        const pct = ((s.cur - s.prev) / Math.abs(s.prev)) * 100;
-        deltaCls = pct > 0.5 ? 'wr-up' : pct < -0.5 ? 'wr-down' : 'wr-flat';
-        const arrow = pct > 0.5 ? '▲' : pct < -0.5 ? '▼' : '→';
-        deltaTxt = arrow + ' ' + Math.abs(pct).toFixed(1) + '%';
+      if (s.deltaPct !== null) {
+        deltaCls = s.deltaPct > 0.5 ? 'wr-up' : s.deltaPct < -0.5 ? 'wr-down' : 'wr-flat';
+        const arrow = s.deltaPct > 0.5 ? '▲' : s.deltaPct < -0.5 ? '▼' : '→';
+        deltaTxt = arrow + ' ' + Math.abs(s.deltaPct).toFixed(1) + '%';
       }
       let progressPct = 0, barCls = '', progressTxt = '—';
-      if (typeof s.cur === 'number' && typeof s.goal === 'number' && s.goal !== 0) {
-        progressPct = Math.max(0, Math.min(100, (s.cur / s.goal) * 100));
+      if (s.attPct !== null) {
+        progressPct = Math.max(0, Math.min(100, s.attPct));
         progressTxt = progressPct.toFixed(0) + '%';
-        barCls = progressPct >= 100 ? 'good' : progressPct >= 70 ? '' : progressPct >= 40 ? 'warn' : 'bad';
+        barCls = s.attPct >= 100 ? 'good' : s.attPct >= 70 ? '' : s.attPct >= 40 ? 'warn' : 'bad';
       }
-      html += '<div class="wr-ovw-team-card" data-team="' + t.id + '">';
-      html += '<div class="wr-ovw-team-head"><div><span class="wr-ovw-team-name">' + escapeHtml(t.label) + '</span><span class="wr-ovw-team-nsm-name" style="margin-left: 10px;">' + escapeHtml(nsmName) + '</span></div><span class="wr-ovw-team-sub">' + (s.lastWeek ? '最新: ' + s.lastWeek : '无存档') + '</span></div>';
-      html += '<div class="wr-ovw-team-row">';
-      html += '<div><div class="wr-ovw-team-val">' + formatVal(s.cur, unit) + '</div><div class="wr-ovw-team-sub">vs 上周 <span class="' + deltaCls + '">' + deltaTxt + '</span> · 目标 ' + formatVal(s.goal, unit) + '</div></div>';
-      html += '<div><div class="wr-ovw-team-sub" style="margin-bottom: 4px; display: flex; justify-content: space-between;"><span>完成度</span><span style="font-weight: 500; color: var(--color-text-primary);">' + progressTxt + '</span></div><div class="wr-ovw-bar-wrap"><div class="wr-ovw-bar ' + barCls + '" style="width: ' + progressPct + '%;"></div></div></div>';
+      // Flag: HOT = top mover with >5% growth; ATTENTION = bad health or sharp drop
+      let flagHtml = '';
+      if (topMover === s && s.deltaPct > 5) flagHtml = '<span class="wr-ovw-team-flag hot">HOT</span>';
+      else if (s.health === 'bad' || (s.deltaPct !== null && s.deltaPct < -5)) flagHtml = '<span class="wr-ovw-team-flag attention">ATTENTION</span>';
+
+      html += '<div class="wr-ovw-team-card health-' + s.health + '" data-team="' + t.id + '">';
+      html += '<div class="wr-ovw-team-head"><div class="wr-ovw-team-name-row"><span class="wr-ovw-team-name">' + escapeHtml(t.label) + '</span>' + flagHtml + '<span class="wr-ovw-team-nsm-name">' + escapeHtml(nsmName) + '</span></div><div class="wr-ovw-team-val-row" style="margin-top:4px;"><span class="wr-ovw-team-val">' + formatVal(s.cur, unit) + '</span><span class="wr-ovw-team-sub">vs 上周 <span class="' + deltaCls + '">' + deltaTxt + '</span></span></div><div class="wr-ovw-team-sub">' + (s.lastWeek ? '最新: ' + s.lastWeek : '无存档') + ' · 目标 ' + formatVal(s.goal, unit) + '</div></div>';
+      html += '<div><div class="wr-ovw-team-sub" style="margin-bottom: 4px; display: flex; justify-content: space-between;"><span>完成度</span><span style="font-weight: 500; color: var(--ink);">' + progressTxt + '</span></div><div class="wr-ovw-bar-wrap"><div class="wr-ovw-bar ' + barCls + '" style="width: ' + progressPct + '%;"></div></div></div>';
       html += '<div><div class="wr-ovw-team-sub" style="margin-bottom: 2px;">' + s.history.length + ' 周趋势</div><div class="wr-ovw-spark-wrap"><canvas id="wr-spark-' + idx + '"></canvas></div></div>';
       html += '<button class="wr-ghostbtn" data-team="' + t.id + '" data-act="goto">进入 →</button>';
-      html += '</div></div>';
+      html += '</div>';
     });
 
     html += '<div class="wr-card" style="margin-top: 1rem;"><div style="font-size: 13px; font-weight: 500; margin-bottom: 4px;">各组完成度横向对比</div><div style="font-size: 11px; color: var(--color-text-tertiary); margin-bottom: 12px;">基于最新一周 NSM 当前值 / 目标值。无目标的组不展示。</div><div class="wr-ovw-chart-wrap"><canvas id="wr-ovw-completion-chart"></canvas></div></div></div>';
@@ -1001,7 +1222,7 @@ details.wr-collapsible[open] summary { color: var(--ink-2); margin-bottom: 8px; 
     cardHtml += '<circle class="wr-ns-ring-track" cx="50" cy="50" r="' + r + '"></circle>';
     cardHtml += '<circle class="wr-ns-ring-fill ' + ringCls + '" cx="50" cy="50" r="' + r + '" stroke-dasharray="' + circ + '" stroke-dashoffset="' + (circ - ringDash) + '"></circle>';
     cardHtml += '</svg>';
-    cardHtml += '<div class="wr-ns-ring-label"><div class="v">' + (attPct === null ? '—' : Math.round(attPct) + '%') + '</div><div class="l">达标</div></div>';
+    cardHtml += '<div class="wr-ns-ring-label"><div class="v' + (_shimmerOnce ? ' wr-cu-anim' : '') + '">' + (attPct === null ? '—' : Math.round(attPct) + '%') + '</div><div class="l">达标</div></div>';
     cardHtml += '</div>';
     cardHtml += '<div class="wr-ns-ring-side">';
     cardHtml += '<div><span class="k">本周</span> <span class="v">' + formatVal(cur, ns.unit) + '</span></div>';
@@ -1023,6 +1244,7 @@ details.wr-collapsible[open] summary { color: var(--ink-2); margin-bottom: 8px; 
 
     cardHtml += '</div>';
     card.innerHTML = cardHtml;
+    if (_shimmerOnce) _shimmerOnce = false;
 
     card.querySelectorAll('input').forEach(el => {
       el.addEventListener('input', e => {
@@ -1193,16 +1415,61 @@ details.wr-collapsible[open] summary { color: var(--ink-2); margin-bottom: 8px; 
   }
 
   function renderInputCats() {
-    // Promote first cat if state.inputCat is __all or invalid (stages view has no "all")
+    // Promote first cat if state.inputCat is __all or invalid
     if (state.inputCat === '__all' || !schema.inputCats.find(c => c.id === state.inputCat)) {
       state.inputCat = schema.inputCats[0] && schema.inputCats[0].id || '';
     }
     const wrap = document.getElementById('wr-input-cats');
     const cats = schema.inputCats;
+    const viz = tweaks.funnelViz || 'stages';
+
+    if (viz === 'stepped') {
+      // Horizontal stepped bar: aggregate-totals or %-headline per stage
+      let html = '<div class="wr-funnel-stepped">';
+      cats.forEach((cat, i) => {
+        const inputs = schema.inputs.filter(m => m.cat === cat.id);
+        const headline = inputs.find(m => m.unit === '%') || inputs[0];
+        let val = '—';
+        if (headline) {
+          const v = (state.metrics[headline.key] || {}).current;
+          if (v != null && v !== '') val = formatVal(v, headline.unit);
+        }
+        const isActive = state.inputCat === cat.id;
+        html += '<div class="wr-funnel-step' + (isActive ? ' active' : '') + '" data-cat="' + cat.id + '">'
+          + '<div class="wr-funnel-step-lbl">阶段 ' + (i + 1) + '</div>'
+          + '<div class="wr-funnel-step-name">' + escapeHtml(cat.label) + '</div>'
+          + '<div class="wr-funnel-step-val">' + val + '</div>'
+          + '</div>';
+      });
+      html += '</div>';
+      // Below the stepped bar, show the active cat's metric chips
+      const activeInputs = schema.inputs.filter(m => m.cat === state.inputCat);
+      html += '<div class="wr-funnel-metrics" style="margin-top:14px;">';
+      html += activeInputs.length === 0
+        ? '<div style="font-size:11px;color:var(--ink-3);padding:4px 0;">该阶段暂无指标</div>'
+        : activeInputs.map(m => buildMetricChip(m)).join('');
+      html += '</div>';
+      wrap.innerHTML = html;
+      wrap.querySelectorAll('.wr-funnel-step').forEach(el => {
+        el.addEventListener('click', () => {
+          state.inputCat = el.dataset.cat;
+          renderInputCats(); renderInputRows(); renderChart();
+        });
+        el.addEventListener('dblclick', e => {
+          e.preventDefault();
+          const cat = schema.inputCats.find(c => c.id === el.dataset.cat);
+          if (!cat) return;
+          const newName = prompt('重命名分类:', cat.label);
+          if (newName && newName.trim()) { cat.label = newName.trim(); persistSchema(); renderInputCats(); }
+        });
+      });
+      return;
+    }
+
+    // Default: stages view
     let html = '<div class="wr-funnel-stages" style="--stage-count:' + cats.length + ';">';
     cats.forEach((cat, i) => {
       const inputs = schema.inputs.filter(m => m.cat === cat.id);
-      // Conv label: in stage 1 just "本阶段汇总", else show first %-unit metric or label
       let convHtml = '';
       if (i === 0) {
         convHtml = '<span>本阶段汇总</span>';
@@ -1517,14 +1784,49 @@ details.wr-collapsible[open] summary { color: var(--ink-2); margin-bottom: 8px; 
     hideAuth();
     document.getElementById('wr-cloud-user').textContent = currentUser.email || '';
     document.getElementById('wr-cloud-logout').style.display = '';
+    document.getElementById('wr-tweaks-toggle').style.display = '';
+    bindTweaksUI();
     await cloudBootstrap();
     init();
+  }
+
+  function bindTweaksUI() {
+    const toggle = document.getElementById('wr-tweaks-toggle');
+    const panel = document.getElementById('wr-tweaks-panel');
+    toggle.addEventListener('click', () => {
+      const open = panel.style.display !== 'none';
+      panel.style.display = open ? 'none' : '';
+      if (!open) {
+        // sync active states
+        panel.querySelectorAll('.wr-tweak-seg').forEach(seg => {
+          const key = seg.dataset.key;
+          const cur = tweaks[key];
+          seg.querySelectorAll('button').forEach(b => {
+            b.classList.toggle('active', b.dataset.val === cur);
+          });
+        });
+      }
+    });
+    document.getElementById('wr-tweaks-close').addEventListener('click', () => { panel.style.display = 'none'; });
+    panel.querySelectorAll('.wr-tweak-seg').forEach(seg => {
+      seg.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const key = seg.dataset.key;
+          tweaks[key] = btn.dataset.val;
+          persistTweaks();
+          seg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+          if (key === 'accent') applyTweaks();
+          if (key === 'funnelViz' && state.team !== '__overview') renderInputCats();
+        });
+      });
+    });
   }
 
   function init() {
     loadTeams();
     state.team = teams[0].id;
     state.week = getCurrentWeek();
+    flagShimmer();
     loadSchema(); loadApi(); loadState();
     document.getElementById('wr-week').value = state.week;
     document.getElementById('wr-week').addEventListener('change', e => { state.week = e.target.value; loadState(); renderAll(); });
@@ -1546,5 +1848,32 @@ details.wr-collapsible[open] summary { color: var(--ink-2); margin-bottom: 8px; 
   else bootApp();
 })();
 </script>
+
+<button class="wr-tweaks-toggle" id="wr-tweaks-toggle" title="主题与视图设置" style="display:none;">⚙</button>
+<div class="wr-tweaks-panel" id="wr-tweaks-panel" style="display:none;">
+  <div class="wr-tweaks-head">
+    <span class="wr-tweaks-title">外观与视图</span>
+    <button class="wr-tweaks-close" id="wr-tweaks-close">×</button>
+  </div>
+  <div class="wr-tweaks-body">
+    <div class="wr-tweak-group">
+      <span class="wr-tweak-group-lbl">主题</span>
+      <div class="wr-tweak-seg" data-key="accent">
+        <button data-val="default" class="active">琥珀</button>
+        <button data-val="mono">单色</button>
+        <button data-val="darkhero">暗 Hero</button>
+      </div>
+    </div>
+    <div class="wr-tweak-group">
+      <span class="wr-tweak-group-lbl">漏斗视图</span>
+      <div class="wr-tweak-seg" data-key="funnelViz">
+        <button data-val="stages" class="active">阶段卡</button>
+        <button data-val="stepped">条形</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /.wr-shell -->
 </body>
 </html>

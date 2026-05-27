@@ -17,7 +17,7 @@
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: opts.model || 'deepseek-chat',
+        model: opts.model || 'deepseek-v4-pro',
         messages,
         temperature: opts.temperature != null ? opts.temperature : 0.3,
         response_format: { type: 'json_object' },

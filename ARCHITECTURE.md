@@ -112,18 +112,18 @@ sources.html:    supabase-js, /config.js, content-ops.js, provider.js
 ## 模块
 
 ### serve.js
-Node 内置 HTTP 模块，读 `.env` → `/config.js`（注入 `window.PALLAX_CONFIG` + `window.DEEPSEEK_CONFIG`），`/` → `src/pages/dashboard.html`。
+Node 内置 HTTP 模块，读 `.env` → `/config.js`（注入 `window.PALLAX_CONFIG` + `window.DEEPSEEK_CONFIG`），`/` → `src/pages/dashboard.html`。代理 OpenCLI 命令（`/api/opencli/*` → `opencli` CLI），负责读取 URL 参数（`limit`、`topByEngagement`）并传递给 opencli。仅使用 opencli 实际支持的 flag（`--limit`、`--top-by-engagement`、`--format`），不使用不存在的 `--hours`。
 
 ### provider.js → `window.Provider`
 
 | 函数 | 说明 |
 |------|------|
-| `fetchTweetsByHandle(handle, hours)` → `Tweet[]` | 拉取账号推文 |
+| `fetchTweetsByHandle(handle, hours, limit, topByEngagement)` → `Tweet[]` | 拉取账号推文 |
 | `fetchSingleTweet(url/id)` → `Tweet` | 拉取单条推文 |
 | `fetchListMembers(listId)` → `User[]` | 拉取 List 成员 |
 | `isAvailable()` → boolean | OpenCLI daemon 是否在线 |
 
-内部：validateHandle → ensureAvailable → opencli（主路径）→ /exec（回退，shellArg 转义）→ normalizeTweet（snake_case/camelCase 双兼容）
+内部：validateHandle → ensureAvailable → opencli（主路径 `/api/twitter/user-timeline`）→ /exec（回退，`twitter tweets` 命令）→ normalizeTweet（snake_case/camelCase 双兼容）。回退路径使用正确的 opencli 命令（`twitter tweets` / `twitter lists`），不再使用无效的 `user-timeline` / `twitter tweet` / `list-members`。
 
 ### ai/client.js → `window.AIClient`
 

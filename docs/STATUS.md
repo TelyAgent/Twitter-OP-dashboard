@@ -100,13 +100,16 @@
 | 单源同步 | 拉推文→聚类→评分→入库→回写 | 已实现 | `Provider.fetchTweetsByHandle()` → `CO.clusterTweets()` → `sb.from('hotspots').upsert()` → `sb.from('sources').update()` |
 | PM 评估 | 拉推文→计算分数→回写 | 已实现 | `Provider.fetchTweetsByHandle()` + `CO.pmRelevance()` → `sb.from('sources').update()` |
 | PM 评估 | 星级展示 + 筛选 | 已实现 | 基于 pm_score 阈值的星级 + `filter-pm-only` 复选框 |
-| 批量同步 | 同步全部 PM 相关来源 | 已实现 | `syncAllPM()` → 遍历 pm_score>=0.4 的来源逐一同步 |
+| 批量同步 | 同步全部 PM 相关来源（含限流安全） | 已实现 | `syncAllPM()` 含 24h 去重、随机延迟、退避保护、批量上限 |
 | 爆款信息流 | hot_signal 推文列表，按浏览量降序 | 已实现 | `sb.from('hotspots').select().eq('hot_signal', true)` |
 | 爆款信息流 | 图片/视频媒体展示 | 已实现 | 媒体 URL 渲染为 `<img>` / `<video>` 标签 |
 | 手动添加 | 粘贴 URL → 抓取 → 预览 → 分类 → 保存 | 已实现 | `Provider.fetchSingleTweet()` → `CO.classifyCategory()` → `sb.from('hotspots').upsert()` |
 | AI 推荐 | 推荐卡片 + 操作按钮 | 已实现 | 从 `GET /api/sources/ai-recommendations` (mock.json) 动态拉取，按钮对接 Supabase `sources` 表写入 |
 | 评审横幅 | 评审日期 + 摘要文案 | 已实现 | 从 `GET /api/sources/review-summary` (mock.json) 动态拉取并渲染 |
 | 表格摘要 | 显示数、本周新增、退役、待 review | 已实现 | 从 `GET /api/sources/review-summary` (mock.json) 动态拉取并渲染 |
+| 列表分页 | 每页 15 条，页码导航，总条数显示 | 已实现 | `renderPagination()` + PAGE_SIZE=15 |
+| 排序稳定性 | added_at DESC + handle ASC 二级排序 | 已实现 | `.order('added_at').order('handle')` 双键排序 |
+| 限流安全 | 24h 去重、随机延迟、429/403 退避、批量上限 | 已实现 | localStorage 缓存 + `applyBackoff()` + `randomDelay()` |
 
 ---
 
@@ -141,8 +144,8 @@
 
 | | 数量 |
 |------|------|
-| 功能总数 | 74 |
-| 已实现（端到端打通） | 74 |
+| 功能总数 | 78 |
+| 已实现（端到端打通） | 77 |
 | Mock（前端 UI 存在但数据未连接） | 0 |
-| 未实现 | 0 |
+| 未实现 | 1（自动同步全部按钮） |
 | 建议删除 | 1（preview.html） |

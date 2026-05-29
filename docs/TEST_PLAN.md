@@ -79,14 +79,14 @@ node src/serve.js
 |---|--------|------|------|
 | 2.4.1 | `isAvailable` | `await Provider.isAvailable()` | daemon 运行时返回 `true` |
 | 2.4.2 | `isAvailable` daemon 未运行 | 关闭 OpenCLI 插件，重启浏览器，`await Provider.isAvailable()` | 返回 `false` |
-| 2.4.3 | `fetchTweetsByHandle` 正常 | `await Provider.fetchTweetsByHandle('jack', 24)` | 返回 Tweet[] 数组，每条含 `{id, text, author, metrics}` |
-| 2.4.4 | `fetchTweetsByHandle` 无效 handle | `await Provider.fetchTweetsByHandle('', 24)` | 抛出 `Error: Invalid handle` |
-| 2.4.5 | `fetchTweetsByHandle` 含特殊字符 | `await Provider.fetchTweetsByHandle('@name with spaces', 24)` | 抛出 `Error: Invalid handle` |
+| 2.4.3 | `fetchTweetsByHandle` 正常 | `await Provider.fetchTweetsByHandle('jack', 24, 100, 30)` | 返回 Tweet[] 数组，每条含 `{id, text, author, metrics}` |
+| 2.4.4 | `fetchTweetsByHandle` 无效 handle | `await Provider.fetchTweetsByHandle('', 24, 100, 30)` | 抛出 `Error: Invalid handle` |
+| 2.4.5 | `fetchTweetsByHandle` 含特殊字符 | `await Provider.fetchTweetsByHandle('@name with spaces', 24, 100, 30)` | 抛出 `Error: Invalid handle` |
 | 2.4.6 | `fetchSingleTweet` | `await Provider.fetchSingleTweet('https://x.com/jack/status/1234567890')` | 返回标准化 tweet 对象 |
 | 2.4.7 | `fetchSingleTweet` 空输入 | `await Provider.fetchSingleTweet('')` | 抛出 `Error: Empty tweet URL or ID` |
 | 2.4.8 | `fetchListMembers` | `await Provider.fetchListMembers('2045070679889055752')` | 返回 User[] 数组 |
 | 2.4.9 | `fetchListMembers` 无效 ID | `await Provider.fetchListMembers('abc')` | 抛出 `Error: Invalid list ID` |
-| 2.4.10 | Provider daemon 未运行时 | 关闭 daemon，`await Provider.fetchTweetsByHandle('jack', 24)` | 抛出 `Error: OpenCLI daemon not running` |
+| 2.4.10 | Provider daemon 未运行时 | 关闭 daemon，`await Provider.fetchTweetsByHandle('jack', 24, 100, 30)` | 抛出 `Error: OpenCLI daemon not running` |
 
 ---
 
@@ -130,6 +130,13 @@ node src/serve.js
 | 3.2.11 | 退役/删除源 | 点击 retire / ✕ 按钮 → 确认 | 状态更新（retire）或行消失（delete） |
 | 3.2.12 | 批量同步 PM | 点击 "↻ 同步全部 PM 相关" | 串行同步每个源，进度更新，最后 toast 显示汇总 |
 | 3.2.13 | 爆款 feed | 查看底部 "爆款推文 · 来自监控源" 区 | 显示 hot_signal=true 的推文卡片，按 views 降序 |
+| 3.2.14 | 列表分页 | sources > 15 条时查看表格底部 | 显示页码控件，当前页高亮 |
+| 3.2.15 | 分页切换 | 点击页码 2 / 点击下一页按钮 | 表格内容切换到对应页 |
+| 3.2.16 | 分页边界 | 跳转到最后一页 | 下一页和末页按钮 disabled |
+| 3.2.17 | 分页+筛选 | 勾选 "仅 PM 相关" | 页码重置为 1 |
+| 3.2.18 | 排序稳定性 | 多次刷新页面 | 列表顺序不变 |
+| 3.2.19 | 24h 去重 | 对同一源连续点击两次同步 | 第二次 toast 提示跳过 |
+| 3.2.20 | 限流退避 | 模拟 429 响应后点击同步 | toast 提示退避中 |
 
 ### 3.3 radar.html
 

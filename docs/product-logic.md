@@ -86,10 +86,14 @@ config.js → content-ops.js → ai/client.js → ai/pipeline.js → provider.js
 
 确认后写入 `sources` 表，同时自动触发 PM 相关度评估。
 
+#### 0. 列表分页
+
+账号列表每页展示 15 条，底部提供页码导航。排序规则：`added_at DESC`（最新添加在前），相同时间按 `handle ASC` 字母序作为二级排序保证顺序稳定。切换筛选条件或数据重载后自动回到第 1 页。
+
 #### 2. 单源同步（↻ 按钮）
 
 ```
-Provider.fetchTweetsByHandle(handle, 168h)
+Provider.fetchTweetsByHandle(handle, 168h, limit=100, topByEngagement=30)
   → ContentOps.clusterTweets()       关键词 + 4h 时间窗口聚类
     → ContentOps.buildHotspotFromCluster()  聚类 → 评分 → 热点行
       → 低分过滤 (score < 0.10 丢弃)
@@ -101,7 +105,13 @@ Provider.fetchTweetsByHandle(handle, 168h)
 
 #### 3. 批量同步 PM 相关源
 
-筛选 `pm_score >= 0.4` 的源，串行同步（避免 API 限流）。
+筛选 `pm_score >= 0.4` 的源，串行同步。内置完整限流安全机制：
+
+- **24h 去重**：同源 24h 内不同步第二次，避免重复消耗 API 配额
+- **批量上限**：单次最多同步 20 个源，超出自动截断
+- **随机延迟**：源间间隔 8~25 秒随机，模拟人类浏览节奏
+- **退避保护**：触发 429/403 后全局 10 分钟冷却，未完成的源自动跳过
+- **确认弹窗**：启动前展示排队数量、间隔策略和预计耗时
 
 #### 4. AI 推荐源
 

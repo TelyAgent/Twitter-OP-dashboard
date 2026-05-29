@@ -5,31 +5,39 @@
 (function () {
   // ─── Constants ────────────────────────────────────────────────
   const CLUSTER_KEYS = [
-    'polymarket','kalshi','manifold','metaculus','predictit',
-    'fomc','cpi','nfp','pce','gdp','payroll',
-    'powell','trump','biden','harris','musk','lagarde','yellen','sbf',
-    'bitcoin','btc','ethereum','eth','solana','sol','xrp','bnb',
-    'smart money','whale','on-chain','onchain','defi','tvl',
-    'inflation','interest rate','rate cut','rate hike',
-    'election','congress','senate',
-    'hack','exploit','rug','scam',
+    'telegram','telegram bot','tg bot','telegram mini app','ton','ton blockchain',
+    'ai agent','ai agents','agent framework','agent sdk','agent api',
+    'autonomous agent','multi-agent','agent swarm','agent orchestration',
+    'llm','large language model','gpt','claude','gemini','deepseek',
+    'openai','anthropic','google ai','mistral','llama','grok','groq',
+    'chatbot','conversational ai','copilot','assistant',
+    'eliza','elizaos','virtuals','agent starter kit','crewai','autogen',
+    'openclaw','claw','openhuman','hermas','piagent',
+    'rag','retrieval augmented','function calling','tool use',
+    'no-code agent','low-code agent','agent marketplace','agent platform',
+    'agent token','agent economy','crypto agent','defi agent','trading agent',
+    'web3 agent','social agent','gaming agent','nft agent',
+    'open source agent','agent launch','agent launchpad',
+    'ai safety','agent safety','agent alignment',
+    'benchmark','sota','funding round','partnership',
   ];
 
   const CAT_KW = {
-    A: ['odds','polymarket','kalshi','manifold','prediction market','bet','probability','resolves','contract','yes/no'],
-    C: ['smart money','whale','wallet','0x','on-chain','onchain','defi','position','buys','sells','moves funds'],
-    D: ['new market','new contract','launching','listed','just added','first trade','new listing'],
-    E: ['fomc','fed','cpi','inflation','rate cut','rate hike','election','trump','powell','bitcoin','btc','crypto'],
+    A: ['telegram','tg','telegram bot','mini app','ton','ton blockchain','telegram channel','telegram group','fragment','wallet bot'],
+    C: ['ai agent','agent builder','agent sdk','agent api','agent platform','agent marketplace','agent launch','agent token','eliza','elizaos','virtuals','agent starter kit','crewai','autogen','openclaw','claw','openhuman','hermas','piagent','no-code agent'],
+    D: ['llm','rag','function calling','tool use','multi-agent','agent swarm','agent orchestration','autonomous','reasoning','chain of thought','prompt engineering','fine tuning','embedding','vector database','context window','token limit'],
+    E: ['openai','anthropic','google ai','deepseek','mistral','llama','grok','groq','funding round','valuation','acquisition','partnership','benchmark','sota','open source','api pricing','rate limit'],
   };
 
   const ALL_KW = Object.values(CAT_KW).flat();
 
   const POLY_KW = [
-    'polymarket','kalshi','manifold','predictit','metaculus',
-    'prediction market','binary market','event contract','odds','probability',
-    'yes/no','resolves','bet on','betting market',
-    'fomc','rate cut','rate hike','election','whale','smart money',
-    'fed','cpi','powell','trump',
+    'telegram bot','ai agent','telegram mini app','agent platform','agent launch',
+    'agent sdk','ton','telegram','autonomous agent','multi-agent','agent marketplace',
+    'eliza','elizaos','virtuals','chatbot','agent token','crypto agent','defi agent',
+    'web3 agent','social agent','trading agent','gaming agent',
+    'openclaw','claw','openhuman','hermas','piagent',
+    'llm','rag','function calling','open source agent',
   ];
 
   // ─── Utility ──────────────────────────────────────────────────

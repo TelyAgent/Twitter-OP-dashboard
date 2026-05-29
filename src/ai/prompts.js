@@ -9,10 +9,10 @@ export function scoringPrompt(tweets) {
   ).join('\n\n');
 
   return {
-    system: `你是预测市场内容分析器。对一批推文 cluster 做三维评分 (0-1)。
+    system: `你是 Telegram Agent 生态内容分析器。对一批推文 cluster 做三维评分 (0-1)。
 
 评分维度:
-- fit (0.3 权重): 与预测市场/Polymarket/Kalshi/赔率/链上/宏观事件的关联密度
+- fit (0.3 权重): 与 Telegram/Agent 产品/Agent 技术/AI 市场动态的关联密度
 - viral (0.4 权重): 互动量(like+rt+reply) / views 比值，views 越高 viral 基线越低
 - fresh (0.3 权重): 时效性，越新越高，72h 半衰
 
@@ -69,11 +69,11 @@ export function intelPrompt(clusterTitle, tweets) {
   ).join('\n\n---\n\n');
 
   return {
-    system: `你是预测市场情报分析师。对以下热点 cluster 做深度分析，生成:
+    system: `你是 Telegram Agent 行业分析师。对以下热点 cluster 做深度分析，生成:
 
-1. summary (2-3 句中文摘要，说清"发生了什么 + 为什么此刻重要")
+1. summary (2-3 句中文摘要，说清"发生了什么 + 为什么对 Agent 生态重要")
 2. facts (3-5 个关键事实，每个一句话，含关键数字)
-3. opportunity (为什么这是交易/内容机会，60 字以内)
+3. opportunity (为什么这是推广 Telegram Agent 工具的内容机会或传播切入点，60 字以内)
 4. dissent (如果推文中有分歧观点，提取反方 handle + 立场)
 5. timeline (按时间排的事件线，最多 8 条)
 
@@ -99,15 +99,15 @@ export function extractTemplatePrompt(tweets) {
     system: `从以下爆款推文中提炼可复用的模板骨架。
 
 规则:
-- 将具体的合约名/人名/数字/金额/链接替换为 {slot} 槽位
+- 将具体的产品名/人名/数字/金额/链接替换为 {slot} 槽位
 - 保留推文结构和句式节奏
-- 槽位用中文命名: {合约名} {金额} {比例} {时间窗} {起赔率} {终赔率} {账号} {链接} {观察窗口} 等
+- 槽位用中文命名: {产品名} {指标} {增长率} {时间窗} {竞品} {版本号} {账号} {链接} {数据} 等
 - 每个模板输出 skeleton (含 {slot} 的文本) 和 slots (槽位名列表)
 
 输出 JSON:
 {
   "templates": [
-    { "skeleton": "...{合约名} 赔率在 {时间窗} 内从 {起赔率} 跳到 {终赔率}...", "slots": ["合约名", "时间窗", "起赔率", "终赔率"] }
+    { "skeleton": "...{产品名} 在 {时间窗} 内 {指标} 从 {数据} 增长到 {数据}...", "slots": ["产品名", "时间窗", "指标", "数据"] }
   ]
 }`,
     user: items,
@@ -117,7 +117,7 @@ export function extractTemplatePrompt(tweets) {
 // ─── Template Filling ───────────────────────────────────────────
 export function fillTemplatePrompt(skeleton, slots, material, angle, category) {
   return {
-    system: `你是一个预测市场内容写手。根据模板骨架 + 素材，填入具体内容生成一条推文。
+    system: `你是 Telegram Agent 产品内容写手。目标是为 Agent 工具做推广传播。根据模板骨架 + 素材，填入具体内容生成一条推文。
 
 角度: ${angle || '数据驱动'}
 类别: ${category || '通用'}

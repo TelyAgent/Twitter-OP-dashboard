@@ -389,10 +389,10 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
   const progressEl = document.getElementById('tpl-progress');
 
   const CATEGORIES = [
-    { value: 'A', label: 'A 赔率' },
-    { value: 'C', label: 'C 链上' },
-    { value: 'D', label: 'D 新合约' },
-    { value: 'E', label: 'E 现实' },
+    { value: 'A', label: 'A TG生态' },
+    { value: 'C', label: 'C Agent产品' },
+    { value: 'D', label: 'D Agent技术' },
+    { value: 'E', label: 'E AI市场' },
   ];
   const ANGLES = ['反直觉', '数据驱动', '案例', 'KOL 蹭点', '深度', '教程', 'Thread'];
 
@@ -906,10 +906,10 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
 
   // ====== 中部金模板矩阵 (loaded from DB) ======
   const MATRIX_CATS = [
-    { code: 'A', label: 'A 赔率' },
-    { code: 'C', label: 'C 链上' },
-    { code: 'D', label: 'D 新合约' },
-    { code: 'E', label: 'E 现实' },
+    { code: 'A', label: 'A TG生态' },
+    { code: 'C', label: 'C Agent产品' },
+    { code: 'D', label: 'D Agent技术' },
+    { code: 'E', label: 'E AI市场' },
   ];
   const MATRIX_ANGLES = ['反直觉','数据驱动','案例','KOL 蹭点','深度','教程','Thread'];
 
@@ -1049,7 +1049,7 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
     }
     
     var tpl = tpls[0];
-    var CAT_LABELS = { A: 'A 赔率', C: 'C 链上', D: 'D 新合约', E: 'E 现实' };
+    var CAT_LABELS = { A: 'A TG生态', C: 'C Agent产品', D: 'D Agent技术', E: 'E AI市场' };
     var catLabel = CAT_LABELS[tpl.category] || tpl.category;
     var statusLabel = tpl.status === 'fire' ? '🔥 当前最爆' : tpl.status === 'solid' ? '✓ 主力' : '观察中';
     var statusColor = tpl.status === 'fire' ? '#993C1D' : tpl.status === 'solid' ? '#27500A' : '#888780';
@@ -1213,7 +1213,7 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
               <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;font-size:11px">
                 <span style="color:var(--color-text-tertiary)">分类:</span>
                 <select class="ex-cat" style="font-size:11px;padding:2px 6px;border-radius:4px;border:0.5px solid var(--color-border-tertiary);font-family:inherit">
-                  ${['A','C','D','E'].map(c => `<option value="${c}"${c===cat?' selected':''}>${c} ${ {A:'赔率',C:'链上',D:'新合约',E:'现实'}[c]}</option>`).join('')}
+                  ${['A','C','D','E'].map(c => `<option value="${c}"${c===cat?' selected':''}>${c} ${ {A:'TG生态',C:'Agent产品',D:'Agent技术',E:'AI市场'}[c]}</option>`).join('')}
                 </select>
                 <span style="color:var(--color-text-tertiary);margin-left:6px">角度:</span>
                 <span style="background:#FAEEDA;color:#854F0B;padding:1px 6px;border-radius:3px;font-weight:500;font-size:11px">${escapeHtml(angle === 'Other' ? '反直觉' : angle)}</span>

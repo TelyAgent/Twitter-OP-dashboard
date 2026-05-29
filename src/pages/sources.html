@@ -96,6 +96,11 @@
 .modal-preview-summary{display:flex;align-items:center;gap:10px;padding:6px 12px;border-bottom:0.5px solid var(--color-border-tertiary);font-size:11px;color:var(--color-text-secondary);background:var(--color-background-primary);}
 .modal-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;padding-top:14px;border-top:0.5px solid var(--color-border-tertiary);}
 
+
+.pg-btn{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:28px;padding:0 6px;border:0.5px solid var(--color-border-secondary);background:var(--color-background-primary);border-radius:4px;font-size:12px;color:var(--color-text-secondary);cursor:pointer;}
+.pg-btn:hover:not(:disabled){background:var(--color-background-secondary);color:var(--color-text-primary);}
+.pg-btn:disabled{opacity:0.35;cursor:default;}
+.pg-btn.pg-active{background:#185FA5;color:#fff;border-color:#185FA5;font-weight:500;}
 </style>
 </head>
 <body>
@@ -195,6 +200,7 @@
 
 <div style="margin-top:10px;padding-top:10px;border-top:0.5px solid var(--color-border-tertiary);font-size:11px;color:var(--color-text-tertiary);display:flex;align-items:center;justify-content:space-between">
 <div id="table-summary-display">显示 — / — 推特 KOL · <span class="act-link">查看全部</span></div>
+<div id="sources-pagination" style="display:flex;align-items:center;gap:4px;font-size:12px"></div>
 <div id="table-summary-stats">本周新增 — · 退役 — · 待 review —</div>
 </div>
 
@@ -408,6 +414,11 @@ theblock.co
 
   // 当前已加载的全量数据 (filter 用)
   let __allSources = [];
+  const PAGE_SIZE = 15;
+  let __currentPage = 1;
+
+  function totalPages(total) { return Math.max(1, Math.ceil(total / PAGE_SIZE)); }
+
 
   function applyFilters() {
     const pmOnly = document.getElementById('filter-pm-only')?.checked;
@@ -449,23 +460,57 @@ theblock.co
     if (document.getElementById('table-summary-stats')) document.getElementById('table-summary-stats').textContent = '本周新增 — · 退役 — · 待 review —';
   }
 
+  function renderPagination(total, currentPage) {
+    var pg = document.getElementById('sources-pagination');
+    if (!pg) return;
+    var tp = totalPages(total);
+    if (tp <= 1) { pg.innerHTML = ''; return; }
+    var html = '<span style="margin-right:8px">' + total + ' 条 · ' + currentPage + '/' + tp + ' 页</span>';
+    html += '<button class="pg-btn" data-pg="1" ' + (currentPage === 1 ? 'disabled' : '') + '>«</button>';
+    html += '<button class="pg-btn" data-pg="' + (currentPage - 1) + '" ' + (currentPage === 1 ? 'disabled' : '') + '>‹</button>';
+    var start = Math.max(1, currentPage - 2);
+    var end = Math.min(tp, currentPage + 2);
+    for (var p = start; p <= end; p++) {
+      html += '<button class="pg-btn' + (p === currentPage ? ' pg-active' : '') + '" data-pg="' + p + '">' + p + '</button>';
+    }
+    html += '<button class="pg-btn" data-pg="' + (currentPage + 1) + '" ' + (currentPage === tp ? 'disabled' : '') + '>›</button>';
+    html += '<button class="pg-btn" data-pg="' + tp + '" ' + (currentPage === tp ? 'disabled' : '') + '>»</button>';
+    pg.innerHTML = html;
+    pg.querySelectorAll('.pg-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var p = parseInt(this.getAttribute('data-pg'));
+        if (!isNaN(p) && p >= 1 && p <= tp) {
+          __currentPage = p;
+          renderTable(__allSources);
+        }
+      });
+    });
+  }
+
   function renderTable(rows){
     __allSources = rows;
     var visible = applyFilters();
+    var total = visible.length;
+    var tp = totalPages(total);
+    if (__currentPage > tp) __currentPage = tp;
+    var start = (__currentPage - 1) * PAGE_SIZE;
+    var pageRows = visible.slice(start, start + PAGE_SIZE);
     var tbody = document.getElementById('sources-tbody');
     if (visible.length === 0) {
       tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--color-text-tertiary);font-size: 12px">' + (rows.length === 0 ? '暂无监控源 · 用右上「↥ 批量导入」' : '当前过滤无匹配 (共 ' + rows.length + ' 条)') + '</td></tr>';
     } else {
-      tbody.innerHTML = visible.map(renderSourceRow).join('');
+      tbody.innerHTML = pageRows.map(renderSourceRow).join('');
     }
     updateMetricsCards(rows);
+    renderPagination(total, __currentPage);
   }
 
   async function loadSourcesFromDB(){
     try {
       const { data, error } = await sb.from('sources')
         .select('*, uploader:user_profiles!sources_uploader_id_fkey(initials,display_name,avatar_color)')
-        .order('added_at', { ascending: false });
+        .order('added_at', { ascending: false })
+        .order('handle', { ascending: true });
       if (error) throw error;
       return data || [];
     } catch (e) {
@@ -587,7 +632,7 @@ theblock.co
   window.__reloadSourcesTable = async () => {
     if (!dbReady) return;
     const rows = await loadSourcesFromDB();
-    if (rows) renderTable(rows);
+    if (rows) { __currentPage = 1; renderTable(rows); }
   };
 
   const modal = document.getElementById('bulk-modal');
@@ -907,6 +952,52 @@ theblock.co
   // Content operations now in window.ContentOps (src/content-ops.js)
   const CO = window.ContentOps;
 
+  // ─── 安全限流配置 ─────────────────────────────────────────────────
+  const FETCH_LIMIT = 100;              // 每次最多拉 100 条推文
+  const TOP_BY_ENGAGEMENT = 30;        // 按互动质量截断,只返回 top 30
+  const SYNC_COOLDOWN_MS = 24 * 3600e3; // 同源 24h 内不同步第二次
+  const BATCH_MAX_SOURCES = 20;        // 单次批量同步上限
+  const DELAY_MIN_MS = 8000;           // 源间最小间隔 8s
+  const DELAY_MAX_MS = 25000;          // 源间最大间隔 25s
+
+  // ─── 限流退避状态 ─────────────────────────────────────────────────
+  var _backoffUntil = 0;               // 全局退避截止时间戳
+  var _consecutive429 = 0;             // 连续 429 计数
+
+  function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+
+  function randomDelay() {
+    return DELAY_MIN_MS + Math.floor(Math.random() * (DELAY_MAX_MS - DELAY_MIN_MS));
+  }
+
+  function isInBackoff() { return Date.now() < _backoffUntil; }
+
+  function applyBackoff(status) {
+    if (status === 429 || status === 403) {
+      _consecutive429++;
+      var minutes = 10;  // 固定 10 分钟退避
+      _backoffUntil = Date.now() + minutes * 60e3;
+      return '触发限流, 退避 ' + minutes + ' 分钟';
+    }
+    return null;
+  }
+
+  // ─── 24h 去重缓存 (localStorage) ─────────────────────────────────
+  function getLastSyncTime(sourceId) {
+    try {
+      var cache = JSON.parse(localStorage.getItem('sync_cooldown') || '{}');
+      return cache[sourceId] || 0;
+    } catch (e) { return 0; }
+  }
+
+  function setLastSyncTime(sourceId) {
+    try {
+      var cache = JSON.parse(localStorage.getItem('sync_cooldown') || '{}');
+      cache[sourceId] = Date.now();
+      localStorage.setItem('sync_cooldown', JSON.stringify(cache));
+    } catch (e) { /* quota exceeded, ignore */ }
+  }
+
   // ─── 工具 ─────────────────────────────────────────────────────────────
   function escapeHtml(s) {
     return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1102,15 +1193,35 @@ theblock.co
   window.__toast = toast;
 
   async function syncHandle(handle, sourceId, btn) {
+    // 0. 安全检查: 全局退避
+    if (isInBackoff()) {
+      var remain = Math.ceil((_backoffUntil - Date.now()) / 60e3);
+      toast('全局限流退避中, 约 ' + remain + ' 分钟后恢复', 'warn');
+      return;
+    }
+    // 0.5 去重: 24h 内同源不重复同步
+    var lastSync = getLastSyncTime(sourceId);
+    if (Date.now() - lastSync < SYNC_COOLDOWN_MS) {
+      toast('@' + handle + ': 24h 内已同步过, 跳过 (冷却中)', 'info', 3000);
+      return;
+    }
+
     // 1. 拉 X (via OpenCLI Provider)
     btn.disabled = true;
     btn.textContent = '↻ 拉取中…';
     let tweets = [];
-    let rateLimit = {};
     try {
-      tweets = await window.Provider.fetchTweetsByHandle(handle, SYNC_HOURS);
+      tweets = await window.Provider.fetchTweetsByHandle(handle, SYNC_HOURS, FETCH_LIMIT, TOP_BY_ENGAGEMENT);
+      // 成功 → 重置连续 429 计数
+      _consecutive429 = 0;
     } catch (e) {
-      toast('✕ 拉 @' + handle + ' 失败: ' + e.message, 'error');
+      var msg = e.message || '';
+      var statusMatch = msg.match(/OpenCLI (\d{3})/);
+      var status = statusMatch ? parseInt(statusMatch[1]) : 0;
+      var backoffMsg = applyBackoff(status);
+      var errText = '✕ 拉 @' + handle + ' 失败: ' + msg;
+      if (backoffMsg) errText += ' — ' + backoffMsg;
+      toast(errText, 'error', 6000);
       btn.disabled = false;
       return;
     } finally {
@@ -1122,6 +1233,9 @@ theblock.co
       toast('@' + handle + ': 近 7 天 0 条推文 (可能账号沉默或被保护)', 'warn');
       return;
     }
+
+    // 记录同步时间 (去重缓存)
+    setLastSyncTime(sourceId);
 
     // 2. 聚类 → 评分 → 过滤 → 调 RPC
     const clusters = CO.clusterTweets(tweets, CLUSTER_WINDOW_MS);
@@ -1217,6 +1331,19 @@ theblock.co
 
   // 暴露给批量 sync 用 (传入一个 "假 btn" 对象即可)
   window.__syncOneSource = syncHandle;
+  // 暴露安全限流工具给其他 IIFE
+  window.__syncSafety = {
+    isInBackoff: isInBackoff,
+    randomDelay: randomDelay,
+    getLastSyncTime: getLastSyncTime,
+    backoffUntil: function() { return _backoffUntil; },
+    SYNC_COOLDOWN_MS: SYNC_COOLDOWN_MS,
+    BATCH_MAX_SOURCES: BATCH_MAX_SOURCES,
+    DELAY_MIN_MS: DELAY_MIN_MS,
+    DELAY_MAX_MS: DELAY_MAX_MS,
+    FETCH_LIMIT: FETCH_LIMIT,
+    TOP_BY_ENGAGEMENT: TOP_BY_ENGAGEMENT,
+  };
 })();
 
 // ====== PM 相关度: 工具函数 (导入时自动调用) + 过滤芯片 ======
@@ -1255,6 +1382,7 @@ theblock.co
 
   // 过滤芯片
   document.getElementById('filter-pm-only').addEventListener('change', () => {
+    __currentPage = 1;
     if (window.__reloadSourcesTable) window.__reloadSourcesTable();
   });
 })();
@@ -1406,6 +1534,15 @@ theblock.co
     btn.disabled = true;
     btn.textContent = '↻ 加载源…';
 
+    // 0. 检查全局退避
+    var S = window.__syncSafety;
+    if (S && S.isInBackoff()) {
+      var remain = Math.ceil((S.backoffUntil() - Date.now()) / 60e3);
+      alert('全局限流退避中, 约 ' + remain + ' 分钟后恢复');
+      btn.disabled = false; btn.textContent = orig;
+      return;
+    }
+
     // 1. 拉所有 twitter + 非 retired 的源
     const { data: srcs, error } = await sb.from('sources')
       .select('id, handle, type, status, metrics_4w')
@@ -1431,19 +1568,43 @@ theblock.co
       return;
     }
 
+    // 3. 上限截断: 单次最多同步 BATCH_MAX_SOURCES 个
+    var BATCH_MAX = (S && S.BATCH_MAX_SOURCES) || 10;
+    var COOLDOWN = (S && S.SYNC_COOLDOWN_MS) || 24 * 3600e3;
+    var queue = targets;
+    var trimmed = false;
+    if (queue.length > BATCH_MAX) {
+      var cooled = queue.filter(function(s) {
+        return Date.now() - (S ? S.getLastSyncTime(s.id) : 0) >= COOLDOWN;
+      });
+      if (cooled.length >= BATCH_MAX) {
+        queue = cooled.slice(0, BATCH_MAX);
+      } else {
+        queue = queue.slice(0, BATCH_MAX);
+      }
+      trimmed = targets.length - queue.length;
+    }
+
+    var DELAY_MIN = (S && S.DELAY_MIN_MS) || 8000;
+    var DELAY_MAX = (S && S.DELAY_MAX_MS) || 25000;
+    var FETCH_LIM = (S && S.FETCH_LIMIT) || 100;
+    var TOP_ENG = (S && S.TOP_BY_ENGAGEMENT) || 30;
+    var etaMin = Math.round(queue.length * (DELAY_MIN + DELAY_MAX) / 2 / 60e3);
     const ok = confirm(
-      `将同步 ${targets.length} 个 PM 相关源 (★★+) 的近 7 天推文:\n\n` +
-      targets.map(s => `  ${s.handle}  (PM ${Math.round(s.metrics_4w.pm_score*100)}%)`).join('\n') +
-      `\n\n预计耗时 ~${Math.round(targets.length*1.5)} 秒, X API 配额 ~${targets.length} 次.\n继续?`
+      `将同步 ${queue.length} 个 PM 相关源 (★★+) 的近 7 天推文:` +
+      (trimmed ? `\n(已截断, 跳过 ${trimmed} 个源, 单次上限 ${BATCH_MAX})` : '') +
+      `\n\n拉取策略: 每人最多 ${FETCH_LIM} 条 → 按互动质量截断取 top ${TOP_ENG}` +
+      `\n源间间隔: ${DELAY_MIN/1000}s~${DELAY_MAX/1000}s 随机` +
+      `\n\n预计耗时 ~${etaMin} 分钟.\n继续?`
     );
     if (!ok) { btn.disabled = false; btn.textContent = orig; return; }
 
-    // 3. 串行同步 (并行容易 429)
+    // 4. 串行同步 + 随机延迟 (避免 429)
     const fakeBtn = { textContent: '', disabled: false, style: {} };
-    let done = 0, success = 0, failed = 0;
-    for (const s of targets) {
+    let done = 0, success = 0, failed = 0, skipped = 0;
+    for (const s of queue) {
       done++;
-      btn.textContent = `↻ ${done}/${targets.length} · ${s.handle}`;
+      btn.textContent = `↻ ${done}/${queue.length} · ${s.handle}`;
       try {
         const handle = s.handle.replace(/^@/, '');
         await window.__syncOneSource(handle, s.id, fakeBtn);
@@ -1452,12 +1613,26 @@ theblock.co
         console.warn('[bulk-sync] fail', s.handle, e);
         failed++;
       }
+
+      // 源间随机延迟 (最后一个不延迟)
+      if (done < queue.length) {
+        var delay = S && S.randomDelay ? S.randomDelay() : 10000;
+        btn.textContent = `↻ ${done}/${queue.length} · 等待 ${Math.round(delay/1000)}s…`;
+        await new Promise(function(r) { setTimeout(r, delay); });
+      }
+
+      // 中途检查退避
+      if (S && S.isInBackoff()) {
+        skipped = queue.length - done;
+        if (window.__toast) window.__toast('触发全局限流, 剩余 ' + skipped + ' 个源已跳过', 'warn', 8000);
+        break;
+      }
     }
 
-    btn.textContent = `↻ 完成 ${success}/${targets.length}${failed ? ` · 失败 ${failed}` : ''}`;
+    btn.textContent = `↻ 完成 ${success}/${queue.length}${failed ? ` · 失败 ${failed}` : ''}${skipped ? ` · 跳过 ${skipped}` : ''}`;
     if (window.__reloadSourcesTable) await window.__reloadSourcesTable();
     if (window.__reloadFireFeed)     await window.__reloadFireFeed();
-    setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 6000);
+    setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 8000);
   }
 
   document.getElementById('btn-sync-all-pm').addEventListener('click', syncAllPM);

@@ -130,13 +130,16 @@ createServer(async (req, res) => {
         return;
       } else if (sub === '/api/twitter/user-timeline') {
         var h = url.searchParams.get('handle') || '';
-        args = ['twitter', 'tweets', h, '--limit', '50', '--format', 'json'];
+        var lim = url.searchParams.get('limit') || '100';
+        var topEng = url.searchParams.get('topByEngagement') || '0';
+        args = ['twitter', 'tweets', h, '--limit', lim, '--format', 'json'];
+        if (topEng !== '0') args.push('--top-by-engagement', topEng);
       } else if (sub === '/api/twitter/tweet') {
         var tweetUrl = url.searchParams.get('url') || '';
         // Extract username from URL, get recent tweets, client will filter by id
         var m = tweetUrl.match(/(?:x\.com|twitter\.com)\/([^/]+)/i);
         var user = m ? m[1] : '';
-        args = ['twitter', 'tweets', user, '--limit', '50', '--format', 'json'];
+        args = ['twitter', 'tweets', user, '--limit', '20', '--format', 'json'];
       } else if (sub === '/api/twitter/list-members') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, count: 0, members: [], note: 'list members not available via OpenCLI — paste handles manually' }));

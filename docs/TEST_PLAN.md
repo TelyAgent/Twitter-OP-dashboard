@@ -23,7 +23,7 @@ node src/serve.js
 | 1.2 | `/config.js` 正确注入 | 浏览器打开 `http://localhost:8080/config.js` | 返回 JS，定义 `window.PALLAX_CONFIG`（含 SUPABASE_URL/KEY）和 `window.DEEPSEEK_CONFIG`（含 API_KEY/BASE_URL） |
 | 1.3 | `.env` 缺 Key 时降级 | `.env` 中删除 `DEEPSEEK_API_KEY`，重启 serve.js | `/config.js` 中 `API_KEY` 为 `""`，serve.js 控制台输出 `WARN: DEEPSEEK_API_KEY not set` |
 | 1.4 | 根路径映射 | 浏览器打开 `http://localhost:8080/` | 显示 dashboard.html（数据复盘面板） |
-| 1.5 | HTML 页面服务 | 分别打开 `/dashboard.html` `/preview.html` `/radar.html` `/templates.html` `/sources.html` | 5 个页面均正常加载，无 404 |
+| 1.5 | HTML 页面服务 | 分别打开 `/dashboard.html` `/radar.html` `/templates.html` `/sources.html` | 4 个页面均正常加载，无 404 |
 | 1.6 | JS/CSS 静态资源 | 打开 `http://localhost:8080/src/styles.css` | 返回 CSS 文件 |
 | 1.7 | 目录遍历保护 | `curl http://localhost:8080/../.env` | 返回 403 |
 | 1.8 | 不存在路径 | `curl http://localhost:8080/nonexistent.html` | 返回 404 |
@@ -174,7 +174,7 @@ node src/serve.js
 
 | # | 测试项 | 操作 | 预期 |
 |---|--------|------|------|
-| 4.1 | 导航一致性 | 在所有 5 个页面之间点击顶部导航标签 | 正确跳转，活跃标签高亮 |
+| 4.1 | 导航一致性 | 在所有 4 个页面之间点击顶部导航标签 | 正确跳转，活跃标签高亮 |
 | 4.2 | Supabase 会话共享 | dashboard 登录后 → 打开 sources → 刷新 | sources 读取到同一 Supabase session 的 user_profile |
 | 4.3 | sources sync → radar 联动 | sources 中同步一个 source → 打开 radar | radar 显示新入库的热点 |
 | 4.4 | radar intel → templates 联动 | radar 中 AI 生成 intel → templates 中查看模板命中 | 关联数据一致 |
@@ -213,3 +213,12 @@ node src/serve.js
 | 7.3 | 超大推文数量 | 同步一个发了 100 条推文的账号 | 聚类正常完成，无浏览器卡死 |
 | 7.4 | 特殊字符 handle | 在批量导入输入 `@test_user_123` | 正确识别 |
 | 7.5 | localStorage 满 | 大量周报数据写入 | 保存失败时有提示，不静默丢数据 |
+
+---
+
+## 相关文档
+
+- [`docs/README.md`](README.md) — 文档索引
+- [`docs/SPEC.md`](SPEC.md) — 测试项来源（功能清单）
+- [`docs/product-logic.md`](product-logic.md) — 被测功能的业务逻辑
+- [`../ARCHITECTURE.md`](../ARCHITECTURE.md) — 共享模块 API 参考

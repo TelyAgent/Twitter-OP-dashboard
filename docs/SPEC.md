@@ -1,6 +1,8 @@
 # 产品功能清单
 
-> 2026-05-26 · `feature/refactor` 分支
+> 2026-05-30 · 全部 77 项功能端到端打通，0 项 Mock。
+>
+> **索引**：[`docs/README.md`](README.md) — 完整文档索引
 
 ## 页面总览
 
@@ -263,3 +265,12 @@
 - 自动汇总摘要
 - 手动评审入口
 - 表格摘要：显示数/总数、本周新增、退役、待 review
+
+---
+
+## 相关文档
+
+- [`docs/README.md`](README.md) — 文档索引
+- [`docs/product-logic.md`](product-logic.md) — 每项功能背后的业务逻辑
+- [`docs/TEST_PLAN.md`](TEST_PLAN.md) — 如何验证每项功能
+- [`../ARCHITECTURE.md`](../ARCHITECTURE.md) — 技术实现位置

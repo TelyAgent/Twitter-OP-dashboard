@@ -1,6 +1,8 @@
 # 架构文档
 
-> 本地优先的内容运营面板。静态 HTML + Supabase（远程持久化）+ DeepSeek API（云端 AI）+ OpenCLI Chrome 插件（数据抓取）。
+> 本地优先的内容运营面板。4 个静态 HTML 页面 + Supabase（远程持久化）+ DeepSeek API（云端 AI）+ OpenCLI Chrome 插件（数据抓取）。
+>
+> **索引**：[`docs/README.md`](docs/README.md) — 完整文档索引和阅读路径
 
 ## 系统拓扑
 
@@ -21,7 +23,6 @@ Magic Link 免密登录，无自建后端——完全依赖 Supabase Auth（BaaS
 | 页面 | 鉴权方式 | 说明 |
 |------|----------|------|
 | dashboard.html | Magic Link（Supabase Auth） | 需登录才能操作，`bootApp()` 检查 session |
-| preview.html | Magic Link（Supabase Auth） | 同 dashboard |
 | radar.html | anon RLS | 无需登录，直接读 Supabase |
 | templates.html | anon RLS | 无需登录，直接读 Supabase |
 | sources.html | anon RLS | 无需登录，直接读 Supabase |
@@ -85,9 +86,8 @@ src/
 │   ├── client.js                     ← window.AIClient: DeepSeek chat + embedding
 │   ├── pipeline.js                   ← window.AIPipeline: LLM 评分/分类/情报/模板
 │   └── prompts.js                    ← Prompt 模板（ES module）
-├── pages/                            ← 5 个 HTML 页面
+├── pages/                            ← 4 个 HTML 页面
 │   ├── dashboard.html                ← 周报复盘（supabase-js + chart.js）
-│   ├── preview.html                  ← 预览变体
 │   ├── radar.html                    ← 热点雷达
 │   ├── templates.html                ← 模板库
 │   └── sources.html                  ← 监控源管理
@@ -101,7 +101,6 @@ src/
 
 ```
 dashboard.html:  supabase-js, chart.js, /config.js
-preview.html:    supabase-js, chart.js, /config.js
 radar.html:      supabase-js, /config.js, content-ops.js, ai/client.js, ai/pipeline.js
 templates.html:  supabase-js, /config.js, content-ops.js, ai/client.js, ai/pipeline.js, provider.js
 sources.html:    supabase-js, /config.js, content-ops.js, provider.js
@@ -187,3 +186,12 @@ node src/serve.js      # → http://localhost:8080
 ```
 
 确保 Chrome 已装 OpenCLI 插件。
+
+## 相关文档
+
+- [`CLAUDE.md`](CLAUDE.md) — AI 代理工作指令（编码约定、GitNexus 工作流）
+- [`docs/README.md`](docs/README.md) — 完整文档索引和阅读路径
+- [`docs/product-logic.md`](docs/product-logic.md) — 产品逻辑详解（评分管线、数据流）
+- [`docs/SPEC.md`](docs/SPEC.md) — 产品功能清单
+- [`docs/TEST_PLAN.md`](docs/TEST_PLAN.md) — 手动测试计划
+- [`src/db/supabase_setup_v2.sql`](src/db/supabase_setup_v2.sql) — 权威数据库 schema

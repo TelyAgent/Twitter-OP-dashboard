@@ -1,8 +1,30 @@
 # 产品功能清单
 
-> 2026-05-30 · 全部 77 项功能端到端打通，0 项 Mock。
+> 2026-05-30 · 77 项功能中 73 项端到端打通，3 项 Mock 占位，1 项死代码。
 >
 > **索引**：[`docs/README.md`](README.md) — 完整文档索引
+
+## Mock 清单
+
+| 页面 | 功能 | 假数据类型 | 位置 |
+|------|------|-----------|------|
+| templates | "从爆款推文提炼"的爆款推文池 | `VIRAL_POOL` 8 条硬编码假推文（假 handle、假浏览数），作为默认提炼数据源 | `src/pages/templates.html:400` |
+| sources | AI 推荐卡片 | `/api/sources/ai-recommendations` → `src/api/ai-recommendations.json`，4 个候选人硬编码 | `src/serve.js:76` |
+| sources | 评审横幅 + 表格摘要 | `/api/sources/review-summary` → `src/api/review-summary.json`，日期/计数/文案全部硬编码 | `src/serve.js:67` |
+
+### 死代码
+
+| 位置 | 内容 |
+|------|------|
+| `sources.html:798` | `MOCK_LIST_MEMBERS` 常量（15 个假 handle），声明后从未引用 |
+
+### 修复计划
+
+| 优先级 | 功能 | 方案 |
+|--------|------|------|
+| P0 | 爆款推文提炼池 | `VIRAL_POOL` 替换为 DB 中 `hot_signal=true` 的真实推文（`allFire` 已加载，接入提炼流程即可） |
+| P1 | 评审摘要动态计算 | 从 `sources` 表聚合真实计数替换 `review-summary.json` |
+| P1 | AI 推荐真实化/移除 | 实现基于 `sources.metrics_4w` 的推荐算法，或删除 AI 推荐 UI 区块
 
 ## 页面总览
 
@@ -172,8 +194,8 @@
 
 ### 3.5 AI 提炼模板
 
-- 从爆款推文池选 Top 5 → AI 提炼骨架
-- 从爆款推文手工选推文 → AI 提炼骨架
+- 从爆款推文池选 Top 5 → AI 提炼骨架  **← Mock — `VIRAL_POOL` 硬编码 8 条假推文**
+- 从爆款推文手工选推文 → AI 提炼骨架  **← Mock（viral 模式）/ 已实现（url 粘贴模式）**
 - 提炼结果可编辑（分类、角度、骨架）
 - 勾选保存到模板库
 
@@ -256,15 +278,15 @@
 
 ### 4.9 AI 推荐
 
-- 展示 AI 推荐新增的监控源
+- 展示 AI 推荐新增的监控源  **← Mock — `/api/sources/ai-recommendations` 静态 JSON，4 个候选硬编码**
 - 操作按钮：加入主力 / 观察 / 忽略
 
 ### 4.10 评审管理
 
-- 评审日期横幅
-- 自动汇总摘要
+- 评审日期横幅  **← Mock — `/api/sources/review-summary` 静态 JSON，日期/文案硬编码**
+- 自动汇总摘要  **← Mock（同上）**
 - 手动评审入口
-- 表格摘要：显示数/总数、本周新增、退役、待 review
+- 表格摘要：显示数/总数、本周新增、退役、待 review  **← Mock — 数字硬编码，不从 `sources` 表实时计算**
 
 ---
 

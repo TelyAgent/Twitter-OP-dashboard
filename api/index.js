@@ -26,7 +26,16 @@ window.DEEPSEEK_CONFIG = {
 
 export default async function handler(req, res) {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-  const path = url.pathname;
+  let path = url.pathname;
+
+  // When invoked via catch-all rewrite, req.url may be the rewritten
+  // /api/index rather than the original request path. Recover original.
+  if (path === '/api/index') {
+    const original = req.headers['x-forwarded-path']
+      || req.headers['x-forwarded-uri']
+      || req.headers['x-original-uri'];
+    path = original || '/';
+  }
 
   try {
     // /config.js — inject runtime config

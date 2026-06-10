@@ -184,17 +184,18 @@
 <table class="kol-table">
 <thead>
 <tr>
-<th style="width:26%">账号 · 类型</th>
+<th style="width:22%">账号 · 类型</th>
 <th>7 天热点</th>
 <th>7 天走势</th>
 <th>爆款贡献</th>
 <th>状态</th>
 <th>添加人</th>
+<th>最近同步</th>
 <th>操作</th>
 </tr>
 </thead>
 <tbody id="sources-tbody">
-<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--color-text-tertiary);font-size: 12px">加载中…</td></tr>
+<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--color-text-tertiary);font-size: 12px">加载中…</td></tr>
 </tbody>
 </table>
 
@@ -407,6 +408,7 @@ theblock.co
         <td>${fireCell}</td>
         <td><span class="status ${st.cls}">${st.label}</span></td>
         <td><span class="uploader"><span class="uploader-av${uClass}">${u.initials}</span><span>${u.display_name}<div class="uploader-date">${dateStr}</div></span></span></td>
+        <td><span style="font-size:11px;color:${s.last_active_at ? 'var(--color-text-secondary)' : 'var(--color-text-tertiary)'}">${s.last_active_at ? ago(s.last_active_at) : '从未'}</span></td>
         <td>${syncBtn}${action}</td>
       </tr>
     `;
@@ -497,7 +499,7 @@ theblock.co
     var pageRows = visible.slice(start, start + PAGE_SIZE);
     var tbody = document.getElementById('sources-tbody');
     if (visible.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--color-text-tertiary);font-size: 12px">' + (rows.length === 0 ? '暂无监控源 · 用右上「↥ 批量导入」' : '当前过滤无匹配 (共 ' + rows.length + ' 条)') + '</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--color-text-tertiary);font-size: 12px">' + (rows.length === 0 ? '暂无监控源 · 用右上「↥ 批量导入」' : '当前过滤无匹配 (共 ' + rows.length + ' 条)') + '</td></tr>';
     } else {
       tbody.innerHTML = pageRows.map(renderSourceRow).join('');
     }

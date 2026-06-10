@@ -7,7 +7,7 @@
 ## 系统拓扑
 
 ```
-本地 node src/serve.js :8080          ← 静态服务，页面读自 src/pages/
+本地 node src/serve.js :8080          ← 静态服务 + 定时同步调度器
      OpenCLI Daemon :19825            ← Twitter 数据抓取（复用浏览器登录态）
 
 远程 Supabase  PostgreSQL             ← 纯持久化，anon RLS，无分析逻辑
@@ -80,6 +80,7 @@ ARCHITECTURE.md / CLAUDE.md           ← 文档（根目录）
 
 src/
 ├── serve.js                          ← Node 静态服务，读 .env → /config.js
+├── scheduler.js                      ← 服务端定时同步调度器（每日自动拉取 Twitter 源）
 ├── provider.js                       ← window.Provider: 数据抓取（OpenCLI）
 ├── content-ops.js                    ← window.ContentOps: 启发式分析（纯函数）
 ├── ai/
@@ -112,6 +113,8 @@ sources.html:    supabase-js, /config.js, content-ops.js, provider.js
 
 ### serve.js
 Node 内置 HTTP 模块，读 `.env` → `/config.js`（注入 `window.PALLAX_CONFIG` + `window.DEEPSEEK_CONFIG`），`/` → `src/pages/dashboard.html`。代理 OpenCLI 命令（`/api/opencli/*` → `opencli` CLI），负责读取 URL 参数（`limit`、`topByEngagement`）并传递给 opencli。仅使用 opencli 实际支持的 flag（`--limit`、`--top-by-engagement`、`--format`），不使用不存在的 `--hours`。
+
+启动时自动加载 `scheduler.js` → 每日定时同步 Twitter 源推文到 hotspots。详见 [`docs/scheduler.md`](docs/scheduler.md)。
 
 ### provider.js → `window.Provider`
 
@@ -192,6 +195,7 @@ node src/serve.js      # → http://localhost:8080
 - [`CLAUDE.md`](CLAUDE.md) — AI 代理工作指令（编码约定、GitNexus 工作流）
 - [`docs/README.md`](docs/README.md) — 完整文档索引和阅读路径
 - [`docs/product-logic.md`](docs/product-logic.md) — 产品逻辑详解（评分管线、数据流）
+- [`docs/scheduler.md`](docs/scheduler.md) — 定时同步调度器
 - [`docs/SPEC.md`](docs/SPEC.md) — 产品功能清单
 - [`docs/TEST_PLAN.md`](docs/TEST_PLAN.md) — 手动测试计划
 - [`src/db/supabase_setup_v2.sql`](src/db/supabase_setup_v2.sql) — 权威数据库 schema

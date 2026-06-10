@@ -6,6 +6,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { readFileSync, existsSync } from 'node:fs';
 import { extname } from 'node:path';
+import { runSync } from './scheduler.js';
 
 const PORT = process.env.PORT || 8080;
 const ROOT = process.cwd();
@@ -167,6 +168,22 @@ createServer(async (req, res) => {
       log(req.method, path, 502, String(msg).slice(0, 80));
       res.writeHead(502);
       res.end(JSON.stringify({ ok: false, error: String(msg).slice(0, 500) }));
+    }
+    return;
+  }
+
+  // /api/sync — trigger a full sync run
+  if (path === '/api/sync' && req.method === 'POST') {
+    log(req.method, path, '…', 'triggered');
+    try {
+      const result = await runSync();
+      log(req.method, path, 200, JSON.stringify(result));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (e) {
+      log(req.method, path, 500, String(e.message).slice(0, 80));
+      res.writeHead(500);
+      res.end(JSON.stringify({ error: String(e.message) }));
     }
     return;
   }

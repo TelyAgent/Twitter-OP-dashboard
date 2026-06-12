@@ -1,100 +1,60 @@
 # CLAUDE.md
 
-本文件为 Claude Code 在此仓库中工作时提供指引。
+本地产品面板：4 个静态 HTML + Node.js 静态服务，Supabase 持久化，DeepSeek AI 推理，OpenCLI 抓取 Twitter。
 
-## 项目形态
-
-本地优先的产品面板。4 个静态 HTML 页面 + 极简 Node.js 静态服务，Supabase 远程持久化，DeepSeek API 云端 AI 推理，OpenCLI Chrome 插件抓取 Twitter 数据。
-
-```
-src/pages/*.html  ──supabase-js──→  Supabase（远程，仅持久化，anon RLS）
-src/pages/*.html  ──fetch────────→  DeepSeek API（云端 LLM）
-src/pages/*.html  ──fetch────────→  OpenCLI Daemon :19825（数据抓取）
-src/scheduler.js  ──execSync────→  OpenCLI CLI（定时批量抓取）
-src/scheduler.js  ──fetch────────→  Supabase REST API（热点写入）
-```
-
-## 常用命令
+## 命令
 
 ```bash
-cp .env.example .env       # 填入 DEEPSEEK_API_KEY
-node src/serve.js          # → http://localhost:8080
+cp .env.example .env            # 填入 SUPABASE_* / DEEPSEEK_API_KEY
+node src/serve.js               # → http://localhost:8080
+node scripts/test-sync-one.js <handle>   # 单源同步测试
+curl -X POST http://localhost:8080/api/sync  # 手动触发全量同步（或 node scripts/run-sync.js）
+vercel --prod                   # 发布到 Vercel
 ```
 
-OpenCLI Daemon 随 Chrome 插件自动启动。DeepSeek API 由浏览器 JS 直接调用。
+同步依赖 OpenCLI CLI + Chrome 插件（Daemon :19825），Vercel 不可用。
 
-## 架构
+## 模块
 
-### 前端结构
-
-每个页面是几乎独立的 HTML 文档：大段内联 CSS、大段内联 JS、直接 DOM 操作、页面本地可变状态。逻辑分散在多个 IIFE 中。编辑 UI 行为前先通读整个页面。
-
-### 共享模块（`src/`，通过 `<script>` 加载，暴露 `window.*`）
+**浏览器端** (`<script>` 加载，`window.*`)：
 
 | 文件 | 全局 | 职责 |
 |------|------|------|
-| `src/provider.js` | `window.Provider` | OpenCLI 数据抓取（fetchTweetsByHandle / fetchSingleTweet / fetchListMembers） |
-| `src/content-ops.js` | `window.ContentOps` | 启发式分析：分类/聚类/评分/模板提取（纯函数，无 I/O） |
-| `src/ai/client.js` | `window.AIClient` | DeepSeek API 封装（chat / embed / cosineSimilarity） |
-| `src/ai/pipeline.js` | `window.AIPipeline` | AI 分析管线（scoreCluster / classifyBatch / generateIntel / extractTemplates / fillTemplate / runPipeline） |
-
-### 服务端模块（`src/`，Node.js，不在浏览器加载）
-
-| 文件 | 职责 |
-|------|------|
-| `src/serve.js` | 静态服务 + OpenCLI 代理 + 启动调度器 |
-| `src/scheduler.js` | 每日定时同步 Twitter 源推文 → hotspots（限流/重试/去重） |
+| `src/provider.js` | `Provider` | 数据抓取（OpenCLI） |
+| `src/content-ops.js` | `ContentOps` | 启发式分析：分类/聚类/评分（纯函数） |
+| `src/ai/client.js` | `AIClient` | DeepSeek API |
+| `src/ai/pipeline.js` | `AIPipeline` | AI 分析管线，LLM 失败自动降级到 ContentOps |
 
 加载顺序：`/config.js → content-ops.js → ai/client.js → ai/pipeline.js → provider.js`
 
-### 持久化：localStorage + Supabase
+**服务端** (Node.js)：
 
-- dashboard：localStorage 离线优先 → Supabase 异步同步（teams / schemas / weekly_data）
-- sources/radar/templates：直接 Supabase 读写（sources / hotspots / templates / template_uses）
-- 全部 `anon` RLS，无需认证
-
-### AI 双轨策略
-
-每个分析任务 LLM 主路径 + 启发式回退。LLM 失败时自动降级到 `ContentOps.*`。
-
-### 数据库
-
-权威 schema：`src/db/supabase_setup_v2.sql`（v3，anon RLS，无 trigger/view 分析逻辑）
-
-## 功能边界
-
-| 页面 | 功能 |
+| 文件 | 职责 |
 |------|------|
-| `src/pages/dashboard.html` | 周报复盘、产品组管理、NSM、漏斗指标、任务、复盘 |
-| `src/pages/sources.html` | 监控源管理、批量导入、单源同步、PM 相关度、分页、限流安全 |
-| `src/pages/radar.html` | 热点池、AI 情报、评分排序 |
-| `src/pages/templates.html` | 模板矩阵、AI 提炼/填充、使用追踪 |
+| `src/serve.js` | 静态服务 + OpenCLI 代理 + 启动每日定时同步 |
+| `src/scheduler.js` | 定时同步：opencli 抓取 → 聚类评分 → Supabase hotspots 写入（限流/重试/24h 去重） |
 
-## OpenCLI 命令语法
+## 数据
 
-- 正确命令：`opencli twitter tweets <handle>`（非 `user-timeline`）
-- 可用 flag：`--limit`、`--top-by-engagement`、`--format`
-- 不存在：`--hours`、`--handle`、`twitter tweet`、`twitter list-members`
+- dashboard：localStorage 离线优先 → Supabase 异步同步
+- sources/radar/templates：直接 Supabase 读写
+- 全部 `anon` RLS，无需认证
+- 权威 schema：`src/db/supabase_setup_v2.sql`
 
-## 限流安全
+## OpenCLI 语法
 
-- 单次拉取上限 `FETCH_LIMIT=100`，互动截断 `TOP_BY_ENGAGEMENT=30`
-- 24h 同源去重（localStorage 缓存上次同步时间）
-- 429/403 → 全局 10 分钟退避（固定，不递进）
-- 批量同步源间随机延迟 8-25s，单次上限 20 个
+```
+opencli twitter tweets <handle> --limit N --format json --top-by-engagement N
+```
+
+不存在：`--hours`、`--handle`、`twitter tweet`、`twitter list-members`、`user-timeline`
 
 ## 工作约定
 
-- 优先在现有页面内做小范围编辑，直接 DOM 更新，内联脚本
-- 修改字段名前先检查 `src/db/supabase_setup_v2.sql`
+- 页面内小范围编辑，直接 DOM 操作，内联脚本
 - 共享逻辑放 `src/`，页面特有逻辑保留内联
-- AI 分析调用经 `src/ai/client.js` → DeepSeek API
-- Prompt 变更仅在 `src/ai/prompts.js`
-- Supabase 仅持久化 — 无 trigger/function/view 分析逻辑
-
-## 文档
-
-- [`docs/README.md`](docs/README.md) — 完整文档索引（功能清单 / 产品逻辑 / 测试计划 / 架构）
+- 改字段名前查 `src/db/supabase_setup_v2.sql`
+- Prompt 变更仅限 `src/ai/prompts.js`
 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence

@@ -6,7 +6,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { readFileSync, existsSync } from 'node:fs';
 import { extname } from 'node:path';
-import { runSync } from './scheduler.js';
+import { runSync, syncState, stopSync } from './scheduler.js';
 
 const PORT = process.env.PORT || 8080;
 const ROOT = process.cwd();
@@ -48,6 +48,7 @@ try {
 const CONFIG_JS = `window.PALLAX_CONFIG = {
   SUPABASE_URL: ${JSON.stringify(SUPABASE_URL)},
   SUPABASE_KEY: ${JSON.stringify(SUPABASE_KEY)},
+  IS_VERCEL: false,
 };
 window.DEEPSEEK_CONFIG = {
   API_KEY: ${JSON.stringify(DEEPSEEK_API_KEY)},
@@ -185,6 +186,67 @@ createServer(async (req, res) => {
       res.writeHead(500);
       res.end(JSON.stringify({ error: String(e.message) }));
     }
+    return;
+  }
+
+  // /api/sync/status — poll current sync state
+  if (path === '/api/sync/status' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(syncState));
+    return;
+  }
+
+  // /api/sync/stop — request stop
+  if (path === '/api/sync/stop' && req.method === 'POST') {
+    stopSync();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true }));
+    return;
+  }
+
+  // /api/sync/env — environment check
+  if (path === '/api/sync/env' && req.method === 'GET') {
+    const result = { opencli: false, daemon: false, supabase: false, env: false, sourcesCount: 0, errors: {} };
+
+    // Check .env
+    result.env = !!(SUPABASE_URL && SUPABASE_KEY);
+
+    // Check opencli CLI
+    try {
+      const { execSync } = await import('node:child_process');
+      execSync('opencli --version', { timeout: 5000, stdio: 'pipe' });
+      result.opencli = true;
+    } catch (e) {
+      result.errors.opencli = String(e.stderr || e.message).slice(0, 100);
+    }
+
+    // Check opencli daemon
+    try {
+      const dc = await fetch('http://localhost:19825', { signal: AbortSignal.timeout(3000) });
+      result.daemon = dc.ok || dc.status < 500;
+    } catch (e) {
+      result.errors.daemon = String(e.message).slice(0, 100);
+    }
+
+    // Check Supabase
+    if (result.env) {
+      try {
+        const r = await fetch(SUPABASE_URL + '/rest/v1/sources?select=id&type=eq.twitter&status=neq.retired', {
+          headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, Prefer: 'count=exact' },
+          signal: AbortSignal.timeout(5000),
+        });
+        result.supabase = r.ok;
+        if (r.ok) {
+          const cnt = r.headers.get('content-range');
+          result.sourcesCount = cnt ? parseInt(cnt.split('/')[1]) : 0;
+        }
+      } catch (e) {
+        result.errors.supabase = String(e.message).slice(0, 100);
+      }
+    }
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(result));
     return;
   }
 

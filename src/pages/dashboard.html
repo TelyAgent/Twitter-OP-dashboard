@@ -567,6 +567,7 @@ details.wr-collapsible[open] summary { color: var(--ink-2); margin-bottom: 8px; 
     <a href="radar.html" class="pg-tab"><span class="ic">◉</span>热点雷达</a>
     <a href="templates.html" class="pg-tab"><span class="ic">◫</span>模板库</a>
     <a href="sources.html" class="pg-tab"><span class="ic">⊙</span>监控源</a>
+    <a href="sync-admin.html" class="pg-tab" id="nav-sync-admin"><span class="ic">⚙</span>同步管理</a>
   </div>
 </nav>
 <div class="wr-shell">
@@ -1875,5 +1876,8 @@ details.wr-collapsible[open] summary { color: var(--ink-2); margin-bottom: 8px; 
 </div>
 
 </div><!-- /.wr-shell -->
+<script>
+if (window.PALLAX_CONFIG?.IS_VERCEL) document.getElementById('nav-sync-admin')?.remove();
+</script>
 </body>
 </html>

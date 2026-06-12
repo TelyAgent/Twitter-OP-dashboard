@@ -462,6 +462,37 @@ async function syncOneSource(source, retriesLeft) {
   return { status: 'ok', tweets: normalized.length, hotspots: inserted, errors };
 }
 
+// ─── Shared sync state (polled by admin page) ───────────────────────
+const syncState = {
+  running: false,
+  stopRequested: false,
+  queue: [],
+  current: null,
+  done: 0,
+  failed: 0,
+  skipped: 0,
+  total: 0,
+  entries: [],
+  startTime: null,
+};
+
+function resetSyncState(queue) {
+  syncState.running = true;
+  syncState.stopRequested = false;
+  syncState.queue = queue.map(s => ({ handle: s.handle.replace(/^@/, ''), sourceId: s.id }));
+  syncState.current = null;
+  syncState.done = 0;
+  syncState.failed = 0;
+  syncState.skipped = 0;
+  syncState.total = queue.length;
+  syncState.entries = syncState.queue.map(q => ({ handle: q.handle, status: 'pending' }));
+  syncState.startTime = Date.now();
+}
+
+function stopSync() {
+  syncState.stopRequested = true;
+}
+
 // ─── Concurrency guard ──────────────────────────────────────────────
 let syncing = false;
 
@@ -489,11 +520,13 @@ async function runSync() {
       log('加载到 ' + (sources ? sources.length : 0) + ' 个 twitter 源');
     } catch (e) {
       log('加载源失败: ' + e.message);
+      syncState.running = false;
       return { ok: 0, failed: 0, skipped: 0, error: e.message };
     }
 
     if (!sources || sources.length === 0) {
       log('没有待同步的源');
+      syncState.running = false;
       return { ok: 0, failed: 0, skipped: 0 };
     }
 
@@ -506,36 +539,71 @@ async function runSync() {
       log('截断至 ' + queue.length + ' 个源 (上限 ' + ENV.SYNC_BATCH_MAX + ')');
     }
 
+    resetSyncState(queue);
+
     // 3. Sequential sync with delays
     let done = 0;
     for (const s of queue) {
+      if (syncState.stopRequested) {
+        log('收到停止请求, 终止同步');
+        syncState.queue.filter(q => q.status === 'pending').forEach(q => {
+          q.status = 'skipped'; q.error = 'stopped';
+        });
+        break;
+      }
+
       done++;
       log('[' + done + '/' + queue.length + '] ' + s.handle);
 
+      const handle = s.handle.replace(/^@/, '');
+      syncState.current = handle;
+      const entry = syncState.entries.find(e => e.handle === handle);
+      if (entry) entry.status = 'running';
+
       if (isInBackoff()) {
         skipped = queue.length - done + 1;
+        for (const q of syncState.entries) {
+          if (q.status === 'pending') { q.status = 'skipped'; q.error = 'backoff'; }
+        }
         log('触发全局限流, 剩余 ' + skipped + ' 个源跳过');
         break;
       }
 
+      const t0 = Date.now();
       const result = await syncOneSource(s, ENV.SYNC_MAX_RETRIES);
+      if (entry) {
+        entry.status = result.status;
+        entry.tweets = result.tweets || 0;
+        entry.hotspots = result.hotspots || 0;
+        entry.error = result.error || '';
+        entry.time = Date.now() - t0;
+      }
+
       if (result.status === 'ok') ok++;
       else if (result.status === 'failed') failed++;
       else skipped++;
 
-      // Inter-source delay (skip after last)
-      if (done < queue.length && !isInBackoff()) {
+      syncState.done = ok;
+      syncState.failed = failed;
+      syncState.skipped = skipped + (syncState.entries.filter(e => e.status === 'skipped' && !e.error).length || 0);
+      // recalc skipped: all non-ok non-failed in entries
+      syncState.skipped = syncState.entries.filter(e => e.status !== 'ok' && e.status !== 'failed' && e.status !== 'pending' && e.status !== 'running').length;
+
+      // Inter-source delay (skip after last, skip if stopped)
+      if (done < queue.length && !isInBackoff() && !syncState.stopRequested) {
         const delay = randomDelay();
         log('  等待 ' + Math.round(delay / 1000) + 's…');
         await sleep(delay);
       }
     }
 
+    syncState.current = null;
+    syncState.running = false;
     log('=== 同步完成: ' + ok + ' 成功, ' + failed + ' 失败, ' + skipped + ' 跳过 ===');
-    return { ok, failed, skipped, sources_total: sourcesTotal };
+    return { ok, failed, skipped: syncState.skipped, sources_total: sourcesTotal };
   } finally {
     syncing = false;
   }
 }
 
-export { runSync };
+export { runSync, syncState, stopSync };

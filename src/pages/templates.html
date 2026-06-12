@@ -92,6 +92,7 @@
     <a href="radar.html" class="nav-item"><span class="ic">◉</span>热点雷达</a>
     <a href="templates.html" class="nav-item active"><span class="ic">◫</span>模板库</a>
     <a href="sources.html" class="nav-item"><span class="ic">⊙</span>监控源</a>
+    <a href="sync-admin.html" class="nav-item" id="nav-sync-admin"><span class="ic">⚙</span>同步管理</a>
   </div>
 </nav>
 <main class="main">
@@ -1433,6 +1434,8 @@ https://twitter.com/PolymarketWhale/status/1234567890123456789"></textarea>
   });
 })();
 </script>
-
+<script>
+if (window.PALLAX_CONFIG?.IS_VERCEL) document.getElementById('nav-sync-admin')?.remove();
+</script>
 </body>
 </html>

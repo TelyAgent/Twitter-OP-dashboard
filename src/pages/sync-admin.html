@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>同步管理</title>
+<link rel="stylesheet" href="src/styles.css">
+<style>
+.env-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:16px}
+.env-card{border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);padding:12px 14px}
+.env-card .label{font-size:11px;color:var(--color-text-tertiary);margin-bottom:4px}
+.env-card .value{font-size:13px;font-weight:500}
+.env-card.ok{border-color:#2DA44E;background:#F0FAF2}
+.env-card.fail{border-color:#CF222E;background:#FFF0F0}
+.env-card .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px}
+.env-card.ok .dot{background:#2DA44E}
+.env-card.fail .dot{background:#CF222E}
+
+.ctrl-bar{display:flex;gap:8px;margin-bottom:14px;align-items:center}
+.btn{padding:7px 16px;border-radius:var(--border-radius-md);font-size:12px;font-weight:500;cursor:pointer;border:none}
+.btn-start{background:#534AB7;color:#fff}
+.btn-stop{background:#CF222E;color:#fff}
+.btn-retry{background:#BA7517;color:#fff}
+.btn:disabled{opacity:0.4;cursor:not-allowed}
+
+.prog-wrap{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:12px 14px;margin-bottom:14px}
+.prog-bar{height:6px;background:#E0E0E0;border-radius:3px;overflow:hidden;margin-bottom:8px}
+.prog-fill{height:100%;background:#534AB7;border-radius:3px;transition:width 0.3s}
+.prog-stats{display:flex;gap:16px;font-size:12px;flex-wrap:wrap}
+.prog-stats span{color:var(--color-text-secondary)}
+.prog-stats b{color:var(--color-text-primary)}
+.prog-current{font-size:11px;color:var(--color-text-tertiary);margin-top:4px}
+
+.log-table{width:100%;border-collapse:collapse;font-size:12px}
+.log-table th{text-align:left;padding:6px 8px;border-bottom:0.5px solid var(--color-border-secondary);font-size:11px;color:var(--color-text-tertiary);font-weight:500}
+.log-table td{padding:5px 8px;border-bottom:0.5px solid var(--color-border-tertiary)}
+.log-table .st-ok{color:#2DA44E}
+.log-table .st-fail{color:#CF222E}
+.log-table .st-skip{color:var(--color-text-tertiary)}
+.log-table .st-run{color:#534AB7;font-weight:500}
+.log-table .st-pend{color:var(--color-text-tertiary)}
+</style>
+</head>
+<body>
+<div class="app">
+<nav class="topnav">
+  <div class="topnav-brand">
+    <div class="logo">P</div>
+    <div class="name">内容工厂</div>
+  </div>
+  <div class="topnav-tabs">
+    <a href="dashboard.html" class="nav-item">数据复盘</a>
+    <a href="radar.html" class="nav-item">热点雷达</a>
+    <a href="templates.html" class="nav-item">模板库</a>
+    <a href="sources.html" class="nav-item">监控源</a>
+    <a href="sync-admin.html" class="nav-item active" id="nav-sync-admin">同步管理</a>
+  </div>
+</nav>
+<main class="main">
+<div class="page-header">
+  <div><h1 style="margin:0;font-size:18px">同步管理</h1></div>
+</div>
+<div class="card" style="padding:14px 16px">
+  <div class="card-head" style="margin-bottom:10px"><span class="card-title">环境检测</span> <button class="btn btn-ghost" onclick="checkEnv()" style="font-size:11px;margin-left:auto">⟳ 重新检测</button></div>
+  <div class="env-grid" id="env-grid">
+    <div class="env-card"><div class="label">OpenCLI CLI</div><div class="value">检测中…</div></div>
+    <div class="env-card"><div class="label">OpenCLI Daemon :19825</div><div class="value">检测中…</div></div>
+    <div class="env-card"><div class="label">Supabase</div><div class="value">检测中…</div></div>
+    <div class="env-card"><div class="label">.env 配置</div><div class="value">检测中…</div></div>
+  </div>
+</div>
+
+<div class="card" style="padding:14px 16px;margin-top:14px">
+  <div class="card-head" style="margin-bottom:10px"><span class="card-title">同步控制</span></div>
+  <div class="ctrl-bar">
+    <button class="btn btn-start" id="btn-start" onclick="startSync()">▶ 开始同步</button>
+    <button class="btn btn-stop" id="btn-stop" onclick="stopSync()" disabled>⏹ 停止</button>
+    <button class="btn btn-retry" id="btn-retry" onclick="retryFailed()" disabled>↻ 重试失败</button>
+  </div>
+  <div class="prog-wrap" id="prog-wrap" style="display:none">
+    <div class="prog-bar"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+    <div class="prog-stats">
+      <span>进度: <b id="prog-pct">0%</b></span>
+      <span>成功: <b id="prog-ok">0</b></span>
+      <span>失败: <b id="prog-fail">0</b></span>
+      <span>跳过: <b id="prog-skip">0</b></span>
+      <span>总计: <b id="prog-total">0</b></span>
+    </div>
+    <div class="prog-current" id="prog-current"></div>
+  </div>
+</div>
+
+<div class="card" style="padding:14px 16px;margin-top:14px">
+  <div class="card-head" style="margin-bottom:10px"><span class="card-title">执行日志</span></div>
+  <div id="log-wrap" style="max-height:480px;overflow-y:auto">
+    <table class="log-table">
+      <thead><tr><th>账号</th><th>状态</th><th>推文</th><th>热点</th><th>耗时</th><th>备注</th></tr></thead>
+      <tbody id="log-tbody"><tr><td colspan="6" style="text-align:center;padding:16px;color:var(--color-text-tertiary)">等待同步…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+</main>
+</div>
+
+<script>
+(function() {
+var pollTimer = null;
+
+function $(id) { return document.getElementById(id); }
+
+function setEnvCard(idx, ok, label, detail, err) {
+  var cards = document.querySelectorAll('#env-grid .env-card');
+  var card = cards[idx];
+  card.className = 'env-card ' + (ok ? 'ok' : 'fail');
+  var status = ok ? '<span class="dot"></span>正常' : '<span class="dot"></span>异常';
+  var d = detail ? ' — ' + detail : '';
+  var e = (!ok && err) ? '<div style="font-size:10px;color:#CF222E;margin-top:2px">' + err + '</div>' : '';
+  card.querySelector('.value').innerHTML = status + d + e;
+}
+
+window.checkEnv = async function() {
+  var cards = document.querySelectorAll('#env-grid .env-card');
+  for (var i=0;i<4;i++) { cards[i].querySelector('.value').textContent = '检测中…'; cards[i].className = 'env-card'; }
+  try {
+    var r = await fetch('/api/sync/env');
+    var d = await r.json();
+    setEnvCard(0, d.opencli, 'OpenCLI CLI', '', d.errors.opencli);
+    setEnvCard(1, d.daemon, 'Daemon :19825', '', d.errors.daemon);
+    setEnvCard(2, d.supabase, 'Supabase', d.sourcesCount + ' 源', d.errors.supabase);
+    setEnvCard(3, d.env, '.env', '', d.errors.env || (d.env ? '' : '缺少 SUPABASE_URL/KEY'));
+    if (d.opencli) document.getElementById('btn-start').disabled = false;
+  } catch(e) {
+    for (var i=0;i<4;i++) setEnvCard(i, false, '检测失败', '', e.message);
+  }
+};
+
+function pollStatus() {
+  fetch('/api/sync/status').then(function(r){return r.json()}).then(function(s){
+    if (!s.running && !pollTimer) return; // not started
+    renderProgress(s);
+    renderLog(s.entries);
+    if (!s.running) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+      $('btn-start').disabled = false;
+      $('btn-stop').disabled = true;
+      if (s.entries.some(function(e){return e.status==='failed'})) {
+        $('btn-retry').disabled = false;
+      }
+    }
+  }).catch(function(){});
+}
+
+function renderProgress(s) {
+  $('prog-wrap').style.display = 'block';
+  var total = s.total || 0;
+  var processed = s.done + s.failed + s.skipped;
+  var pct = total > 0 ? Math.round(processed / total * 100) : 0;
+  $('prog-fill').style.width = pct + '%';
+  $('prog-pct').textContent = pct + '%';
+  $('prog-ok').textContent = s.done;
+  $('prog-fail').textContent = s.failed;
+  $('prog-skip').textContent = s.skipped;
+  $('prog-total').textContent = total;
+  $('prog-current').textContent = s.current ? '当前: @' + s.current : (s.running ? '' : '完成');
+}
+
+function renderLog(entries) {
+  if (!entries || !entries.length) return;
+  var rows = entries.map(function(e){
+    var cls = 'st-' + ({ok:'ok',failed:'fail',skipped:'skip',running:'run',pending:'pend'}[e.status]||'pend');
+    var statusLabel = {ok:'成功',failed:'失败',skipped:'跳过',running:'进行中',pending:'等待'}[e.status]||e.status;
+    var timeStr = e.time ? (e.time > 1000 ? Math.round(e.time/1000)+'s' : e.time+'ms') : '';
+    var errStr = e.error ? e.error.slice(0,60) : '';
+    return '<tr><td>@' + e.handle + '</td><td class="'+cls+'">'+statusLabel+'</td><td>'+(e.tweets||'')+'</td><td>'+(e.hotspots||'')+'</td><td>'+timeStr+'</td><td style="font-size:10px;color:var(--color-text-tertiary)">'+errStr+'</td></tr>';
+  }).reverse().join('');
+  $('log-tbody').innerHTML = rows;
+}
+
+window.startSync = async function() {
+  $('btn-start').disabled = true;
+  $('btn-retry').disabled = true;
+  $('btn-stop').disabled = false;
+  $('log-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:16px;color:var(--color-text-tertiary)">开始同步…</td></tr>';
+  try {
+    var r = await fetch('/api/sync', { method: 'POST' });
+    if (r.ok) {
+      pollTimer = setInterval(pollStatus, 1500);
+      pollStatus();
+    } else {
+      var d = await r.json();
+      $('log-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:16px;color:#CF222E">启动失败: ' + (d.error||'') + '</td></tr>';
+      $('btn-start').disabled = false;
+      $('btn-stop').disabled = true;
+    }
+  } catch(e) {
+    $('log-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:16px;color:#CF222E">请求失败: ' + e.message + '</td></tr>';
+    $('btn-start').disabled = false;
+    $('btn-stop').disabled = true;
+  }
+};
+
+window.stopSync = async function() {
+  $('btn-stop').disabled = true;
+  await fetch('/api/sync/stop', { method: 'POST' });
+};
+
+window.retryFailed = async function() {
+  $('btn-start').disabled = true;
+  $('btn-retry').disabled = true;
+  $('btn-stop').disabled = false;
+  // Use POST /api/sync — the 24h cooldown prevents re-sync of ok entries anyway.
+  // For true retry-only-failed, we'd need a new endpoint. Simple approach: restart.
+  try {
+    var r = await fetch('/api/sync', { method: 'POST' });
+    if (r.ok) {
+      pollTimer = setInterval(pollStatus, 1500);
+      pollStatus();
+    }
+  } catch(e) {}
+};
+
+// Init
+checkEnv();
+})();
+</script>
+<script>
+if (window.PALLAX_CONFIG?.IS_VERCEL) document.getElementById('nav-sync-admin')?.remove();
+</script>
+</body>
+</html>

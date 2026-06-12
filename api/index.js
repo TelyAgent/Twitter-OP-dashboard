@@ -17,6 +17,7 @@ const MIME = {
 const CONFIG_JS = `window.PALLAX_CONFIG = {
   SUPABASE_URL: ${JSON.stringify(process.env.SUPABASE_URL || '')},
   SUPABASE_KEY: ${JSON.stringify(process.env.SUPABASE_KEY || '')},
+  IS_VERCEL: true,
 };
 window.DEEPSEEK_CONFIG = {
   API_KEY: ${JSON.stringify(process.env.DEEPSEEK_API_KEY || '')},
@@ -91,6 +92,18 @@ export default async function handler(req, res) {
       res.writeHead(503, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'OpenCLI proxy unavailable on Vercel. Use local dev server.' }));
       return;
+    }
+
+    // /api/sync* — management endpoints, not available on Vercel
+    if (path.startsWith('/api/sync')) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Sync management unavailable on Vercel. Use local dev server.' }));
+      return;
+    }
+
+    // sync-admin.html — management page, not published on Vercel
+    if (path === '/sync-admin.html') {
+      res.writeHead(404); res.end('404'); return;
     }
 
     // Security: block sensitive paths

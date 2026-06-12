@@ -1,21 +1,29 @@
-// src/scheduler.js — daily sync scheduler for imported Twitter accounts.
-// Runs in serve.js process. Fetches tweets via opencli, clusters/scoring
-// (ported from content-ops.js), upserts hotspots + updates source metrics via
-// Supabase REST API.
+// scheduler.js — daily batch sync for imported Twitter accounts.
+//
+// Runs inside serve.js. Fetches tweets via opencli, clusters/scores
+// (logic ported from content-ops.js), upserts hotspots + updates source
+// metrics via Supabase REST API.
+//
+// Also exposes live syncState for the sync-admin.html management page,
+// supports stop-via-API, breakpoint checkpointing, and 24h cooldown
+// dedup (persisted to disk across restarts).
 //
 // Configuration (env vars, all optional):
-//   SYNC_HOUR=2              hour of day to run (0-23, default 2 = 2 AM)
+//   SYNC_HOUR=2              hour of day to run (0-23, default 2)
 //   SYNC_MAX_RETRIES=3       max retries per source on failure
-//   SYNC_FETCH_LIMIT=100     tweets per source
+//   SYNC_FETCH_LIMIT=100    tweets per source
 //   SYNC_TOP_ENGAGEMENT=30   engagement cutoff
 //   SYNC_BATCH_MAX=20        max sources per run
 //   SYNC_DELAY_MIN=8000      min inter-source delay ms
 //   SYNC_DELAY_MAX=25000     max inter-source delay ms
 
-import { execSync } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
+import { exec } from 'node:child_process';
+import { readFileSync, existsSync, writeFileSync, unlinkSync } from 'node:fs';
 
-// ─── Config from env ────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════
+// 1. INFRASTRUCTURE – config, logging, Supabase client
+// ══════════════════════════════════════════════════════════════════════
+
 const ROOT = process.cwd();
 
 function readEnv() {
@@ -41,7 +49,6 @@ function readEnv() {
         if (eq === -1) continue;
         const key = trimmed.slice(0, eq).trim();
         let val = trimmed.slice(eq + 1).trim();
-        // Strip inline comments (space+# followed by comment). Safe for URLs/numbers.
         const hashIdx = val.search(/\s+#/);
         if (hashIdx !== -1) val = val.slice(0, hashIdx).trim();
         if (key in vars) {
@@ -56,10 +63,17 @@ function readEnv() {
 
 const ENV = readEnv();
 
-// ─── Logging ────────────────────────────────────────────────────────
+// ── logging ──────────────────────────────────────────────────────────
+const LOG_MAX = 200;
+
 function log(msg) {
   const ts = new Date().toLocaleTimeString('zh-CN', { hour12: false });
-  console.log('[scheduler ' + ts + '] ' + msg);
+  const line = '[' + ts + '] ' + msg;
+  console.log(line);
+  if (syncState.logs) {
+    syncState.logs.push(line);
+    if (syncState.logs.length > LOG_MAX) syncState.logs.shift();
+  }
 }
 
 function nowMinute() {
@@ -68,7 +82,7 @@ function nowMinute() {
   return d.toISOString();
 }
 
-// ─── Supabase REST client ───────────────────────────────────────────
+// ── Supabase REST client ─────────────────────────────────────────────
 function sb(path, opts) {
   const url = ENV.SUPABASE_URL + '/rest/v1/' + path;
   const headers = {
@@ -90,19 +104,41 @@ async function sbJSON(path, opts) {
   return text ? JSON.parse(text) : null;
 }
 
-// ─── OpenCLI ────────────────────────────────────────────────────────
-function opencliTweets(handle, limit, topEng) {
+// ══════════════════════════════════════════════════════════════════════
+// 2. DATA PROCESSING – opencli, tweet normalization, clustering/scoring
+//    (pure functions ported from src/content-ops.js)
+// ══════════════════════════════════════════════════════════════════════
+
+// ── OpenCLI (async, so event loop stays free for stop requests) ─────
+let activeOpenCLIProcess = null;
+
+async function opencliTweets(handle, limit, topEng) {
   const args = ['opencli', 'twitter', 'tweets', handle, '--limit', String(limit), '--format', 'json'];
   if (topEng > 0) args.push('--top-by-engagement', String(topEng));
   const cmd = args.join(' ');
   log('  opencli: ' + cmd);
-  const result = execSync(cmd, {
-    timeout: 30000, maxBuffer: 10 * 1024 * 1024, encoding: 'utf-8',
+  return new Promise((resolve, reject) => {
+    activeOpenCLIProcess = exec(cmd, {
+      timeout: 30000, maxBuffer: 10 * 1024 * 1024, encoding: 'utf-8',
+    }, (err, stdout, stderr) => {
+      activeOpenCLIProcess = null;
+      if (err) {
+        err.stdout = stdout;
+        err.stderr = stderr;
+        reject(err);
+        return;
+      }
+      try {
+        const data = JSON.parse(stdout);
+        resolve(Array.isArray(data) ? data : (data.tweets || data.result || []));
+      } catch (e) {
+        reject(e);
+      }
+    });
   });
-  const data = JSON.parse(result);
-  return Array.isArray(data) ? data : (data.tweets || data.result || []);
 }
 
+// ── Tweet normalization ──────────────────────────────────────────────
 function normalizeTweet(t) {
   if (!t) return null;
   const isOpenCLI = typeof t.author === 'string';
@@ -132,7 +168,7 @@ function normalizeTweet(t) {
   };
 }
 
-// ─── Content ops (ported from src/content-ops.js) ───────────────────
+// ── Clustering & scoring (ported from src/content-ops.js) ────────────
 const CLUSTER_KEYS = [
   'telegram','telegram bot','tg bot','telegram mini app','ton','ton blockchain',
   'ai agent','ai agents','agent framework','agent sdk','agent api',
@@ -281,7 +317,11 @@ function buildHotspotFromCluster(cluster, opts) {
   };
 }
 
-// ─── Rate limiting ──────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════
+// 3. RUNTIME CONTROL – rate limiting, delays, graceful stop
+// ══════════════════════════════════════════════════════════════════════
+
+// ── Rate limiting ────────────────────────────────────────────────────
 let backoffUntil = 0;
 let consecutive429 = 0;
 
@@ -296,42 +336,184 @@ function applyBackoff(status) {
   return null;
 }
 
+// ── Delays ───────────────────────────────────────────────────────────
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Interruptible: checks stopRequested every second so admin stop is responsive
+async function interruptibleSleep(ms) {
+  const deadline = Date.now() + ms;
+  while (Date.now() < deadline) {
+    if (syncState.stopRequested) return;         // forward ref, safe – init'd before use
+    const chunk = Math.min(1000, deadline - Date.now());
+    await sleep(chunk);
+  }
+}
 
 function randomDelay() {
   return ENV.SYNC_DELAY_MIN + Math.floor(Math.random() * (ENV.SYNC_DELAY_MAX - ENV.SYNC_DELAY_MIN));
 }
 
-// ─── 24h cooldown cache (in-memory, survives across runs in same process) ──
+// ── Graceful stop ────────────────────────────────────────────────────
+// kill() the active opencli child process so stop takes effect immediately
+function stopActiveProcess() {
+  if (activeOpenCLIProcess) {
+    activeOpenCLIProcess.kill('SIGTERM');
+    log('已终止当前 OpenCLI 进程');
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// 4. STATE PERSISTENCE – cooldown, checkpoint, live syncState
+// ══════════════════════════════════════════════════════════════════════
+
+// ── 4a. Cooldown cache (24h per-source dedup, disk-backed) ───────────
+//      Prevents the daily cron from re-syncing a source that was already
+//      synced today.  Manual sync from sources.html bypasses this
+//      (it uses a separate /api/opencli/* code path).
+const COOLDOWN_PATH = ROOT + '/.sync_cooldown.json';
 const lastSyncCache = new Map();
 
-// ─── Sync one source ────────────────────────────────────────────────
+(function loadCooldowns() {
+  try {
+    if (existsSync(COOLDOWN_PATH)) {
+      const raw = readFileSync(COOLDOWN_PATH, 'utf-8');
+      const data = JSON.parse(raw);
+      for (const [k, v] of Object.entries(data)) {
+        lastSyncCache.set(k, v);
+      }
+      if (lastSyncCache.size > 0) log('加载冷却记录: ' + lastSyncCache.size + ' 个源');
+    }
+  } catch {}
+})();
+
+function saveCooldowns() {
+  try {
+    const obj = {};
+    const cutoff = Date.now() - 24 * 3600e3;
+    for (const [k, v] of lastSyncCache) {
+      if (v > cutoff) obj[k] = v;             // prune expired entries
+    }
+    writeFileSync(COOLDOWN_PATH, JSON.stringify(obj, null, 2));
+  } catch (e) {
+    log('保存冷却文件失败: ' + e.message);
+  }
+}
+
+// ── 4b. Checkpoint (in-run progress, survives crashes/restarts) ──────
+//      Written after each source completes.  Cleared only when ALL
+//      sources in the batch finish naturally (not stopped / backoff).
+const CHECKPOINT_PATH = ROOT + '/.sync_checkpoint.json';
+
+function loadCheckpoint() {
+  try {
+    if (existsSync(CHECKPOINT_PATH)) {
+      const raw = readFileSync(CHECKPOINT_PATH, 'utf-8');
+      return JSON.parse(raw);
+    }
+  } catch (e) {
+    log('读取断点文件失败: ' + e.message);
+  }
+  return null;
+}
+
+function saveCheckpoint() {
+  try {
+    const doneHandles = syncState.entries
+      .filter(e => e.status === 'ok' || e.status === 'failed' ||
+        (e.status === 'skipped' && e.error !== 'stopped' && e.error !== 'backoff'))
+      .map(e => ({ handle: e.handle, status: e.status, time: e.time || 0, note: e.note || '' }));
+    writeFileSync(CHECKPOINT_PATH, JSON.stringify({
+      done: doneHandles,
+      updatedAt: Date.now(),
+    }, null, 2));
+  } catch (e) {
+    log('写断点文件失败: ' + e.message);
+  }
+}
+
+function clearCheckpoint() {
+  try { if (existsSync(CHECKPOINT_PATH)) unlinkSync(CHECKPOINT_PATH); } catch {}
+}
+
+// ── 4c. Live sync state (polled by admin page & sync-admin.html) ────
+//      done / failed / skipped are getters computed from entries[] —
+//      entries is the single source of truth, no manual counters.
+const syncState = {
+  running: false,
+  stopRequested: false,
+  current: null,
+  total: 0,
+  entries: [],
+  logs: [],
+  startTime: null,
+
+  get done()    { return this.entries.filter(e => e.status === 'ok').length; },
+  get failed()  { return this.entries.filter(e => e.status === 'failed').length; },
+  get skipped() { return this.entries.filter(e => e.status === 'skipped').length; },
+};
+
+function resetSyncState(queue) {
+  syncState.running = true;
+  syncState.stopRequested = false;
+  syncState.current = null;
+  syncState.total = queue.length;
+  syncState.entries = queue.map(s => ({
+    handle: s.handle.replace(/^@/, ''),
+    sourceId: s.id,
+    status: 'pending',
+  }));
+  syncState.startTime = Date.now();
+}
+
+function stopSync() {
+  syncState.stopRequested = true;
+  stopActiveProcess();
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// 5. SYNC LOGIC – per-source & main loop
+// ══════════════════════════════════════════════════════════════════════
+
+// ── Concurrency guard ────────────────────────────────────────────────
+let syncing = false;
+
+// ── Sync one source ──────────────────────────────────────────────────
+//    fetch → normalize → cluster → score → filter → upsert → metrics
 async function syncOneSource(source, retriesLeft) {
   const handle = source.handle.replace(/^@/, '');
   const sourceId = source.id;
 
-  // Check cooldown
+  // Cooldown check (24h, disk-persisted)
   const lastSync = lastSyncCache.get(sourceId) || 0;
   if (Date.now() - lastSync < 24 * 3600e3) {
     log('  SKIP @' + handle + ' — 24h 内已同步');
-    return { status: 'skipped', reason: 'cooldown' };
+    return { status: 'skipped', reason: 'cooldown', note: '24h 内已同步' };
   }
 
+  // Global backoff check
   if (isInBackoff()) {
     const remain = Math.ceil((backoffUntil - Date.now()) / 60e3);
     log('  SKIP @' + handle + ' — 全局限流退避中 (~' + remain + 'min)');
-    return { status: 'skipped', reason: 'backoff' };
+    return { status: 'skipped', reason: 'backoff', note: '限流退避中' };
   }
 
   log('  SYNC @' + handle + ' (重试剩余 ' + retriesLeft + ' 次)');
 
+  // Fetch tweets
   let tweets = [];
   try {
-    tweets = opencliTweets(handle, ENV.SYNC_FETCH_LIMIT, ENV.SYNC_TOP_ENGAGEMENT);
+    tweets = await opencliTweets(handle, ENV.SYNC_FETCH_LIMIT, ENV.SYNC_TOP_ENGAGEMENT);
     consecutive429 = 0;
+    if (syncState.stopRequested) {
+      log('  STOP @' + handle + ' — 收到停止请求，跳过聚类入库');
+      return { status: 'skipped', reason: 'stopped', note: '收到停止请求' };
+    }
   } catch (e) {
+    if (syncState.stopRequested) {
+      log('  STOP @' + handle + ' — 收到停止请求');
+      return { status: 'skipped', reason: 'stopped', note: '收到停止请求' };
+    }
     const msg = e.stderr || e.stdout || e.message || '';
-    // Filter out Node.js warning noise
     const clean = String(msg)
       .replace(/^\(node:\d+\) \[UNDICI-EHPA\][^\n]*\n?/gm, '')
       .replace(/\(Use `node --trace-warnings.*?\)\n?/g, '')
@@ -342,26 +524,33 @@ async function syncOneSource(source, retriesLeft) {
 
     log('  FAIL @' + handle + ': ' + (clean || String(msg).trim()).slice(0, 100) + (backoffMsg ? ' — ' + backoffMsg : ''));
 
-    if (retriesLeft > 0 && !isInBackoff()) {
+    if (retriesLeft > 0 && !isInBackoff() && !syncState.stopRequested) {
       const waitMs = Math.min(60000, 5000 * Math.pow(2, ENV.SYNC_MAX_RETRIES - retriesLeft));
       log('  RETRY @' + handle + ' in ' + Math.round(waitMs / 1000) + 's…');
-      await sleep(waitMs);
+      await interruptibleSleep(waitMs);
+      if (syncState.stopRequested) {
+        log('  STOP @' + handle + ' — 收到停止请求，取消重试');
+        return { status: 'skipped', reason: 'stopped', note: '收到停止请求' };
+      }
       return syncOneSource(source, retriesLeft - 1);
     }
-    return { status: 'failed', error: String(msg).slice(0, 200) };
+    return { status: 'failed', error: String(msg).slice(0, 200), note: clean.slice(0, 60) };
   }
 
+  // Normalize
   const normalized = tweets.map(normalizeTweet).filter(Boolean);
   if (normalized.length === 0) {
     lastSyncCache.set(sourceId, Date.now());
+    saveCooldowns();
     log('  DONE @' + handle + ': 0 条推文 (可能沉默/保护)');
-    return { status: 'ok', tweets: 0, hotspots: 0 };
+    return { status: 'ok', tweets: 0, hotspots: 0, note: '0 条推文 (可能沉默/保护)' };
   }
 
-  // Record sync time
+  // Record cooldown
   lastSyncCache.set(sourceId, Date.now());
+  saveCooldowns();
 
-  // Cluster → score → filter → upsert hotspots
+  // Cluster → score → filter
   const CLUSTER_WINDOW_MS = 4 * 3600e3;
   const MIN_CLUSTER_SCORE = 0.10;
   const HOT_THRESHOLD = 0.35;
@@ -377,6 +566,7 @@ async function syncOneSource(source, retriesLeft) {
   }));
   const kept = candidates.filter(h => h.metrics.score >= MIN_CLUSTER_SCORE);
 
+  // Upsert hotspots
   let inserted = 0, errors = 0;
   for (const h of kept) {
     try {
@@ -427,7 +617,7 @@ async function syncOneSource(source, retriesLeft) {
     }
   }
 
-  // Update source metrics_4w (7-day window)
+  // Update source metrics (7-day window)
   try {
     const since = new Date(Date.now() - 7 * 24 * 3600e3).toISOString();
     const hsRes = await sb('hotspots?select=id,hot_signal,sources,created_at&created_at=gte.' + encodeURIComponent(since));
@@ -458,45 +648,12 @@ async function syncOneSource(source, retriesLeft) {
     log('    metrics update fail: ' + String(e.message).slice(0, 80));
   }
 
-  log('  DONE @' + handle + ': ' + normalized.length + ' 推 → ' + kept.length + ' 簇 (入库 ' + inserted + ', 失败 ' + errors + ')');
-  return { status: 'ok', tweets: normalized.length, hotspots: inserted, errors };
+  const doneNote = normalized.length + ' 推 → ' + kept.length + ' 簇 (入库 ' + inserted + ', 失败 ' + errors + ')';
+  log('  DONE @' + handle + ': ' + doneNote);
+  return { status: 'ok', tweets: normalized.length, hotspots: inserted, errors, note: doneNote };
 }
 
-// ─── Shared sync state (polled by admin page) ───────────────────────
-const syncState = {
-  running: false,
-  stopRequested: false,
-  queue: [],
-  current: null,
-  done: 0,
-  failed: 0,
-  skipped: 0,
-  total: 0,
-  entries: [],
-  startTime: null,
-};
-
-function resetSyncState(queue) {
-  syncState.running = true;
-  syncState.stopRequested = false;
-  syncState.queue = queue.map(s => ({ handle: s.handle.replace(/^@/, ''), sourceId: s.id }));
-  syncState.current = null;
-  syncState.done = 0;
-  syncState.failed = 0;
-  syncState.skipped = 0;
-  syncState.total = queue.length;
-  syncState.entries = syncState.queue.map(q => ({ handle: q.handle, status: 'pending' }));
-  syncState.startTime = Date.now();
-}
-
-function stopSync() {
-  syncState.stopRequested = true;
-}
-
-// ─── Concurrency guard ──────────────────────────────────────────────
-let syncing = false;
-
-// ─── Main sync run ──────────────────────────────────────────────────
+// ── Main sync run ────────────────────────────────────────────────────
 async function runSync() {
   if (!ENV.SUPABASE_URL || !ENV.SUPABASE_KEY) {
     log('SKIP: Supabase 未配置 (检查 .env)');
@@ -511,64 +668,86 @@ async function runSync() {
   syncing = true;
   log('=== 开始同步 ===');
 
-  let ok = 0, failed = 0, skipped = 0, sourcesTotal = 0;
+  let sourcesTotal = 0;
   try {
-    // 1. Load all non-retired twitter sources
+    // 1. Load sources from Supabase
     let sources = [];
     try {
       sources = await sbJSON('sources?select=id,handle,type,status,metrics_4w&type=eq.twitter&status=neq.retired&order=handle.asc');
       log('加载到 ' + (sources ? sources.length : 0) + ' 个 twitter 源');
     } catch (e) {
       log('加载源失败: ' + e.message);
+      syncing = false;
       syncState.running = false;
       return { ok: 0, failed: 0, skipped: 0, error: e.message };
     }
 
     if (!sources || sources.length === 0) {
       log('没有待同步的源');
+      syncing = false;
       syncState.running = false;
       return { ok: 0, failed: 0, skipped: 0 };
     }
 
     sourcesTotal = sources.length;
 
-    // 2. Truncate to batch max
+    // 2. Build queue (truncate + checkpoint filter)
     let queue = sources;
     if (queue.length > ENV.SYNC_BATCH_MAX) {
       queue = queue.slice(0, ENV.SYNC_BATCH_MAX);
       log('截断至 ' + queue.length + ' 个源 (上限 ' + ENV.SYNC_BATCH_MAX + ')');
     }
 
+    const cp = loadCheckpoint();
+    if (cp && cp.done && cp.done.length > 0) {
+      const doneSet = new Set(cp.done.map(d => d.handle));
+      const before = queue.length;
+      queue = queue.filter(s => !doneSet.has(s.handle.replace(/^@/, '')));
+      if (before !== queue.length) {
+        log('断点恢复: 跳过 ' + (before - queue.length) + ' 个已完成源, 剩余 ' + queue.length);
+      }
+    }
+
     resetSyncState(queue);
 
-    // 3. Sequential sync with delays
-    let done = 0;
+    // Show checkpoint history in admin page (skip temporary errors that will retry)
+    if (cp && cp.done && cp.done.length > 0) {
+      for (const d of cp.done) {
+        if (d.status === 'skipped' && (d.error === 'stopped' || d.error === 'backoff')) continue;
+        syncState.entries.unshift({ handle: d.handle, status: d.status, tweets: 0, hotspots: 0, time: d.time, note: d.note || '', error: '' });
+      }
+    }
+
+    // 3. Process queue sequentially
+    let seq = 0;
     for (const s of queue) {
+      // ── Stop check ──
       if (syncState.stopRequested) {
         log('收到停止请求, 终止同步');
-        syncState.queue.filter(q => q.status === 'pending').forEach(q => {
-          q.status = 'skipped'; q.error = 'stopped';
-        });
+        for (const e of syncState.entries) {
+          if (e.status === 'pending') { e.status = 'skipped'; e.error = 'stopped'; }
+        }
         break;
       }
 
-      done++;
-      log('[' + done + '/' + queue.length + '] ' + s.handle);
+      seq++;
+      log('[' + seq + '/' + queue.length + '] ' + s.handle);
 
       const handle = s.handle.replace(/^@/, '');
       syncState.current = handle;
-      const entry = syncState.entries.find(e => e.handle === handle);
+      const entry = syncState.entries.find(e => e.handle === handle && e.status === 'pending');
       if (entry) entry.status = 'running';
 
+      // ── Backoff check ──
       if (isInBackoff()) {
-        skipped = queue.length - done + 1;
-        for (const q of syncState.entries) {
-          if (q.status === 'pending') { q.status = 'skipped'; q.error = 'backoff'; }
+        for (const e of syncState.entries) {
+          if (e.status === 'pending' || e.status === 'running') { e.status = 'skipped'; e.error = 'backoff'; }
         }
-        log('触发全局限流, 剩余 ' + skipped + ' 个源跳过');
+        log('触发全局限流, 剩余 ' + (queue.length - seq + 1) + ' 个源跳过');
         break;
       }
 
+      // ── Process source ──
       const t0 = Date.now();
       const result = await syncOneSource(s, ENV.SYNC_MAX_RETRIES);
       if (entry) {
@@ -576,34 +755,41 @@ async function runSync() {
         entry.tweets = result.tweets || 0;
         entry.hotspots = result.hotspots || 0;
         entry.error = result.error || '';
+        entry.note = result.note || result.reason || result.error || '';
         entry.time = Date.now() - t0;
       }
 
-      if (result.status === 'ok') ok++;
-      else if (result.status === 'failed') failed++;
-      else skipped++;
+      saveCheckpoint();
 
-      syncState.done = ok;
-      syncState.failed = failed;
-      syncState.skipped = skipped + (syncState.entries.filter(e => e.status === 'skipped' && !e.error).length || 0);
-      // recalc skipped: all non-ok non-failed in entries
-      syncState.skipped = syncState.entries.filter(e => e.status !== 'ok' && e.status !== 'failed' && e.status !== 'pending' && e.status !== 'running').length;
-
-      // Inter-source delay (skip after last, skip if stopped)
-      if (done < queue.length && !isInBackoff() && !syncState.stopRequested) {
+      // ── Inter-source delay ──
+      if (seq < queue.length && !isInBackoff() && !syncState.stopRequested) {
         const delay = randomDelay();
         log('  等待 ' + Math.round(delay / 1000) + 's…');
-        await sleep(delay);
+        await interruptibleSleep(delay);
       }
     }
 
+    // 4. Cleanup
     syncState.current = null;
     syncState.running = false;
-    log('=== 同步完成: ' + ok + ' 成功, ' + failed + ' 失败, ' + skipped + ' 跳过 ===');
-    return { ok, failed, skipped: syncState.skipped, sources_total: sourcesTotal };
+
+    const wasStopped = syncState.stopRequested;
+    const hasPending = syncState.entries.some(e => e.status === 'pending');
+    if (!wasStopped && !hasPending) {
+      clearCheckpoint();               // all done — clean start next time
+    } else {
+      saveCheckpoint();                // interrupted — resume next time
+    }
+
+    log('=== 同步完成: ' + syncState.done + ' 成功, ' + syncState.failed + ' 失败, ' + syncState.skipped + ' 跳过 ===');
+    return { ok: syncState.done, failed: syncState.failed, skipped: syncState.skipped, sources_total: sourcesTotal };
   } finally {
     syncing = false;
   }
 }
+
+// ══════════════════════════════════════════════════════════════════════
+// 6. EXPORTS
+// ══════════════════════════════════════════════════════════════════════
 
 export { runSync, syncState, stopSync };

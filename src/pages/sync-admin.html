@@ -32,13 +32,17 @@
 .prog-current{font-size:11px;color:var(--color-text-tertiary);margin-top:4px}
 
 .log-table{width:100%;border-collapse:collapse;font-size:12px}
-.log-table th{text-align:left;padding:6px 8px;border-bottom:0.5px solid var(--color-border-secondary);font-size:11px;color:var(--color-text-tertiary);font-weight:500}
+.log-table th{text-align:left;padding:6px 8px;border-bottom:0.5px solid var(--color-border-secondary);font-size:11px;color:var(--color-text-tertiary);font-weight:500;position:sticky;top:0;background:var(--color-background-primary);z-index:1}
 .log-table td{padding:5px 8px;border-bottom:0.5px solid var(--color-border-tertiary)}
 .log-table .st-ok{color:#2DA44E}
 .log-table .st-fail{color:#CF222E}
 .log-table .st-skip{color:var(--color-text-tertiary)}
 .log-table .st-run{color:#534AB7;font-weight:500}
 .log-table .st-pend{color:var(--color-text-tertiary)}
+.log-table tr.row-run td{background:#F5F3FF;font-size:13px}
+.log-table tr.row-summary td{font-size:11px;color:var(--color-text-tertiary);text-align:center;padding:6px}
+summary.run-log{cursor:pointer;font-size:11px;color:var(--color-text-tertiary);padding:4px 0}
+summary.run-log:hover{color:var(--color-text-primary)}
 </style>
 </head>
 <body>
@@ -93,11 +97,17 @@
 <div class="card" style="padding:14px 16px;margin-top:14px">
   <div class="card-head" style="margin-bottom:10px"><span class="card-title">执行日志</span></div>
   <div id="log-wrap" style="max-height:480px;overflow-y:auto">
+    <div id="log-summary" style="display:none;margin-bottom:8px;font-size:12px;padding:6px 10px;background:var(--color-background-secondary);border-radius:4px"></div>
     <table class="log-table">
-      <thead><tr><th>账号</th><th>状态</th><th>推文</th><th>热点</th><th>耗时</th><th>备注</th></tr></thead>
-      <tbody id="log-tbody"><tr><td colspan="6" style="text-align:center;padding:16px;color:var(--color-text-tertiary)">等待同步…</td></tr></tbody>
+      <thead><tr><th>账号</th><th>状态</th><th>备注</th></tr></thead>
+      <tbody id="log-tbody"><tr><td colspan="3" style="text-align:center;padding:16px;color:var(--color-text-tertiary)">等待同步…</td></tr></tbody>
     </table>
   </div>
+</div>
+
+<div class="card" style="padding:14px 16px;margin-top:14px">
+  <div class="card-head" style="margin-bottom:10px"><span class="card-title">控制台日志</span></div>
+  <div id="console-log" style="max-height:300px;overflow-y:auto;background:#1a1a2e;color:#a0ffa0;font-family:Menlo,monospace;font-size:11px;padding:10px;border-radius:var(--border-radius-md);white-space:pre-wrap;word-break:break-all"></div>
 </div>
 
 </main>
@@ -106,6 +116,7 @@
 <script>
 (function() {
 var pollTimer = null;
+var fastPoll = false;
 
 function $(id) { return document.getElementById(id); }
 
@@ -137,16 +148,34 @@ window.checkEnv = async function() {
 
 function pollStatus() {
   fetch('/api/sync/status').then(function(r){return r.json()}).then(function(s){
-    if (!s.running && !pollTimer) return; // not started
     renderProgress(s);
     renderLog(s.entries);
-    if (!s.running) {
-      clearInterval(pollTimer);
-      pollTimer = null;
-      $('btn-start').disabled = false;
+    renderConsole(s.logs);
+
+    if (s.running) {
+      // Sync is running — ensure fast polling and correct buttons
+      if (!fastPoll) {
+        fastPoll = true;
+        clearInterval(pollTimer);
+        pollTimer = setInterval(pollStatus, 1500);
+      }
+      $('btn-start').disabled = true;
+      $('btn-stop').disabled = false;
+      $('btn-retry').disabled = true;
+    } else {
+      // Sync is idle — slow polling, enable start
+      if (fastPoll) {
+        fastPoll = false;
+        clearInterval(pollTimer);
+        pollTimer = setInterval(pollStatus, 3000);
+      }
+      $('btn-start').disabled = !!(window._envOk);
       $('btn-stop').disabled = true;
-      if (s.entries.some(function(e){return e.status==='failed'})) {
+      $('btn-stop').textContent = '⏹ 停止';
+      if (s.entries && s.entries.some(function(e){return e.status==='failed'})) {
         $('btn-retry').disabled = false;
+      } else {
+        $('btn-retry').disabled = true;
       }
     }
   }).catch(function(){});
@@ -167,35 +196,89 @@ function renderProgress(s) {
 }
 
 function renderLog(entries) {
-  if (!entries || !entries.length) return;
-  var rows = entries.map(function(e){
-    var cls = 'st-' + ({ok:'ok',failed:'fail',skipped:'skip',running:'run',pending:'pend'}[e.status]||'pend');
-    var statusLabel = {ok:'成功',failed:'失败',skipped:'跳过',running:'进行中',pending:'等待'}[e.status]||e.status;
-    var timeStr = e.time ? (e.time > 1000 ? Math.round(e.time/1000)+'s' : e.time+'ms') : '';
-    var errStr = e.error ? e.error.slice(0,60) : '';
-    return '<tr><td>@' + e.handle + '</td><td class="'+cls+'">'+statusLabel+'</td><td>'+(e.tweets||'')+'</td><td>'+(e.hotspots||'')+'</td><td>'+timeStr+'</td><td style="font-size:10px;color:var(--color-text-tertiary)">'+errStr+'</td></tr>';
-  }).reverse().join('');
-  $('log-tbody').innerHTML = rows;
+  if (!entries || !entries.length) {
+    $('log-summary').style.display = 'none';
+    $('log-tbody').innerHTML = '<tr><td colspan="3" style="text-align:center;padding:16px;color:var(--color-text-tertiary)">等待同步…</td></tr>';
+    return;
+  }
+  var done=[],running=[],pending=[],failed=[];
+  for (var i=0;i<entries.length;i++) {
+    var e=entries[i];
+    if (e.status==='pending') pending.push(e);
+    else if (e.status==='running') running.push(e);
+    else if (e.status==='failed') failed.push(e);
+    else done.push(e);
+  }
+
+  // ── Summary bar ──
+  var summary = [];
+  if (running.length) summary.push('⏳ <b>'+running.length+'</b> 进行中');
+  summary.push('✅ <b>'+countBy(done,'ok')+'</b> 成功');
+  if (failed.length) summary.push('❌ <b style=\"color:#CF222E\">'+failed.length+'</b> 失败');
+  summary.push('⬜ <b>'+countBy(done,'skipped')+'</b> 跳过');
+  if (pending.length) summary.push('📋 <b>'+pending.length+'</b> 排队');
+  $('log-summary').innerHTML = summary.join(' &nbsp;|&nbsp; ');
+  $('log-summary').style.display = 'block';
+
+  var rows='';
+
+  // ── 1. Running (always first, highlighted) ──
+  for (var i=0;i<running.length;i++) {
+    var r=running[i];
+    rows+='<tr class="row-run"><td>@'+r.handle+'</td><td class="st-run">⏳ 进行中</td><td style="font-size:12px;color:#534AB7">抓取中…</td></tr>';
+  }
+
+  // ── 2. Failed (always visible) ──
+  for (var i=failed.length-1;i>=0;i--) {
+    var e=failed[i];
+    var note=e.note||e.error||'';
+    rows+='<tr><td>@'+e.handle+'</td><td class="st-fail">失败</td><td style="font-size:10px;color:#CF222E">'+note.slice(0,80)+'</td></tr>';
+  }
+
+  // ── 3. Done — collapsible ──
+  if (done.length) {
+    var wasOpen = true; // default open
+    var oldDetails = document.getElementById('run-done-details');
+    if (oldDetails) wasOpen = oldDetails.open;
+    rows+='<tr><td colspan="3"><details class="run-log" id="run-done-details"'+(wasOpen?' open':'')+'><summary>已完成: '+done.length+' 个源</summary><table class="log-table" style="margin-top:4px">';
+    for (var i=done.length-1;i>=0;i--) {
+      var e=done[i];
+      var cls='st-'+(e.status==='ok'?'ok':'skip');
+      var label=e.status==='ok'?'成功':'跳过';
+      var note=e.note||'';
+      rows+='<tr><td>@'+e.handle+'</td><td class="'+cls+'">'+label+'</td><td style="font-size:10px;color:var(--color-text-tertiary)">'+note+'</td></tr>';
+    }
+    rows+='</table></details></td></tr>';
+  }
+
+  $('log-tbody').innerHTML = rows || '<tr><td colspan="3" style="text-align:center;padding:16px;color:var(--color-text-tertiary)">—</td></tr>';
+}
+function countBy(a,s){var n=0;for(var i=0;i<a.length;i++) if(a[i].status===s) n++;return n}
+
+function renderConsole(logs) {
+  if (!logs || !logs.length) { $('console-log').textContent = '(等待日志…)'; return; }
+  $('console-log').textContent = logs.join('\n');
+  $('console-log').scrollTop = $('console-log').scrollHeight;
 }
 
 window.startSync = async function() {
   $('btn-start').disabled = true;
   $('btn-retry').disabled = true;
   $('btn-stop').disabled = false;
-  $('log-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:16px;color:var(--color-text-tertiary)">开始同步…</td></tr>';
+  $('log-tbody').innerHTML = '<tr><td colspan="3" style="text-align:center;padding:16px;color:var(--color-text-tertiary)">开始同步…</td></tr>';
   try {
     var r = await fetch('/api/sync', { method: 'POST' });
-    if (r.ok) {
-      pollTimer = setInterval(pollStatus, 1500);
-      pollStatus();
-    } else {
-      var d = await r.json();
-      $('log-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:16px;color:#CF222E">启动失败: ' + (d.error||'') + '</td></tr>';
+    var d = await r.json().catch(function(){return {};});
+    if (d.error && d.error.indexOf('已有同步') >= 0) {
+      // Sync already running — the background poll will pick it up
+      $('log-tbody').innerHTML = '<tr><td colspan="3" style="text-align:center;padding:16px;color:var(--color-text-tertiary)">同步已在运行中，已连接…</td></tr>';
+    } else if (!r.ok) {
+      $('log-tbody').innerHTML = '<tr><td colspan="3" style="text-align:center;padding:16px;color:#CF222E">启动失败: ' + (d.error||'') + '</td></tr>';
       $('btn-start').disabled = false;
       $('btn-stop').disabled = true;
     }
   } catch(e) {
-    $('log-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:16px;color:#CF222E">请求失败: ' + e.message + '</td></tr>';
+    $('log-tbody').innerHTML = '<tr><td colspan="3" style="text-align:center;padding:16px;color:#CF222E">请求失败: ' + e.message + '</td></tr>';
     $('btn-start').disabled = false;
     $('btn-stop').disabled = true;
   }
@@ -203,26 +286,29 @@ window.startSync = async function() {
 
 window.stopSync = async function() {
   $('btn-stop').disabled = true;
-  await fetch('/api/sync/stop', { method: 'POST' });
+  $('btn-stop').textContent = '⏳ 停止中…';
+  try {
+    await fetch('/api/sync/stop', { method: 'POST' });
+  } catch(e) {}
+  // pollStatus will re-enable start / disable stop when state updates
 };
 
 window.retryFailed = async function() {
   $('btn-start').disabled = true;
   $('btn-retry').disabled = true;
   $('btn-stop').disabled = false;
-  // Use POST /api/sync — the 24h cooldown prevents re-sync of ok entries anyway.
-  // For true retry-only-failed, we'd need a new endpoint. Simple approach: restart.
   try {
-    var r = await fetch('/api/sync', { method: 'POST' });
-    if (r.ok) {
-      pollTimer = setInterval(pollStatus, 1500);
-      pollStatus();
-    }
+    await fetch('/api/sync', { method: 'POST' });
   } catch(e) {}
 };
 
 // Init
-checkEnv();
+checkEnv().then(function() {
+  window._envOk = true;
+});
+// Permanent background poll: fast (1.5s) when running, slow (5s) when idle
+pollTimer = setInterval(pollStatus, 3000);
+pollStatus();
 })();
 </script>
 <script>

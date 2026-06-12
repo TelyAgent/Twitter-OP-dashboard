@@ -192,7 +192,18 @@ createServer(async (req, res) => {
   // /api/sync/status — poll current sync state
   if (path === '/api/sync/status' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(syncState));
+    res.end(JSON.stringify({
+      running: syncState.running,
+      stopRequested: syncState.stopRequested,
+      current: syncState.current,
+      total: syncState.total,
+      done: syncState.done,
+      failed: syncState.failed,
+      skipped: syncState.skipped,
+      entries: syncState.entries,
+      logs: syncState.logs,
+      startTime: syncState.startTime,
+    }));
     return;
   }
 

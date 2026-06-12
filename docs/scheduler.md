@@ -10,8 +10,11 @@ serve.js
   ├─ POST /api/sync        → runSync()
   ├─ GET  /api/sync/status  → syncState (轮询)
   ├─ GET  /api/sync/env     → 环境检测
-  ├─ POST /api/sync/stop    → stopSync()
-  └─ 定时器 (每日 SYNC_HOUR + 启动后 30s)
+  └─ POST /api/sync/stop    → stopSync()
+
+crontab（系统定时，见下文「crontab 配置」）
+  ├─ 凌晨 2:00 → curl POST /api/sync（同步）
+  └─ 每 5 分钟  → curl /api/sync/env（保活）
 
 sync-admin.html  ←→  /api/sync/status  (1.5s 轮询)
                        /api/sync/stop
@@ -145,6 +148,30 @@ SYNC_DELAY_MAX=25000     # 源间最大延迟 ms, 默认 25000
 | `src/content-ops.js` | 浏览器端原始实现，scheduler.js 内联移植了核心逻辑 |
 | `.sync_cooldown.json` | 冷却记录（自动生成，gitignore） |
 | `.sync_checkpoint.json` | 断点文件（自动生成，gitignore） |
+
+## crontab 配置
+
+服务端未内置定时器，通过系统 crontab 实现自动同步和服务保活。
+
+```bash
+# ── 当前配置 ──
+crontab -l
+# 0 2 * * * curl -sf http://localhost:8080/api/sync/env ... && curl -X POST http://localhost:8080/api/sync
+# */5 * * * * curl -sf http://localhost:8080/api/sync/env ... || nohup node src/serve.js ...
+
+# ── 编辑 ──
+crontab -e
+
+# ── 格式说明 ──
+# 分 时 日 月 周
+# 0  2  *  *  *   = 每天凌晨 2:00
+# */5 *  *  *  *   = 每 5 分钟
+```
+
+| 规则 | 定时 | 作用 |
+|------|------|------|
+| 同步任务 | 每日 02:00 | `curl POST /api/sync`，先检查服务在线 |
+| 保活检查 | 每 5 分钟 | `curl /api/sync/env`，不通则 `nohup node src/serve.js` |
 
 ## 相关文档
 
